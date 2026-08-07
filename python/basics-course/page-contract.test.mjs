@@ -22,8 +22,17 @@ test('课程页面固定加载本地数据与版本化浏览器依赖', () => {
   assert.match(html, /marked@18\.0\.9/);
   assert.match(html, /dompurify@3\.4\.13/);
   assert.match(html, /runner\.js/);
+  assert.match(html, /runner-adapter\.js/);
   assert.match(html, /store\.js/);
   assert.match(html, /app\.js/);
+});
+
+test('运行器适配器在页面编排脚本之前加载', () => {
+  const runnerPosition = html.indexOf('runner.js');
+  const adapterPosition = html.indexOf('runner-adapter.js');
+  const appPosition = html.indexOf('app.js');
+  assert.ok(runnerPosition >= 0 && runnerPosition < adapterPosition);
+  assert.ok(adapterPosition < appPosition);
 });
 
 test('页面编排使用课程数据、Markdown 清理和本地进度', () => {

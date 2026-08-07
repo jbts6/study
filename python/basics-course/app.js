@@ -10,7 +10,7 @@
   let courseData = null;
   let appState = { ...defaultState };
   let progressStore = null;
-  let pythonRunner = null;
+  let runnerAdapter = null;
 
   const byId = (id) => document.getElementById(id);
 
@@ -226,25 +226,13 @@
     showStorageStatus();
   }
 
-  async function runCode(editor, output, button) {
-    if (!pythonRunner || typeof pythonRunner.run !== 'function') {
+  function runCode(editor, output, button) {
+    if (!runnerAdapter || typeof runnerAdapter.run !== 'function') {
       output.className = 'code-output is-error';
       output.textContent = 'Python 运行器尚未加载，等待 Task 3 提供 runner.js。';
       return;
     }
-    button.disabled = true;
-    output.className = 'code-output is-running';
-    output.textContent = '运行中…';
-    try {
-      const result = await pythonRunner.run(editor.value);
-      output.className = result?.ok ? 'code-output is-success' : 'code-output is-error';
-      output.textContent = result?.ok ? (result.output || '（无输出）') : (result?.error || result?.output || '代码运行失败。');
-    } catch (error) {
-      output.className = 'code-output is-error';
-      output.textContent = `代码运行失败：${error?.message || String(error)}`;
-    } finally {
-      button.disabled = false;
-    }
+    return runnerAdapter.run(editor, output, button);
   }
 
   function closeSidebar() {
@@ -260,20 +248,12 @@
     byId('menuButton')?.setAttribute('aria-expanded', String(Boolean(isOpen)));
   }
 
-  async function initializeRunner() {
-    try {
-      const factory = global.createPythonRunner || global.PythonCourseRunner?.createPythonRunner;
-      pythonRunner = typeof factory === 'function' ? factory({ loadPyodide: global.loadPyodide, document }) : null;
-      if (!pythonRunner || typeof pythonRunner.init !== 'function') {
-        setRuntimeStatus('运行器待 Task 3 接入', 'idle');
-        return;
-      }
-      setRuntimeStatus('正在加载 Python 运行时…', 'loading');
-      await pythonRunner.init();
-      setRuntimeStatus('Python 已就绪', 'ready');
-    } catch (error) {
-      setRuntimeStatus(`Python 加载失败：${error?.message || String(error)}`, 'error');
-    }
+  function initializeRunner() {
+    const factory = global.PythonCourseRunnerAdapter?.createRunnerAdapter;
+    runnerAdapter = typeof factory === 'function'
+      ? factory({ global, document, setRuntimeStatus })
+      : null;
+    runnerAdapter?.initialize();
   }
 
   function boot() {
@@ -293,6 +273,7 @@
     } else {
       const initial = courseData.lessons.find((lesson) => lesson.day === appState.currentDay) || courseData.lessons[0];
       appState = progressStore?.setCurrentDay(initial.day) || { ...appState, currentDay: initial.day };
+      showStorageStatus();
       renderNav();
       renderLesson(initial, appState);
     }
