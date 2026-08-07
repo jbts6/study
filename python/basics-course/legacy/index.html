@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python 基础交互课程 · 写给前端开发者</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2128;
+    --border: #30363d;
+    --border-dim: #21262d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-faint: #6e7681;
+    --accent: #58a6ff;
+    --py-blue: #3776ab;
+    --py-yellow: #ffd43b;
+    --analogy: #f0883e;
+    --code-bg: #010409;
+    --success: #3fb950;
+    --error: #f85149;
+    --mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, 'Liberation Mono', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* 顶部栏 */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 20px; height: 56px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; white-space: nowrap; }
+  .logo .py-mark {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--py-blue), var(--py-yellow));
+    display: grid; place-items: center; font-family: var(--mono); font-weight: 700; color: #fff; font-size: 15px;
+  }
+  .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }
+  .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); transition: background .3s; }
+  .status .dot.ready { background: var(--success); }
+  .status .dot.loading { background: var(--py-yellow); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .progress-wrap { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .progress-bar { width: 120px; height: 6px; background: var(--border-dim); border-radius: 3px; overflow: hidden; }
+  .progress-bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s ease; border-radius: 3px; }
+  .progress-text { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .menu-btn { display: none; background: none; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 16px; }
+
+  /* 布局 */
+  .layout { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 56px); }
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+    overflow-y: auto;
+    position: sticky; top: 56px;
+    height: calc(100vh - 56px);
+  }
+  .sidebar h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-faint); padding: 0 20px; margin-bottom: 8px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 20px; cursor: pointer; font-size: 14px; color: var(--text-dim);
+    border-left: 2px solid transparent; transition: all .15s;
+  }
+  .nav-item:hover { background: var(--panel-2); color: var(--text); }
+  .nav-item.active { color: var(--text); background: var(--panel-2); border-left-color: var(--accent); }
+  .nav-item .num { font-family: var(--mono); font-size: 12px; color: var(--text-faint); width: 22px; }
+  .nav-item.active .num { color: var(--accent); }
+  .nav-item .check { margin-left: auto; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); display: grid; place-items: center; flex-shrink: 0; }
+  .nav-item.done .check { background: var(--success); border-color: var(--success); }
+  .nav-item.done .check::after { content: ''; width: 8px; height: 4px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(-45deg) translateY(-1px); }
+
+  /* 主内容 */
+  .main { padding: 40px 48px 120px; max-width: 880px; }
+  .lesson-num { font-family: var(--mono); font-size: 13px; color: var(--accent); margin-bottom: 8px; }
+  .main h1 { font-size: 30px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 6px; }
+  .main .subtitle { color: var(--text-dim); font-size: 15px; margin-bottom: 28px; }
+  .main h2 { font-size: 20px; font-weight: 600; margin: 32px 0 12px; }
+  .main p { margin-bottom: 14px; color: #c9d1d9; }
+  .main ul, .main ol { margin: 0 0 14px 22px; color: #c9d1d9; }
+  .main li { margin-bottom: 6px; }
+  .main code { font-family: var(--mono); font-size: 13px; background: var(--panel-2); padding: 2px 6px; border-radius: 4px; color: var(--py-yellow); }
+  .main strong { color: var(--text); font-weight: 600; }
+
+  /* 前端类比卡片 */
+  .analogy {
+    background: var(--panel-2);
+    border: 1px solid var(--analogy);
+    border-left: 3px solid var(--analogy);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px 0;
+  }
+  .analogy .tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--analogy); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .analogy .tag::before { content: ''; width: 14px; height: 14px; border-radius: 3px; background: var(--analogy); opacity: .9; }
+  .analogy table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .analogy th { text-align: left; padding: 6px 10px; color: var(--text-dim); font-weight: 500; border-bottom: 1px solid var(--border); }
+  .analogy td { padding: 7px 10px; border-bottom: 1px solid var(--border-dim); font-family: var(--mono); }
+  .analogy td:last-child { color: var(--text-dim); }
+  .analogy tr:last-child td { border-bottom: none; }
+
+  /* 代码块 */
+  .code-block { margin: 20px 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--code-bg); }
+  .code-block .code-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .code-block .code-head .label { font-size: 12px; color: var(--text-dim); font-family: var(--mono); }
+  .code-block .code-head .run-btn { background: var(--accent); color: #fff; border: none; border-radius: 5px; padding: 5px 14px; font-size: 13px; cursor: pointer; font-family: var(--sans); display: flex; align-items: center; gap: 6px; transition: opacity .15s; }
+  .code-block .code-head .run-btn:hover { opacity: .88; }
+  .code-block .code-head .run-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .code-block .code-head .run-btn .play { width: 0; height: 0; border-left: 7px solid #fff; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+  .code-block textarea {
+    width: 100%; min-height: 160px; padding: 14px 16px; border: none; background: var(--code-bg);
+    color: #c9d1d9; font-family: var(--mono); font-size: 13.5px; line-height: 1.65; resize: none; outline: none; tab-size: 4; white-space: pre; overflow: hidden;
+  }
+  .code-block .output { padding: 12px 16px; background: var(--code-bg); border-top: 1px solid var(--border); font-family: var(--mono); font-size: 13px; color: var(--text-dim); white-space: pre-wrap; word-break: break-word; min-height: 20px; }
+  .code-block .output.empty::before { content: '点击运行查看输出…'; color: var(--text-faint); font-style: italic; }
+  .code-block .output.err { color: var(--error); }
+
+  /* 练习 */
+  .exercise { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px 22px; margin: 24px 0; }
+  .exercise .ex-head { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--success); margin-bottom: 10px; }
+  .exercise .ex-prompt { margin-bottom: 14px; color: #c9d1d9; }
+  .exercise .ex-hint { font-size: 13px; color: var(--text-dim); margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+
+  /* 完成按钮 + 翻页 */
+  .lesson-foot { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .done-btn { background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 6px; padding: 8px 18px; cursor: pointer; font-size: 14px; transition: all .15s; }
+  .done-btn:hover { border-color: var(--success); color: var(--success); }
+  .done-btn.checked { background: var(--success); border-color: var(--success); color: #fff; }
+  .pager { margin-left: auto; display: flex; gap: 8px; }
+  .pager button { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 14px; transition: all .15s; }
+  .pager button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .pager button:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* 加载遮罩 */
+  .loader-overlay { position: fixed; inset: 0; background: rgba(13,17,23,.92); z-index: 100; display: grid; place-items: center; transition: opacity .4s; }
+  .loader-overlay.hide { opacity: 0; pointer-events: none; }
+  .loader-box { text-align: center; max-width: 360px; }
+  .loader-box .spinner { width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--py-yellow); border-radius: 50%; margin: 0 auto 20px; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader-box h3 { font-size: 17px; margin-bottom: 8px; }
+  .loader-box p { color: var(--text-dim); font-size: 14px; }
+
+  /* 移动端 */
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: fixed; left: 0; top: 56px; width: 280px; z-index: 40; transform: translateX(-100%); transition: transform .25s; }
+    .sidebar.open { transform: translateX(0); }
+    .menu-btn { display: block; }
+    .main { padding: 24px 18px 100px; }
+    .progress-wrap { display: none; }
+    .topbar { gap: 10px; padding: 0 14px; }
+  }
+  .backdrop { display: none; position: fixed; inset: 56px 0 0 0; background: rgba(0,0,0,.5); z-index: 39; }
+  .backdrop.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <button class="menu-btn" id="menuBtn">☰</button>
+  <div class="logo"><div class="py-mark">py</div> Python 基础交互课程</div>
+  <div class="status"><span class="dot loading" id="pyDot"></span><span id="pyStatus">加载 Python 运行时…</span></div>
+  <div class="progress-wrap">
+    <div class="progress-bar"><i id="progBar"></i></div>
+    <span class="progress-text" id="progText">0 / 11</span>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <h4>课程章节</h4>
+    <div id="navList"></div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+  <main class="main" id="main"></main>
+</div>
+
+<div class="loader-overlay" id="loader">
+  <div class="loader-box">
+    <div class="spinner"></div>
+    <h3>正在加载 Python 运行时</h3>
+    <p>首次加载约需 10-20 秒（下载 Pyodide 解释器），之后可在浏览器内直接运行所有 Python 代码。</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+<script>
+/* ============================================================
+   章节数据 —— 每章含讲解、前端类比、可运行示例、练习
+   ============================================================ */
+const LESSONS = [
+  {
+    id: 1, title: "变量与数据类型", subtitle: "Python 的基础类型，与 JS 的关键差异",
+    body: `
+<p>Python 是<strong>动态类型</strong>语言，跟 JavaScript 一样变量无需声明类型。但 Python 的类型系统更严格——没有隐式类型转换的"魔法"。</p>
+<h2>四种基础类型</h2>
+<ul>
+<li><code>int</code> 整数 —— 注意：Python 的 int 是<strong>任意精度</strong>的，不会溢出，不像 JS 的 Number 受 64 位浮点限制</li>
+<li><code>float</code> 浮点数 —— 对应 JS 的 Number</li>
+<li><code>str</code> 字符串 —— 对应 JS 的 string，但 Python 没有单字符 char 类型，单个字符就是长度 1 的 str</li>
+<li><code>bool</code> 布尔 —— 注意首字母大写：<code>True</code> / <code>False</code>，不是 JS 的 <code>true</code> / <code>false</code></li>
+</ul>
+<p>用 <code>type()</code> 查看类型，对标 JS 的 <code>typeof</code>。Python 没有 <code>===</code>，比较运算符直接判断类型和值。</p>
+`,
+    analogy: {
+      rows: [
+        ["let x = 1", "x = 1", "都无需声明类型"],
+        ["typeof x", "type(x)", "查看类型"],
+        ["true / false", "True / False", "Python 首字母大写"],
+        ["null / undefined", "None", "Python 只有 None"],
+        ["Number(任意精度有限)", "int(任意精度)", "Python 的大整数不会溢出"],
+      ]
+    },
+    example: `# 变量赋值 —— 无需声明类型
+age = 25
+name = "前端转后端"
+height = 1.75
+is_dev = True
+
+# 用 type() 查看类型
+print(type(age))     # <class 'int'>
+print(type(name))    # <class 'str'>
+print(type(is_dev))  # <class 'bool'>
+
+# Python 的整数不会溢出
+big = 2 ** 100
+print(big)  # 一个 31 位数，JS 里会变成 Infinity
+
+# 类型转换 —— 显式，不会自动转换
+print(int("42"))      # 字符串转整数
+print(str(42))        # 整数转字符串
+print(float("3.14"))  # 字符串转浮点`,
+    exercise: {
+      prompt: "创建变量 city 存储你的城市名（字符串），population 存储人口数（整数），is_capital 存储是否首都（布尔值）。然后用 print 分别输出它们的类型。",
+      starter: `# 在下面写你的代码
+city = 
+population = 
+is_capital = 
+
+# 输出类型
+print(type(city))`,
+      hint: "字符串用引号包裹，布尔值首字母大写 True/False，整数直接写数字。"
+    }
+  },
+  {
+    id: 2, title: "字符串", subtitle: "f-string 格式化、切片与常用方法",
+    body: `
+<p>Python 字符串比 JS 更"重"——它是<strong>不可变</strong>的（跟 JS 一样），但方法更丰富。最值得掌握的是 <strong>f-string</strong>，比 JS 的模板字符串还方便。</p>
+<h2>三个核心操作</h2>
+<ol>
+<li><strong>f-string 格式化</strong>：<code>f"Hello {name}"</code>，对标 JS 的反引号模板字符串 <code>\`Hello ${name}\`</code></li>
+<li><strong>切片</strong>：<code>s[1:4]</code> 取子串，Python 的切片比 JS 的 <code>substring</code> 强大且统一（列表也能用）</li>
+<li><strong>常用方法</strong>：<code>.upper()</code> <code>.lower()</code> <code>.split()</code> <code>.strip()</code> <code>.replace()</code></li>
+</ol>
+<p>注意：Python 字符串方法返回<strong>新字符串</strong>（原串不变），这跟 JS 一致。但 Python 没有 <code>.includes()</code>，用 <code>in</code> 关键字：<code>"a" in s</code>。</p>
+`,
+    analogy: {
+      rows: [
+        ["`Hello ${name}`", 'f"Hello {name}"', "模板字符串 vs f-string"],
+        ["s.substring(1,4)", "s[1:4]", "切片语法更简洁"],
+        ["s.includes('a')", "'a' in s", "用 in 关键字"],
+        ["s.split(',')", "s.split(',')", "完全一致"],
+        ["s.length", "len(s)", "属性 vs 函数"],
+      ]
+    },
+    example: `# f-string —— 比模板字符串更强
+name = "Python"
+version = 3.12
+print(f"当前 {name} 版本 {version}")  # 当前 Python 版本 3.12
+
+# f-string 支持表达式
+price = 99.5
+count = 3
+print(f"总价: {price * count} 元")  # 总价: 298.5 元
+print(f"打折后: {price * count * 0.8:.2f} 元")  # 保留两位小数
+
+# 切片 —— start:stop:step，stop 不包含
+s = "Hello, World"
+print(s[0:5])    # Hello
+print(s[-6:])    # World（负数从末尾数）
+print(s[::-1])   # 反转字符串
+
+# 常用方法
+print("  hello  ".strip())       # 去首尾空格 -> hello
+print("a,b,c".split(","))        # 分割 -> ['a', 'b', 'c']
+print("-".join(["2024","01","15"]))  # 拼接 -> 2024-01-15
+print("abc" in "xxabcyy")        # 包含判断 -> True`,
+    exercise: {
+      prompt: "给定邮箱字符串 email = 'user@example.com'，用字符串方法提取出用户名（@ 前部分）和域名（@ 后部分），用 f-string 输出 '用户名: xxx, 域名: xxx'。",
+      starter: `email = "user@example.com"
+
+# 提取用户名和域名（提示：用 split）
+parts = email.split("@")
+username = 
+domain = 
+
+# 用 f-string 输出
+print(f"用户名: {}, 域名: {}")`,
+      hint: "split('@') 返回列表，parts[0] 是用户名，parts[1] 是域名。f-string 里用 {username} {domain}。"
+    }
+  },
+  {
+    id: 3, title: "列表 list", subtitle: "Python 的主力数据结构，对应 JS 数组",
+    body: `
+<p>列表是 Python 用得最多的数据结构，直接对应 JS 的 Array。但有几个关键差异要记住。</p>
+<h2>核心差异</h2>
+<ul>
+<li><strong>可混合类型</strong>：Python 列表能放任意类型 <code>[1, "a", True]</code>，但实际开发中通常放同类型</li>
+<li><strong>切片是利器</strong>：<code>lst[1:3]</code> 取子列表，JS 数组没有这个语法（要用 <code>.slice()</code>）</li>
+<li><strong>负索引</strong>：<code>lst[-1]</code> 取最后一个元素，JS 不支持负索引（会返回 undefined）</li>
+<li><strong>没有 map/filter</strong>：Python 用列表推导式（第 9 课）替代，更简洁</li>
+</ul>
+<h2>常用方法</h2>
+<p><code>.append()</code> 尾部添加（对应 JS <code>.push()</code>）、<code>.pop()</code> 弹出、<code>.insert()</code> 插入、<code>.sort()</code> 排序、<code>len()</code> 长度（不是 <code>.length</code> 属性，是函数）。</p>
+`,
+    analogy: {
+      rows: [
+        ["[1, 2, 3]", "[1, 2, 3]", "语法一致"],
+        ["arr.length", "len(lst)", "属性 vs 函数"],
+        ["arr.push(x)", "lst.append(x)", "方法名不同"],
+        ["arr[arr.length-1]", "lst[-1]", "负索引更方便"],
+        ["arr.slice(1,3)", "lst[1:3]", "切片语法"],
+        ["arr.map(x=>x*2)", "[x*2 for x in lst]", "推导式替代 map"],
+      ]
+    },
+    example: `# 创建列表
+nums = [10, 20, 30, 40, 50]
+fruits = ["apple", "banana", "cherry"]
+mixed = [1, "two", 3.0, True]  # 可以混合，但不推荐
+
+# 索引与切片
+print(nums[0])     # 10（第一个）
+print(nums[-1])    # 50（最后一个，负索引）
+print(nums[1:4])   # [20, 30, 40]（切片）
+print(nums[::2])   # [10, 30, 50]（步长为2）
+
+# 增删改
+nums.append(60)       # 尾部添加
+nums.insert(0, 5)     # 指定位置插入
+nums[0] = 99          # 修改元素
+print(nums)           # [99, 20, 30, 40, 50, 60]
+
+# 遍历
+for fruit in fruits:
+    print(fruit)
+
+# 判断包含
+print("banana" in fruits)  # True
+
+# 长度
+print(len(fruits))  # 3`,
+    exercise: {
+      prompt: "创建列表 scores = [88, 92, 75, 96, 83]。求：最高分、最低分、平均分（保留1位小数）。提示：用 max()、min()、sum()、len()。",
+      starter: `scores = [88, 92, 75, 96, 83]
+
+highest = 
+lowest = 
+average = 
+
+print(f"最高分: {highest}")
+print(f"最低分: {lowest}")
+print(f"平均分: {average:.1f}")`,
+      hint: "max(scores) 求最大，min(scores) 求最小，sum(scores)/len(scores) 求平均。"
+    }
+  },
+  {
+    id: 4, title: "字典与元组", subtitle: "dict 键值对 + tuple 不可变序列",
+    body: `
+<p>字典是 Python 的<strong>键值对</strong>结构，直接对应 JS 的 Object / Map。元组是不可变序列，JS 没有直接对应物。</p>
+<h2>字典 dict</h2>
+<ul>
+<li>对标 JS 的 Object，但语法用花括号 <code>{}</code>，键不必加引号也能写但<strong>键必须是字符串时会加引号</strong></li>
+<li>Python 3.7+ 字典<strong>保持插入顺序</strong>，跟 JS Object 一致</li>
+<li>访问不存在的键会报 <code>KeyError</code>，用 <code>.get(key, default)</code> 更安全（对应 JS 的 <code>obj.key ?? default</code>）</li>
+<li>遍历：<code>for k, v in d.items()</code>，比 JS 的 <code>Object.entries()</code> 简洁</li>
+</ul>
+<h2>元组 tuple</h2>
+<p>用圆括号 <code>()</code>，<strong>创建后不可修改</strong>。用于函数返回多个值、固定配置等场景。JS 没有原生不可变数组，这是 Python 特有的常用结构。</p>
+`,
+    analogy: {
+      rows: [
+        ["{name: 'Tom'}", "{'name': 'Tom'}", "键需加引号"],
+        ["obj.name", "d['name']", "用方括号访问"],
+        ["obj.key ?? '默认'", "d.get('key', '默认')", "安全访问"],
+        ["Object.entries(obj)", "d.items()", "遍历键值对"],
+        ["(无对应)", "(1, 2, 3)", "元组不可变"],
+        ["const arr=[]", "lst=[] / tpl=()", "可变 vs 不可变"],
+      ]
+    },
+    example: `# 字典 —— 键值对
+user = {
+    "name": "张三",
+    "age": 28,
+    "skills": ["JS", "Python"]
+}
+print(user["name"])          # 张三
+print(user.get("email", "未填写"))  # 安全访问，返回默认值
+
+# 添加/修改
+user["email"] = "z@x.com"    # 新增
+user["age"] = 29             # 修改
+print(user)
+
+# 遍历键值对
+for key, value in user.items():
+    print(f"{key}: {value}")
+
+# 判断键是否存在
+print("name" in user)  # True
+
+# 元组 —— 不可变
+point = (10, 20)
+rgb = (255, 128, 0)
+print(point[0])  # 10
+# point[0] = 99  # 报错！元组不可变
+
+# 元组解包 —— 常用于函数返回多值
+x, y = point
+print(f"x={x}, y={y}")
+
+# 函数返回多值（本质返回元组）
+def min_max(lst):
+    return min(lst), max(lst)
+
+lo, hi = min_max([3, 1, 4, 1, 5])
+print(f"最小={lo}, 最大={hi}")`,
+    exercise: {
+      prompt: "创建字典 student 存储姓名、三门课成绩。计算平均分并添加到字典中（键 'avg'）。最后遍历输出所有信息。",
+      starter: `student = {
+    "name": "李四",
+    "math": 90,
+    "english": 85,
+    "python": 95
+}
+
+# 计算平均分并添加到字典
+scores = [student["math"], student["english"], student["python"]]
+student["avg"] = 
+
+# 遍历输出
+for key, value in student.items():
+    print(f"{}: {}")`,
+      hint: "sum(scores)/len(scores) 算平均。遍历时用 for key, value in student.items()，f-string 用 {key} 和 {value}。"
+    }
+  },
+  {
+    id: 5, title: "集合 set", subtitle: "去重利器与集合运算",
+    body: `
+<p>集合是<strong>无序、不重复</strong>的容器。最常见用途：<strong>去重</strong>和<strong>集合运算</strong>（交集、并集、差集）。</p>
+<p>对标 JS 的 <code>Set</code>，但 Python 的集合运算符更直观：<code>&amp;</code> 交集、<code>|</code> 并集、<code>-</code> 差集。</p>
+<h2>何时用集合</h2>
+<ul>
+<li>需要去重时 —— <code>set(list)</code> 一行搞定</li>
+<li>需要快速判断"是否包含" —— 集合的 <code>in</code> 是 O(1)，列表是 O(n)</li>
+<li>需要集合运算（交集/并集/差集）</li>
+</ul>
+<p>注意：集合<strong>无序</strong>，不能用下标访问。如果需要有序去重，先 set 再 list 转换。</p>
+`,
+    analogy: {
+      rows: [
+        ["new Set([1,2,2])", "set([1,2,2])", "去重"],
+        ["set.has(x)", "x in s", "判断包含"],
+        ["set.size", "len(s)", "大小"],
+        ["new Set([...a, ...b])", "a | b", "并集（Python 用运算符）"],
+        ["a.filter(x=>b.has(x))", "a & b", "交集（Python 用运算符）"],
+      ]
+    },
+    example: `# 创建集合
+nums = {1, 2, 3, 3, 2, 1}  # 自动去重
+print(nums)  # {1, 2, 3}
+
+# 从列表去重
+lst = [1, 2, 2, 3, 3, 3, 4]
+unique = list(set(lst))
+print(unique)  # [1, 2, 3, 4]
+
+# 添加和删除
+nums.add(4)
+nums.discard(1)  # 删除（不存在不报错）
+print(nums)
+
+# 集合运算
+frontend = {"JS", "CSS", "HTML", "React"}
+backend = {"Python", "JS", "SQL", "Go"}
+
+print("都会:", frontend & backend)       # 交集
+print("至少会一门:", frontend | backend)   # 并集
+print("只前端:", frontend - backend)      # 差集
+print("只会一门:", frontend ^ backend)     # 对称差集
+
+# 快速判断包含 —— O(1)
+banned = {"spam", "ads"}
+print("spam" in banned)  # True，比列表快`,
+    exercise: {
+      prompt: "给定两个列表 list_a = [1,2,3,4,5] 和 list_b = [4,5,6,7,8]，用集合运算求：同时出现在两个列表的数（交集）、只出现在 list_a 的数（差集）。",
+      starter: `list_a = [1, 2, 3, 4, 5]
+list_b = [4, 5, 6, 7, 8]
+
+set_a = set(list_a)
+set_b = set(list_b)
+
+common =     # 交集
+only_a =     # 差集
+
+print(f"共同元素: {common}")
+print(f"只在 list_a: {only_a}")`,
+      hint: "交集用 & 运算符，差集用 - 运算符。结果还是集合，直接打印即可。"
+    }
+  },
+  {
+    id: 6, title: "条件判断", subtitle: "if / elif / else，缩进即代码块",
+    body: `
+<p>这是 Python 和 JS 最大的语法差异：<strong>Python 用缩进表示代码块，没有花括号</strong>。缩进错了直接报错。</p>
+<h2>关键规则</h2>
+<ul>
+<li><strong>缩进必须一致</strong>，推荐用 4 个空格（不要混用 tab 和空格）</li>
+<li><strong>条件后加冒号</strong> <code>:</code>，这是初学者最常漏的</li>
+<li><code>else if</code> 在 Python 里是 <code>elif</code>（不是 <code>elseif</code>）</li>
+<li>没有 <code>===</code>，Python 的 <code>==</code> 已经是严格相等（不转换类型）</li>
+<li>逻辑运算符：<code>and</code> / <code>or</code> / <code>not</code>，不是 <code>&amp;&amp;</code> / <code>||</code> / <code>!</code></li>
+</ul>
+<h2>真值判断</h2>
+<p>Python 中这些为假：<code>False</code> <code>0</code> <code>""</code> <code>[]</code> <code>{}</code> <code>None</code>。跟 JS 类似，但 Python 没有 <code>0 == false</code> 这种隐式转换的坑。</p>
+`,
+    analogy: {
+      rows: [
+        ["if (x > 0) {", "if x > 0:", "去括号，加冒号"],
+        ["} else if {", "elif:", "elif 而非 else if"],
+        ["} else {", "else:", "简化"],
+        ["&& || !", "and or not", "逻辑运算符"],
+        ["=== 严格相等", "==  即严格相等", "Python 没有隐式转换"],
+        ["(花括号)", "(缩进)", "代码块界定方式"],
+      ]
+    },
+    example: `# 基本条件判断 —— 注意冒号和缩进
+score = 85
+
+if score >= 90:
+    grade = "A"
+elif score >= 80:
+    grade = "B"
+elif score >= 60:
+    grade = "C"
+else:
+    grade = "D"
+
+print(f"成绩等级: {grade}")  # B
+
+# 逻辑运算符 —— and / or / not
+age = 20
+has_id = True
+
+if age >= 18 and has_id:
+    print("可以入场")
+else:
+    print("拒绝入场")
+
+# 真值判断 —— 空容器为假
+items = []
+if items:
+    print("列表非空")
+else:
+    print("列表为空")  # 输出这个
+
+# 三元表达式 —— 对标 JS 的 x ? a : b
+status = "成年" if age >= 18 else "未成年"
+print(status)
+
+# 成员判断 —— in
+lang = "Python"
+if lang in ["Python", "Go", "Rust"]:
+    print("后端语言")`,
+    exercise: {
+      prompt: "写一个判断闰年的逻辑：能被4整除但不能被100整除，或能被400整除的是闰年。给定 year = 2024，输出 '闰年' 或 '平年'。",
+      starter: `year = 2024
+
+# 写判断逻辑
+if (year % 4 == 0 and year % 100 != 0) or ():
+    print("闰年")
+else:
+    print("平年")`,
+      hint: "第二个条件是 year % 400 == 0。用 or 连接两个条件，用括号分组。"
+    }
+  },
+  {
+    id: 7, title: "循环", subtitle: "for 遍历 + while 条件循环 + range",
+    body: `
+<p>Python 的 <code>for</code> 循环和 JS 差异很大：Python 的 for 是<strong>遍历</strong>（for...of），不是计数循环。要计数循环得用 <code>range()</code>。</p>
+<h2>for 循环的三种用法</h2>
+<ol>
+<li><strong>遍历元素</strong>：<code>for x in lst</code> —— 对应 JS 的 <code>for...of</code></li>
+<li><strong>遍历索引</strong>：<code>for i in range(len(lst))</code> —— 对应 JS 的 <code>for(let i=0;...)</code>，但不推荐</li>
+<li><strong>同时要索引和值</strong>：<code>for i, x in enumerate(lst)</code> —— 对应 JS 的 <code>entries()</code>，推荐方式</li>
+</ol>
+<h2>range 函数</h2>
+<p><code>range(5)</code> → 0,1,2,3,4；<code>range(2,8)</code> → 2..7；<code>range(0,10,2)</code> → 0,2,4,6,8。</p>
+<h2>break / continue</h2>
+<p>跟 JS 完全一致。但 Python 的 for 循环可以带 <code>else</code> 子句——循环正常结束（没 break）时执行，这个 JS 没有。</p>
+`,
+    analogy: {
+      rows: [
+        ["for (let x of arr)", "for x in lst", "遍历元素"],
+        ["for (let i=0; i<n; i++)", "for i in range(n)", "计数循环"],
+        ["arr.forEach((x,i)=>...)", "for i,x in enumerate(lst)", "索引+值"],
+        ["arr.map(x=>x*2)", "[x*2 for x in lst]", "推导式更简洁"],
+        ["while (cond)", "while cond:", "条件循环"],
+      ]
+    },
+    example: `# 遍历列表
+fruits = ["apple", "banana", "cherry"]
+for fruit in fruits:
+    print(fruit)
+
+# range 计数循环
+for i in range(5):       # 0,1,2,3,4
+    print(i, end=" ")
+print()  # 换行
+
+for i in range(2, 8):    # 2,3,4,5,6,7
+    print(i, end=" ")
+print()
+
+# enumerate —— 同时拿索引和值
+for index, fruit in enumerate(fruits):
+    print(f"{index}: {fruit}")
+
+# while 循环
+count = 0
+while count < 3:
+    print(f"计数 {count}")
+    count += 1
+
+# break 和 continue
+for num in range(10):
+    if num == 5:
+        break       # 跳出循环
+    if num % 2 == 0:
+        continue    # 跳过偶数
+    print(num, end=" ")  # 1 3
+
+# for...else —— 循环正常结束才执行 else
+for n in range(2, 10):
+    if n == 5:
+        break
+else:
+    print("没 break，正常结束")`,
+    exercise: {
+      prompt: "用循环计算 1 到 100 所有偶数的和。提示：用 range(2, 101, 2) 直接生成偶数，或用 range 遍历后判断。",
+      starter: `total = 0
+
+# 方法1：range 直接生成偶数
+for n in range(, , ):
+    total += n
+
+print(f"1到100偶数和: {total}")`,
+      hint: "range(2, 101, 2) 从2开始到100，步长2，正好是所有偶数。"
+    }
+  },
+  {
+    id: 8, title: "函数", subtitle: "def 定义、参数、返回值、默认参数陷阱",
+    body: `
+<p>Python 函数用 <code>def</code> 关键字定义（不是 <code>function</code>），返回值用 <code>return</code>。有个<strong>经典陷阱</strong>必须提前知道。</p>
+<h2>与 JS 的关键差异</h2>
+<ul>
+<li>定义用 <code>def</code>，不是 <code>function</code> / 箭头函数</li>
+<li>参数可以设<strong>默认值</strong>：<code>def f(x, y=10)</code></li>
+<li>支持<strong>关键字参数</strong>：<code>f(y=1, x=2)</code> 按名传参，JS 没有这个</li>
+<li>支持<strong>返回多个值</strong>（本质返回元组）：<code>return a, b</code></li>
+<li><strong>没有函数提升</strong>：必须先定义后调用（JS 的 function 声明会提升）</li>
+</ul>
+<h2>可变默认参数陷阱（重点）</h2>
+<p>这是 Python 最经典的坑：<strong>默认参数只创建一次</strong>。如果默认值是可变对象（list/dict），多次调用会共享同一个对象！</p>
+`,
+    analogy: {
+      rows: [
+        ["function f(x){}", "def f(x):", "定义语法"],
+        ["const f = x => {}", "def f(x):", "对应箭头函数"],
+        ["x = x || 10", "def f(x=10):", "默认参数"],
+        ["return {a, b}", "return a, b", "多返回值"],
+        ["(无对应)", "f(y=1, x=2)", "关键字参数"],
+        ["(闭包陷阱)", "可变默认参数", "各自的坑"],
+      ]
+    },
+    example: `# 基本函数
+def greet(name):
+    return f"Hello, {name}!"
+
+print(greet("Python"))  # Hello, Python!
+
+# 默认参数
+def greet2(name, greeting="Hello"):
+    return f"{greeting}, {name}!"
+
+print(greet2("Tom"))              # Hello, Tom!
+print(greet2("Tom", "Hi"))        # Hi, Tom!
+
+# 关键字参数 —— 按名传参，顺序随意
+def create_user(name, age, role):
+    return {"name": name, "age": age, "role": role}
+
+print(create_user(age=25, name="Bob", role="admin"))
+
+# 返回多个值（元组解包）
+def min_max(lst):
+    return min(lst), max(lst), sum(lst)/len(lst)
+
+lo, hi, avg = min_max([3, 1, 4, 1, 5, 9])
+print(f"最小={lo}, 最大={hi}, 平均={avg:.1f}")
+
+# 可变默认参数陷阱 —— 必须记住！
+def add_item(item, lst=[]):   # 错误写法
+    lst.append(item)
+    return lst
+
+print(add_item("a"))  # ['a']
+print(add_item("b"))  # ['a', 'b']  —— 惊喜！不是 ['b']
+
+# 正确写法 —— 用 None
+def add_item_safe(item, lst=None):
+    if lst is None:
+        lst = []
+    lst.append(item)
+    return lst
+
+print(add_item_safe("a"))  # ['a']
+print(add_item_safe("b"))  # ['b']  —— 正确`,
+    exercise: {
+      prompt: "写一个函数 calculate(a, b, op='+')，根据 op 参数（+、-、*、/）返回对应运算结果。除法时如果 b 为 0 返回 '错误: 除零'。",
+      starter: `def calculate(a, b, op='+'):
+    if op == '+':
+        return a + b
+    # 补充 -、*、/ 的逻辑
+    # 除法时检查 b 是否为 0
+    
+
+print(calculate(10, 3, '+'))   # 13
+print(calculate(10, 3, '-'))   # 7
+print(calculate(10, 3, '*'))   # 30
+print(calculate(10, 3, '/'))   # 3.33...
+print(calculate(10, 0, '/'))   # 错误: 除零`,
+      hint: "用 elif 处理不同 op。除法用 if b == 0: return '错误: 除零'，否则 return a / b。"
+    }
+  },
+  {
+    id: 9, title: "列表推导式", subtitle: "Python 特色：一行替代 map+filter",
+    body: `
+<p>列表推导式是 Python 最有特色的语法之一，用一行代码完成"遍历+变换+过滤"，替代 JS 的 <code>.map().filter()</code> 链式调用。</p>
+<h2>基本语法</h2>
+<p><code>[表达式 for 变量 in 可迭代对象 if 条件]</code></p>
+<p>读法：对可迭代对象中的每个变量，如果满足条件，就计算表达式，收集成列表。</p>
+<h2>对应关系</h2>
+<p>JS 的 <code>arr.filter(x => x>0).map(x => x*2)</code>，Python 写成 <code>[x*2 for x in arr if x>0]</code>。顺序不同：<strong>表达式在前，条件在后</strong>。</p>
+<h2>何时用 / 何时不用</h2>
+<ul>
+<li>简单变换/过滤 —— 推导式更简洁，推荐</li>
+<li>嵌套循环或复杂逻辑 —— 可读性变差，改用普通 for 循环</li>
+<li>只遍历不求列表 —— 用生成器 <code>(x for x in ...)</code> 省内存</li>
+</ul>
+`,
+    analogy: {
+      rows: [
+        ["arr.map(x=>x*2)", "[x*2 for x in arr]", "变换"],
+        ["arr.filter(x=>x>0)", "[x for x in arr if x>0]", "过滤"],
+        ["arr.filter(...).map(...)", "[x*2 for x in arr if x>0]", "组合"],
+        ["arr.flatMap(...)", "[y for x in arr for y in x]", "扁平化"],
+      ]
+    },
+    example: `# 基本变换 —— 对标 map
+nums = [1, 2, 3, 4, 5]
+squares = [x**2 for x in nums]
+print(squares)  # [1, 4, 9, 16, 25]
+
+# 条件过滤 —— 对标 filter
+evens = [x for x in nums if x % 2 == 0]
+print(evens)  # [2, 4]
+
+# 变换 + 过滤组合 —— 对标 filter+map
+doubled_odds = [x*2 for x in nums if x % 2 == 1]
+print(doubled_odds)  # [2, 6, 10]
+
+# 字符串处理
+words = ["hello", "world", "python"]
+upper = [w.upper() for w in words]
+print(upper)  # ['HELLO', 'WORLD', 'PYTHON']
+
+# 带条件表达式
+labels = ["偶" if x % 2 == 0 else "奇" for x in nums]
+print(labels)  # ['奇', '偶', '奇', '偶', '奇']
+
+# 字典推导式
+square_dict = {x: x**2 for x in range(1, 6)}
+print(square_dict)  # {1: 1, 2: 4, 3: 9, 4: 16, 5: 25}
+
+# 嵌套循环（慎用，可读性差）
+pairs = [(x, y) for x in range(2) for y in range(2)]
+print(pairs)  # [(0,0),(0,1),(1,0),(1,1)]`,
+    exercise: {
+      prompt: "给定列表 words = ['apple', 'banana', 'kiwi', 'pear', 'cherry']，用列表推导式筛选出长度大于 5 的单词，并转为大写。",
+      starter: `words = ['apple', 'banana', 'kiwi', 'pear', 'cherry']
+
+# 一行搞定：筛选长度>5 并转大写
+result = [    for     in     if     ]
+
+print(result)  # ['APPLE', 'BANANA', 'CHERRY']`,
+      hint: "[w.upper() for w in words if len(w) > 5]。表达式在前，循环在中，条件在后。"
+    }
+  },
+  {
+    id: 10, title: "异常处理", subtitle: "try/except，Python 没有 try/catch",
+    body: `
+<p>Python 的异常处理对应 JS 的 try/catch，但关键字不同：<strong>except 代替 catch</strong>。</p>
+<h2>核心差异</h2>
+<ul>
+<li><code>try / except</code>（不是 catch）/ <code>else</code>（没异常时执行）/ <code>finally</code></li>
+<li>Python 可以<strong>按异常类型捕获</strong>：<code>except ValueError:</code> 只抓这一类</li>
+<li>JS 是 <code>catch(e)</code> 拿到错误对象，Python 是 <code>except Exception as e:</code></li>
+<li>Python 手动抛异常用 <code>raise</code>（不是 <code>throw</code>）</li>
+</ul>
+<h2>常见异常类型</h2>
+<p><code>ValueError</code> 值错误、<code>TypeError</code> 类型错误、<code>KeyError</code> 键不存在、<code>IndexError</code> 索引越界、<code>ZeroDivisionError</code> 除零、<code>FileNotFoundError</code> 文件不存在。</p>
+<p>开发阶段建议<strong>不要</strong>用 <code>except:</code> 裸捕获（会吞掉所有错误包括 KeyboardInterrupt），要写明异常类型。</p>
+`,
+    analogy: {
+      rows: [
+        ["try {", "try:", "开始"],
+        ["catch (e) {", "except Exception as e:", "捕获"],
+        ["finally {", "finally:", "无论是否异常都执行"],
+        ["throw new Error()", "raise Exception()", "抛出"],
+        ["catch(e) { console.log(e) }", "except Exception as e: print(e)", "拿到错误对象"],
+      ]
+    },
+    example: `# 基本异常处理
+try:
+    num = int("abc")  # 会抛 ValueError
+except ValueError as e:
+    print(f"转换失败: {e}")
+
+# 按类型捕获不同异常
+try:
+    value = int(input("输入数字: "))  # 这里用固定值模拟
+except ValueError:
+    print("不是有效数字")
+except KeyboardInterrupt:
+    print("用户中断")
+else:
+    print(f"输入的是 {value}")  # 没异常才执行
+finally:
+    print("清理工作")  # 总是执行
+
+# 处理多种异常
+def safe_divide(a, b):
+    try:
+        return a / b
+    except ZeroDivisionError:
+        return "不能除以零"
+    except TypeError:
+        return "类型错误"
+
+print(safe_divide(10, 0))    # 不能除以零
+print(safe_divide(10, "a"))  # 类型错误
+print(safe_divide(10, 3))    # 3.333...
+
+# 主动抛异常
+def set_age(age):
+    if age < 0:
+        raise ValueError("年龄不能为负数")
+    return age
+
+try:
+    set_age(-5)
+except ValueError as e:
+    print(f"错误: {e}")  # 错误: 年龄不能为负数`,
+    exercise: {
+      prompt: "写一个函数 safe_get(lst, index)，安全获取列表指定索引的元素。如果索引越界，返回 '索引越界' 而不是报错。",
+      starter: `def safe_get(lst, index):
+    try:
+        return 
+    except :
+        return "索引越界"
+
+print(safe_get([10, 20, 30], 1))   # 20
+print(safe_get([10, 20, 30], 10))  # 索引越界`,
+      hint: "try 里 return lst[index]，except IndexError 捕获越界。"
+    }
+  },
+  {
+    id: 11, title: "类与对象", subtitle: "面向对象基础，class / __init__ / 方法",
+    body: `
+<p>Python 的类对应 JS 的 class（ES6+），语法相近但细节不同。这是阶段 1 的最后一课，也是通往"用 Python 写正经程序"的门槛。</p>
+<h2>核心概念</h2>
+<ul>
+<li><code>class</code> 定义类，<strong>首字母大写</strong>是命名惯例（如 <code>User</code>）</li>
+<li><code>__init__</code> 是构造函数（对标 JS 的 <code>constructor</code>），双下划线</li>
+<li><code>self</code> 对标 JS 的 <code>this</code>，但<strong>必须显式写在参数列表第一个</strong></li>
+<li>实例方法第一个参数永远是 <code>self</code>，调用时不传</li>
+<li>继承：<code>class Dog(Animal):</code>，括号里写父类</li>
+</ul>
+<h2>与 JS 的关键差异</h2>
+<p>JS 的 <code>this</code> 是隐式的（还分普通函数和箭头函数），Python 的 <code>self</code> 是<strong>显式</strong>的——每个方法必须把 self 写在第一个参数。这看起来啰嗦，但避免了 JS 的 this 指向混乱问题。</p>
+`,
+    analogy: {
+      rows: [
+        ["class User {", "class User:", "定义类"],
+        ["constructor(name){", "def __init__(self, name):", "构造函数"],
+        ["this.name = name", "self.name = name", "实例属性"],
+        ["greet(){ ... }", "def greet(self): ...", "方法（self 必写）"],
+        ["new User('Tom')", "User('Tom')", "实例化（无 new）"],
+        ["class Dog extends Animal", "class Dog(Animal):", "继承"],
+      ]
+    },
+    example: `# 基本类定义
+class User:
+    def __init__(self, name, age):
+        self.name = name      # 实例属性
+        self.age = age
+
+    def greet(self):          # 实例方法，self 必写
+        return f"Hi, I'm {self.name}"
+
+    def have_birthday(self):
+        self.age += 1
+        return f"{self.name} 现在 {self.age} 岁"
+
+# 实例化（无 new 关键字）
+user = User("张三", 25)
+print(user.greet())          # Hi, I'm 张三
+print(user.have_birthday())  # 张三 现在 26 岁
+
+# 继承
+class Admin(User):
+    def __init__(self, name, age, permissions):
+        super().__init__(name, age)   # 调用父类构造
+        self.permissions = permissions
+
+    def show_perms(self):
+        return f"{self.name} 权限: {self.permissions}"
+
+admin = Admin("管理员", 30, ["read", "write", "delete"])
+print(admin.greet())         # 继承父类方法
+print(admin.show_perms())    # 子类自己的方法
+
+# 类属性 vs 实例属性
+class Counter:
+    total = 0    # 类属性（所有实例共享）
+
+    def __init__(self):
+        Counter.total += 1
+        self.id = Counter.total   # 实例属性
+
+c1 = Counter()
+c2 = Counter()
+print(f"创建了 {Counter.total} 个实例")  # 2
+print(f"c1.id={c1.id}, c2.id={c2.id}")  # 1, 2`,
+    exercise: {
+      prompt: "定义一个 Rectangle 类，有 width 和 height 属性，一个 area() 方法返回面积，一个 describe() 方法返回 '宽x高的矩形，面积=x'。",
+      starter: `class Rectangle:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+    
+    def area(self):
+        return 
+    
+    def describe(self):
+        return f"{}x{}的矩形，面积={}"
+
+r = Rectangle(4, 5)
+print(r.area())      # 20
+print(r.describe())  # 4x5的矩形，面积=20`,
+      hint: "area 返回 self.width * self.height。describe 用 f-string，{self.width}x{self.height}。"
+    }
+  },
+  {
+    id: 12, title: "文件操作与脚本", subtitle: "读写文件、os 路径操作、批量处理脚本",
+    body: `
+<p>真实程序离不开文件读写。Python 的文件操作比 JS 简洁——内置 <code>open()</code> 函数，配合 <code>with</code> 语句自动管理资源。</p>
+<h2>核心：with 语句</h2>
+<p><code>with open(...) as f:</code> 会在代码块结束后<strong>自动关闭文件</strong>，不用手动 <code>f.close()</code>。对标 JS 里用 <code>finally</code> 关闭资源，但 Python 的 with 更简洁可靠，永远不会忘关。</p>
+<h2>三种打开模式</h2>
+<ul>
+<li><code>"r"</code> 读取（默认模式）</li>
+<li><code>"w"</code> 写入（覆盖已有内容）</li>
+<li><code>"a"</code> 追加（在末尾添加）</li>
+</ul>
+<p>注意：读写文本文件务必加 <code>encoding="utf-8"</code>，否则 Windows 默认 GBK 编码会乱码。</p>
+<h2>os 模块</h2>
+<p>路径操作用 <code>os.path</code>，对标 Node.js 的 <code>path</code> 模块。<code>os.listdir()</code> 列目录，<code>os.path.join()</code> 拼接路径（自动处理分隔符）。</p>
+<p>这里的示例在 Pyodide 虚拟文件系统里运行，能真实读写，和本地行为一致。</p>
+`,
+    analogy: {
+      rows: [
+        ["fs.readFileSync(p)", "open(p).read()", "一次读完"],
+        ["fs.writeFileSync(p,d)", "open(p,'w').write(d)", "写入文件"],
+        ["try{...}finally{f.close()}", "with open(...) as f:", "自动关闭"],
+        ["path.join(a,b)", "os.path.join(a,b)", "拼接路径"],
+        ["fs.readdirSync(dir)", "os.listdir(dir)", "列目录"],
+        ["fs.existsSync(p)", "os.path.exists(p)", "判断存在"],
+      ]
+    },
+    example: `# 写文件 —— with 自动关闭
+with open("note.txt", "w", encoding="utf-8") as f:
+    f.write("第一行\\n")
+    f.write("第二行\\n")
+
+# 读文件 —— 一次读完
+with open("note.txt", "r", encoding="utf-8") as f:
+    content = f.read()
+print("完整内容:")
+print(content)
+
+# 追加内容
+with open("note.txt", "a", encoding="utf-8") as f:
+    f.write("第三行\\n")
+
+# 逐行读取 —— 处理大文件不用全部加载
+print("逐行读取:")
+with open("note.txt", encoding="utf-8") as f:
+    for i, line in enumerate(f, 1):
+        print(f"  {i}: {line.strip()}")
+
+# os 模块 —— 路径与目录
+import os
+print("当前目录文件:", os.listdir("."))
+
+# 写入多个文件模拟批量操作
+for name in ["a.txt", "b.txt", "c.txt"]:
+    with open(name, "w") as f:
+        f.write(f"这是 {name} 的内容")
+
+print("创建后目录:", sorted(os.listdir(".")))`,
+    exercise: {
+      prompt: "写一个待办清单脚本：创建 todos.txt 写入 3 条待办（每行一条），再读取出来逐行打印带编号。提示：用 with open 写入和读取，strip() 去掉换行符。",
+      starter: `# 写入 3 条待办
+with open("todos.txt", "w", encoding="utf-8") as f:
+    f.write("学习 Python\\n")
+    # 补充另外两条
+    
+
+# 读取并逐行打印
+with open("todos.txt", encoding="utf-8") as f:
+    for i, line in enumerate(f, 1):
+        print(f"{i}. ")`,
+      hint: "f.write() 每条后面加 \\n 换行。读取时 enumerate(f, 1) 从 1 开始编号，line.strip() 去掉行尾换行。"
+    }
+  },
+  {
+    id: 13, title: "HTTP 请求与接口调用", subtitle: "pyfetch 调 API、JSON 解析、GET/POST",
+    body: `
+<p>调用接口是后端开发的日常。本地 Python 用 <code>requests</code> 库（最流行），但浏览器里的 Pyodide 没有 socket，改用 <code>pyfetch</code>（基于浏览器 fetch API）。</p>
+<h2>两套环境</h2>
+<ul>
+<li><strong>本地 Python</strong>：<code>import requests; requests.get(url)</code>，同步调用，对标 axios</li>
+<li><strong>Pyodide 浏览器</strong>：<code>from pyodide.http import pyfetch</code>，异步 await，对标 fetch API</li>
+</ul>
+<p>这里演示 Pyodide 环境的 pyfetch，写法和浏览器的 fetch 几乎一样。本地用 requests 时去掉 asyncio/await 即可。</p>
+<h2>异步处理</h2>
+<p>pyfetch 返回 Promise（异步），必须用 <code>await</code>。在同步代码里调用，要用 <code>asyncio.run()</code> 包装一个 async 函数——这跟 JS 里用 <code>async/await</code> 或 <code>.then()</code> 处理 fetch 是同一个道理。</p>
+<h2>JSON 处理</h2>
+<p>接口返回 JSON，用 <code>response.json()</code> 解析，得到 Python 字典，对标 JS 的 <code>res.json()</code>。</p>
+`,
+    analogy: {
+      rows: [
+        ["fetch(url)", "pyfetch(url)", "发起请求"],
+        ["await res.json()", "await resp.json()", "解析 JSON"],
+        ["axios.get(url)", "requests.get(url)", "本地同步方案"],
+        ["res.data", "resp.json() 返回的 dict", "响应数据"],
+        ["headers: {'k':'v'}", "headers={'k':'v'}", "请求头"],
+        ["async function f(){}", "async def f(): ...", "异步函数"],
+      ]
+    },
+    example: `import asyncio
+from pyodide.http import pyfetch
+
+# GET 请求 —— 获取单条数据
+async def get_todo():
+    resp = await pyfetch("https://jsonplaceholder.typicode.com/todos/1")
+    return await resp.json()
+
+data = asyncio.run(get_todo())
+print(f"ID: {data['id']}")
+print(f"标题: {data['title']}")
+print(f"完成: {data['completed']}")
+
+# 获取列表
+async def get_users():
+    resp = await pyfetch("https://jsonplaceholder.typicode.com/users")
+    return await resp.json()
+
+users = asyncio.run(get_users())
+print(f"\\n共 {len(users)} 个用户")
+for u in users[:3]:  # 只看前 3 个
+    print(f"  {u['name']} - {u['email']}")
+
+# POST 请求 —— 提交数据
+async def create_post():
+    resp = await pyfetch(
+        "https://jsonplaceholder.typicode.com/posts",
+        method="POST",
+        headers={"Content-Type": "application/json"},
+        body='{"title":"测试","body":"内容","userId":1}'
+    )
+    return await resp.json()
+
+result = asyncio.run(create_post())
+print(f"\\n创建成功，ID: {result['id']}")`,
+    exercise: {
+      prompt: "调用接口获取 https://jsonplaceholder.typicode.com/todos/2 ，输出它的标题和完成状态。参照示例用 asyncio.run + pyfetch + await resp.json()。",
+      starter: `import asyncio
+from pyodide.http import pyfetch
+
+async def get_todo():
+    resp = await pyfetch("https://jsonplaceholder.typicode.com/todos/2")
+    return await resp.json()
+
+data = asyncio.run(get_todo())
+
+# 输出标题和完成状态
+print(f"标题: {}")
+print(f"完成: {}")`,
+      hint: "data 是字典，data['title'] 是标题，data['completed'] 是布尔完成状态。"
+    }
+  },
+  {
+    id: 14, title: "数据持久化与 SQLite CRUD", subtitle: "JSON 文件 + SQLite 数据库增删改查",
+    body: `
+<p>CRUD（增删改查）是数据持久化的基础。Python 有两个层次可选：</p>
+<h2>轻量：JSON 文件</h2>
+<p>用 <code>json</code> 模块读写 JSON 文件，对标前端的 localStorage / JSON 配置文件。适合配置项、小数据量。</p>
+<ul>
+<li><code>json.loads(str)</code> 字符串转对象 —— 对标 <code>JSON.parse()</code></li>
+<li><code>json.dumps(obj)</code> 对象转字符串 —— 对标 <code>JSON.stringify()</code></li>
+</ul>
+<h2>正经：SQLite 数据库</h2>
+<p>Python 内置 <code>sqlite3</code> 标准库，<strong>无需安装</strong>，对标前端的 IndexedDB 但更强大。支持完整 SQL 语法，适合结构化数据。</p>
+<ul>
+<li>建表：<code>CREATE TABLE</code></li>
+<li>增：<code>INSERT INTO</code></li>
+<li>查：<code>SELECT</code></li>
+<li>改：<code>UPDATE</code></li>
+<li>删：<code>DELETE</code></li>
+</ul>
+<h2>SQL 注入防护（重点）</h2>
+<p>用 <code>?</code> 占位符传参，<strong>不要用字符串拼接 SQL</strong>。这跟 JS 里用参数化查询一个道理——拼接 SQL 会导致注入漏洞。</p>
+`,
+    analogy: {
+      rows: [
+        ["JSON.parse(str)", "json.loads(str)", "字符串→对象"],
+        ["JSON.stringify(obj)", "json.dumps(obj)", "对象→字符串"],
+        ["localStorage", "json 文件", "轻量键值"],
+        ["IndexedDB", "sqlite3", "结构化存储"],
+        ["db.query(sql, [args])", "cursor.execute(sql, (args,))", "参数化查询"],
+        ["(无直接对应)", "with conn: 自动提交", "事务管理"],
+      ]
+    },
+    example: `import json
+
+# ===== JSON 读写 =====
+config = {"name": "我的应用", "version": "1.0", "debug": True}
+
+# 写入 JSON 文件
+with open("config.json", "w", encoding="utf-8") as f:
+    json.dump(config, f, ensure_ascii=False, indent=2)
+
+# 读取 JSON 文件
+with open("config.json", encoding="utf-8") as f:
+    loaded = json.load(f)
+print("配置:", loaded)
+
+# 字符串与对象互转
+s = json.dumps({"a": 1, "b": [2, 3]}, ensure_ascii=False)
+print("转字符串:", s)
+print("转回对象:", json.loads(s))
+
+
+# ===== SQLite CRUD =====
+import sqlite3
+
+# 连接数据库（文件不存在会自动创建）
+conn = sqlite3.connect(":memory:")  # 内存数据库，演示用
+cursor = conn.cursor()
+
+# 建表
+cursor.execute("""
+    CREATE TABLE users (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        age INTEGER,
+        email TEXT
+    )
+""")
+
+# 增 Create —— 用 ? 占位符防注入
+cursor.execute("INSERT INTO users (name, age, email) VALUES (?, ?, ?)",
+               ("张三", 25, "zhang@x.com"))
+cursor.execute("INSERT INTO users (name, age, email) VALUES (?, ?, ?)",
+               ("李四", 30, "li@x.com"))
+cursor.execute("INSERT INTO users (name, age, email) VALUES (?, ?, ?)",
+               ("王五", 28, "wang@x.com"))
+conn.commit()
+
+# 查 Read
+cursor.execute("SELECT * FROM users")
+for row in cursor.fetchall():
+    print(row)
+
+# 条件查询
+cursor.execute("SELECT name, age FROM users WHERE age > ?", (27,))
+print("\\n年龄>27的:", cursor.fetchall())
+
+# 改 Update
+cursor.execute("UPDATE users SET age = ? WHERE name = ?", (26, "张三"))
+cursor.execute("SELECT name, age FROM users WHERE name = ?", ("张三",))
+print("更新后张三:", cursor.fetchone())
+
+# 删 Delete
+cursor.execute("DELETE FROM users WHERE name = ?", ("王五",))
+cursor.execute("SELECT COUNT(*) FROM users")
+print("删除后剩余:", cursor.fetchone()[0], "人")
+
+conn.close()`,
+    exercise: {
+      prompt: "用 SQLite 建一个 products 表（id, name, price），插入 3 个商品，然后查询价格大于 50 的商品并打印。提示：建表用 CREATE TABLE，插入用 INSERT INTO ... VALUES (?, ?, ?)，查询用 SELECT ... WHERE price > ?。",
+      starter: `import sqlite3
+
+conn = sqlite3.connect(":memory:")
+cur = conn.cursor()
+
+# 建表
+cur.execute("""
+    CREATE TABLE products (
+        
+    )
+""")
+
+# 插入 3 个商品（名称、价格）
+cur.execute("INSERT INTO products (name, price) VALUES (?, ?)", ("键盘", 199))
+# 补充另外两个
+    
+
+# 查询价格 > 50 的商品
+cur.execute("SELECT * FROM products WHERE ")
+for row in cur.fetchall():
+    print(row)
+
+conn.close()`,
+      hint: "建表字段：id INTEGER PRIMARY KEY, name TEXT, price REAL。插入两条：（'鼠标', 89）、（'贴纸', 5）。查询条件：price > ?，参数传 50。"
+    }
+  },
+  {
+    id: 15, title: "正则表达式 re", subtitle: "数据提取利器，对标 JS 的 RegExp",
+    body: `
+<p>正则表达式是数据提取的核武器。Python 的 <code>re</code> 模块对标 JS 的 RegExp，正则语法几乎一样，但 API 调用方式不同。</p>
+<h2>四个核心函数</h2>
+<ul>
+<li><code>re.search(pattern, string)</code> —— 搜第一个匹配，对标 <code>/p/.exec(s)</code></li>
+<li><code>re.findall(pattern, string)</code> —— 找全部，对标 <code>s.match(/p/g)</code></li>
+<li><code>re.sub(pattern, replace, string)</code> —— 替换，对标 <code>s.replace(/p/, x)</code></li>
+<li><code>re.match(pattern, string)</code> —— 从开头匹配（较少用）</li>
+</ul>
+<h2>用 raw string</h2>
+<p>正则字符串前加 <code>r</code>：<code>r"\\d+"</code>。否则反斜杠会被 Python 转义，写成 <code>"\\\\d+"</code> 才行。这是 Python 写正则的<strong>必须习惯</strong>。</p>
+<h2>分组捕获</h2>
+<p>用括号 <code>()</code> 分组，<code>.group(1)</code> 取第一个分组。<code>findall</code> 配合分组会返回元组列表——这是和 JS 差异最大的地方。</p>
+`,
+    analogy: {
+      rows: [
+        ["/pattern/.test(s)", "re.search(p, s)", "查找是否存在"],
+        ["s.match(/p/g)", "re.findall(p, s)", "找全部匹配"],
+        ["s.replace(/p/, x)", "re.sub(p, x, s)", "替换"],
+        ["/(\\\\d+)/.exec(s)[1]", "re.search(p, s).group(1)", "捕获分组"],
+        ["new RegExp(p)", "re.compile(p)", "预编译复用"],
+        ["'\\\\d+' (需双转义)", "r'\\d+' (raw string)", "正则字符串写法"],
+      ]
+    },
+    example: `import re
+
+text = "联系：zhang@example.com 或 138-1234-5678，备用 li@test.org"
+
+# 查找第一个邮箱
+email = re.search(r"[\\w.]+@[\\w.]+", text)
+print(f"邮箱: {email.group()}")
+
+# 查找所有邮箱
+emails = re.findall(r"[\\w.]+@[\\w.]+", text)
+print(f"所有邮箱: {emails}")
+
+# 查找电话（带分组）
+m = re.search(r"(\\d{3})-(\\d{4})-(\\d{4})", text)
+if m:
+    print(f"区号:{m.group(1)} 中间:{m.group(2)} 尾号:{m.group(3)}")
+
+# 替换 —— 脱敏处理
+masked = re.sub(r"\\d{4}", "****", text)
+print(f"脱敏: {masked}")
+
+# findall + 分组 → 返回元组列表（和 JS 差异最大）
+dates = re.findall(r"(\\d{4})-(\\d{2})-(\\d{2})", "日期 2024-01-15 和 2024-12-31")
+print(f"日期: {dates}")
+
+# 预编译 —— 多次使用时提升性能
+phone_re = re.compile(r"\\d{3}-\\d{4}-\\d{4}")
+print(f"编译匹配: {phone_re.findall(text)}")`,
+    exercise: {
+      prompt: "从文本中提取所有 URL。给定 text = '访问 https://abc.com 或 http://test.org/path 获取详情'，用 re.findall 提取所有 http 开头的 URL。",
+      starter: `import re
+
+text = "访问 https://abc.com 或 http://test.org/path 获取详情"
+
+# 提取所有 URL（http 或 https 开头）
+urls = re.findall(r"", text)
+print(urls)  # ['https://abc.com', 'http://test.org/path']`,
+      hint: "正则 r'https?://[\\w./]+' 匹配 http 或 https 开头的域名和路径。s? 表示 s 可选。"
+    }
+  },
+  {
+    id: 16, title: "CSV 与表格处理", subtitle: "办公自动化高频技能，读写表格数据",
+    body: `
+<p>CSV 是数据交换最通用的格式。Python 内置 <code>csv</code> 模块处理 CSV，对标 JS 没有内置（通常用 papaparse 等库）。</p>
+<h2>两种读取方式</h2>
+<ul>
+<li><code>csv.reader</code> —— 返回列表，<code>row[0]</code> 按下标取列</li>
+<li><code>csv.DictReader</code> —— 返回字典，<code>row["姓名"]</code> 按表头取列，<strong>推荐</strong></li>
+</ul>
+<h2>关键细节</h2>
+<p>写文件时加 <code>newline=""</code>，避免 Windows 下多出空行——这是 Python CSV 的经典坑。编码同样加 <code>utf-8</code>。</p>
+<p>DictWriter 写入：<code>fieldnames</code> 指定列顺序，<code>writeheader()</code> 写表头，<code>writerows()</code> 批量写入。</p>
+`,
+    analogy: {
+      rows: [
+        ["(papaparse.parse)", "csv.reader(f)", "逐行读"],
+        ["{header: value}", "csv.DictReader(f)", "字典行（推荐）"],
+        ["(手动拼接)", "csv.writer(f)", "写入"],
+        ["JSON.stringify rows", "csv.DictWriter", "结构化写"],
+        ["(无内置)", "csv 模块", "Python 标准库"],
+      ]
+    },
+    example: `import csv
+
+# 写 CSV —— 注意 newline=""
+with open("sales.csv", "w", newline="", encoding="utf-8") as f:
+    w = csv.writer(f)
+    w.writerow(["商品", "数量", "单价"])
+    w.writerow(["键盘", 10, 199])
+    w.writerow(["鼠标", 25, 89])
+    w.writerow(["显示器", 5, 1299])
+
+# 读 CSV —— 列表形式
+print("列表形式:")
+with open("sales.csv", encoding="utf-8") as f:
+    for row in csv.reader(f):
+        print(row)
+
+# DictReader —— 字典形式，用表头当键
+print("\\n字典形式 + 计算:")
+total = 0
+with open("sales.csv", encoding="utf-8") as f:
+    for row in csv.DictReader(f):
+        amount = int(row["数量"]) * float(row["单价"])
+        total += amount
+        print(f"  {row['商品']}: {row['数量']} x {row['单价']} = {amount}")
+print(f"总销售额: {total}")
+
+# DictWriter —— 写入结构化数据
+products = [
+    {"name": "耳机", "qty": 15, "price": 159},
+    {"name": "摄像头", "qty": 8, "price": 299},
+]
+with open("more.csv", "w", newline="", encoding="utf-8") as f:
+    w = csv.DictWriter(f, fieldnames=["name", "qty", "price"])
+    w.writeheader()
+    w.writerows(products)
+print("已写入 more.csv")`,
+    exercise: {
+      prompt: "读取 sales.csv，找出销售额最高（数量×单价）的商品并输出。提示：用 DictReader，计算每行 amount，用 max 找最大。",
+      starter: `import csv
+
+with open("sales.csv", encoding="utf-8") as f:
+    rows = list(csv.DictReader(f))
+
+# 计算每个商品的销售额，找最高
+best = max(rows, key=lambda r: )
+best_amount = int(best["数量"]) * float(best["单价"])
+print(f"销冠: {best['商品']}, 销售额 {best_amount}")`,
+      hint: "max 的 key 参数传 lambda r: int(r['数量']) * float(r['单价'])。"
+    }
+  },
+  {
+    id: 17, title: "HTML 解析与数据采集", subtitle: "BeautifulSoup 解析网页，爬虫基础",
+    body: `
+<p>抓取网页数据是 Python 最实用的能力之一。前端开发者天然熟悉 HTML 结构，学这个会非常快——BeautifulSoup 的 API 几乎就是 Python 版的 DOM 操作。</p>
+<h2>BeautifulSoup 核心</h2>
+<p>用 <code>BeautifulSoup(html, "html.parser")</code> 解析 HTML 字符串，得到可查询的树结构。语法对标 jQuery / DOM API。</p>
+<h2>两种查询方式</h2>
+<ul>
+<li><code>soup.select("css选择器")</code> —— CSS 选择器，对标 <code>querySelectorAll</code>，<strong>推荐</strong></li>
+<li><code>soup.find_all("tag")</code> —— 按标签名找，对标 <code>getElementsByTagName</code></li>
+</ul>
+<p>取属性用字典语法 <code>el["href"]</code>，取文本用 <code>el.text</code>。和 JS 的 <code>el.getAttribute()</code> / <code>el.innerText</code> 一一对应。</p>
+<p>注意：真实爬虫用 requests 抓网页（本地环境），Pyodide 里用 pyfetch。这里演示解析已有 HTML 字符串——解析逻辑完全通用。</p>
+`,
+    analogy: {
+      rows: [
+        ["document.querySelector", "soup.select_one", "选第一个"],
+        ["document.querySelectorAll", "soup.select()", "选全部"],
+        ["el.innerText", "el.text", "文本内容"],
+        ["el.getAttribute('href')", "el['href']", "属性值"],
+        ["el.classList", "el.get('class')", "类名"],
+        ["$('.item')", "soup.select('.item')", "CSS 选择器"],
+      ]
+    },
+    example: `from bs4 import BeautifulSoup
+
+html = """
+<html><body>
+  <h1>商品列表</h1>
+  <ul class="products">
+    <li class="item"><a href="/p/1">键盘 <span class="price">199</span></a></li>
+    <li class="item"><a href="/p/2">鼠标 <span class="price">89</span></a></li>
+    <li class="item"><a href="/p/3">显示器 <span class="price">1299</span></a></li>
+  </ul>
+  <p class="footer">共3件</p>
+</body></html>
+"""
+
+soup = BeautifulSoup(html, "html.parser")
+
+# 取标题 —— 直接用标签名
+print(soup.h1.text)
+
+# CSS 选择器 —— 选所有商品
+items = soup.select("li.item")
+for item in items:
+    name = item.a.text.split()[0]          # 商品名
+    price = item.select_one(".price").text  # 价格
+    link = item.a["href"]                   # 链接
+    print(f"{name} - ¥{price} - {link}")
+
+# 提取所有链接 —— 列表推导式 + find_all
+links = [a["href"] for a in soup.find_all("a")]
+print(f"\\n所有链接: {links}")
+
+# 按属性查找
+footer = soup.find("p", class_="footer")
+print(f"页脚: {footer.text}")
+
+# 计算总价
+prices = [int(p.text) for p in soup.select(".price")]
+print(f"总价: ¥{sum(prices)}")`,
+    exercise: {
+      prompt: "解析下面的 HTML，提取所有商品名称和对应链接，输出格式 '名称 -> 链接'。用 select 或 find_all 都行。",
+      starter: `from bs4 import BeautifulSoup
+
+html = '''<ul>
+  <li><a href="/download/python">Python 3.12</a></li>
+  <li><a href="/download/go">Go 1.22</a></li>
+  <li><a href="/download/rust">Rust 1.75</a></li>
+</ul>'''
+
+soup = BeautifulSoup(html, "html.parser")
+
+# 提取名称和链接
+for a in soup.find_all("a"):
+    print(f"{} -> {}")`,
+      hint: "a.text 是链接文字，a['href'] 是链接地址。"
+    }
+  },
+  {
+    id: 18, title: "命令行工具 argparse", subtitle: "把脚本变成可复用工具，对标 commander",
+    body: `
+<p>能把脚本变成"带参数的命令行工具"，是 Python 进阶的标志。Python 内置 <code>argparse</code> 模块，对标 Node.js 的 commander / yargs。</p>
+<h2>三步走</h2>
+<ol>
+<li>创建解析器：<code>argparse.ArgumentParser()</code></li>
+<li>添加参数：<code>parser.add_argument("-n", type=int, help="...")</code></li>
+<li>解析：<code>args = parser.parse_args()</code>，用 <code>args.n</code> 取值</li>
+</ol>
+<h2>参数类型</h2>
+<ul>
+<li>位置参数：<code>add_argument("filename")</code> —— 必填，按顺序</li>
+<li>可选参数：<code>add_argument("-n", "--name")</code> —— 带 - 前缀，选填</li>
+<li><code>type=int/float</code> 自动转类型，<code>default=</code> 设默认值，<code>choices=[...]</code> 限定选项</li>
+</ul>
+<p>注意：Pyodide 里没有真实命令行，这里用 <code>parse_args(["模拟参数"])</code> 演示解析逻辑。本地使用时直接 <code>parse_args()</code> 从命令行读参数。</p>
+`,
+    analogy: {
+      rows: [
+        ["process.argv", "sys.argv", "原始参数数组"],
+        ["commander.program", "argparse.ArgumentParser", "解析器"],
+        [".option('-n, --name')", "add_argument('-n')", "添加参数"],
+        [".parse(process.argv)", "parser.parse_args()", "解析"],
+        ["options.name", "args.name", "取值"],
+        ["(无内置)", "argparse 标准库", "Python 自带"],
+      ]
+    },
+    example: `import argparse
+
+# 创建解析器
+parser = argparse.ArgumentParser(description="计算器命令行工具")
+parser.add_argument("-a", type=float, required=True, help="第一个数")
+parser.add_argument("-b", type=float, required=True, help="第二个数")
+parser.add_argument("--op", default="+", choices=["+","-","*","/"], help="运算符")
+
+# 本地用 parse_args() 读真实命令行
+# 这里传模拟参数演示
+args = parser.parse_args(["-a", "10", "-b", "3", "--op", "*"])
+print(f"参数: a={args.a}, b={args.b}, op={args.op}")
+
+# 执行运算
+ops = {
+    "+": lambda x, y: x + y,
+    "-": lambda x, y: x - y,
+    "*": lambda x, y: x * y,
+    "/": lambda x, y: x / y if y != 0 else "除零错误"
+}
+result = ops[args.op](args.a, args.b)
+print(f"结果: {args.a} {args.op} {args.b} = {result}")
+
+# 演示不同参数
+args2 = parser.parse_args(["-a", "100", "-b", "7", "--op", "/"])
+print(f"\\n{args2.a} / {args2.b} = {ops['/'](args2.a, args2.b):.4f}")
+
+# 本地使用方式（存为 calc.py）:
+# 命令行运行: python calc.py -a 10 -b 3 --op *
+# 自动生成帮助: python calc.py -h`,
+    exercise: {
+      prompt: "定义一个文件处理工具的参数：需要一个必填的 filename 参数（位置参数），一个可选的 --mode 参数（默认 'read'，可选 read/write/append）。用 parse_args 传模拟参数测试。",
+      starter: `import argparse
+
+parser = argparse.ArgumentParser(description="文件处理工具")
+# 添加位置参数 filename
+parser.add_argument("filename", help="要处理的文件名")
+# 添加可选参数 --mode
+parser.add_argument("--mode", default="read", choices=["read", "write", "append"])
+
+# 传模拟参数测试
+args = parser.parse_args(["data.txt", "--mode", "write"])
+print(f"文件: {args.filename}, 模式: {args.mode}")`,
+      hint: "位置参数不带 - 前缀，直接 add_argument('filename')。可选参数带 -- 前缀。"
+    }
+  },
+  {
+    id: 19, title: "综合实战项目", subtitle: "串联所有技能，做出真实有用的程序",
+    body: `
+<p>这一课把前面学的全部串起来，做一个<strong>真实可用的项目</strong>：从 API 采集数据 → 清洗提取 → 存入 CSV → 统计分析。这就是 Python 在实际工作中最典型的数据流转场景。</p>
+<h2>项目：用户数据采集与分析</h2>
+<p>流程：<code>HTTP 请求</code> → <code>JSON 解析</code> → <code>数据清洗</code> → <code>CSV 存储</code> → <code>统计分析</code></p>
+<p>用到的技能：第 13 课的 pyfetch、第 4 课的字典、第 9 课的推导式、第 16 课的 CSV、第 7 课的循环。一个项目把阶段 1 的核心全部串起来。</p>
+<h2>为什么这个项目重要</h2>
+<p>它能直接迁移到你的工作场景：换成任何 API（公司内部接口、第三方数据源），换成任何输出（存数据库、生成报表、发通知），骨架完全一样。学会这个，你就具备了"用 Python 解决实际数据问题"的能力。</p>
+`,
+    analogy: {
+      rows: [
+        ["fetch + 处理 + 存储", "pyfetch + 清洗 + CSV", "数据流相同"],
+        ["axios.get().then()", "asyncio.run(fetch())", "异步请求"],
+        ["data.map().filter()", "推导式 + 循环", "数据处理"],
+        ["导出 JSON/Excel", "csv.DictWriter", "结构化输出"],
+        ["console.table()", "统计 + 打印", "结果展示"],
+      ]
+    },
+    example: `# 综合项目：用户数据采集 → 清洗 → CSV 存储 → 统计
+import asyncio, csv
+from pyodide.http import pyfetch
+from collections import Counter
+
+# 第 1 步：从 API 采集数据
+async def fetch_users():
+    resp = await pyfetch("https://jsonplaceholder.typicode.com/users")
+    return await resp.json()
+
+users = asyncio.run(fetch_users())
+print(f"采集到 {len(users)} 条用户数据\\n")
+
+# 第 2 步：数据清洗与提取（只取需要的字段）
+cleaned = [{
+    "姓名": u["name"],
+    "邮箱": u["email"],
+    "城市": u["address"]["city"],
+    "公司": u["company"]["name"],
+    "经度": float(u["address"]["geo"]["lng"])
+} for u in users]
+
+# 第 3 步：存入 CSV
+with open("users.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.DictWriter(f, fieldnames=["姓名","邮箱","城市","公司","经度"])
+    writer.writeheader()
+    writer.writerows(cleaned)
+print("已存入 users.csv\\n")
+
+# 第 4 步：读取验证
+print("前 3 条记录:")
+with open("users.csv", encoding="utf-8") as f:
+    for i, row in enumerate(csv.DictReader(f)):
+        if i >= 3: break
+        print(f"  {row['姓名']} | {row['城市']} | {row['公司']}")
+
+# 第 5 步：统计分析
+cities = [u["address"]["city"] for u in users]
+print("\\n城市分布:")
+for city, count in Counter(cities).most_common():
+    print(f"  {city}: {count} 人")
+
+# 经度分布（东半球/西半球）
+east = len([u for u in cleaned if u["经度"] > 0])
+print(f"\\n东半球用户: {east} 人, 西半球: {len(cleaned)-east} 人")`,
+    exercise: {
+      prompt: "改造项目：只采集邮箱以 .org 结尾的用户，按公司分组统计人数，输出每家公司有多少人。提示：用字符串 .endswith('.org') 过滤，用 Counter 统计公司。",
+      starter: `import asyncio, csv
+from pyodide.http import pyfetch
+from collections import Counter
+
+async def fetch_users():
+    resp = await pyfetch("https://jsonplaceholder.typicode.com/users")
+    return await resp.json()
+
+users = asyncio.run(fetch_users())
+
+# 过滤邮箱以 .org 结尾的用户
+org_users = [u for u in users if u["email"]]
+
+# 按公司分组统计
+companies = [u["company"]["name"] for u in org_users]
+for company, count in Counter(companies).most_common():
+    print(f"{company}: {count}人")`,
+      hint: "过滤条件 u['email'].endswith('.org')。统计用 Counter([u['company']['name'] for u in org_users])。"
+    }
+  }
+];
+
+/* ============================================================
+   Pyodide 初始化
+   ============================================================ */
+let pyodide = null;
+let pyodideReady = false;
+
+async function initPyodide() {
+  try {
+    pyodide = await loadPyodide();
+    await pyodide.loadPackage("beautifulsoup4");
+    pyodideReady = true;
+    document.getElementById('pyDot').className = 'dot ready';
+    document.getElementById('pyStatus').textContent = 'Python 已就绪';
+    document.getElementById('loader').classList.add('hide');
+  } catch (e) {
+    document.getElementById('pyDot').className = 'dot';
+    document.getElementById('pyStatus').textContent = '加载失败，请刷新重试';
+    console.error(e);
+  }
+}
+
+async function runCode(code, outputEl) {
+  if (!pyodideReady) {
+    outputEl.textContent = 'Python 运行时还在加载，请稍候…';
+    outputEl.className = 'output err';
+    return;
+  }
+  outputEl.textContent = '运行中…';
+  outputEl.className = 'output';
+  try {
+    const wrapped = `
+import sys, io, traceback
+_old = sys.stdout
+sys.stdout = io.StringIO()
+_err = None
+try:
+    exec(${JSON.stringify(code)})
+except Exception:
+    _err = traceback.format_exc()
+_out = sys.stdout.getvalue()
+sys.stdout = _old
+_out + (_err if _err else "")
+`;
+    const result = pyodide.runPython(wrapped);
+    outputEl.textContent = result || '(无输出)';
+  } catch (e) {
+    outputEl.textContent = String(e.message || e);
+    outputEl.className = 'output err';
+  }
+}
+
+/* ============================================================
+   渲染逻辑
+   ============================================================ */
+let currentLesson = 0;
+const STORAGE_KEY = 'py-course-progress';
+
+function loadProgress() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+  catch { return {}; }
+}
+function saveProgress(p) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch {}
+}
+let progress = loadProgress();
+
+function renderNav() {
+  const nav = document.getElementById('navList');
+  nav.innerHTML = LESSONS.map((l, i) => `
+    <div class="nav-item ${i === currentLesson ? 'active' : ''} ${progress[l.id] ? 'done' : ''}" data-idx="${i}">
+      <span class="num">${String(i+1).padStart(2,'0')}</span>
+      <span>${l.title}</span>
+      <span class="check"></span>
+    </div>
+  `).join('');
+  nav.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => {
+      currentLesson = parseInt(el.dataset.idx);
+      renderNav();
+      renderLesson();
+      closeSidebar();
+      window.scrollTo(0, 0);
+    });
+  });
+  updateProgressBar();
+}
+
+function updateProgressBar() {
+  const done = LESSONS.filter(l => progress[l.id]).length;
+  const pct = (done / LESSONS.length) * 100;
+  document.getElementById('progBar').style.width = pct + '%';
+  document.getElementById('progText').textContent = `${done} / ${LESSONS.length}`;
+}
+
+function renderLesson() {
+  const l = LESSONS[currentLesson];
+  const main = document.getElementById('main');
+  const analogyHtml = l.analogy.rows.map(r =>
+    `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`
+  ).join('');
+
+  main.innerHTML = `
+    <div class="lesson-num">第 ${String(currentLesson+1).padStart(2,'0')} 课 / 共 ${LESSONS.length} 课</div>
+    <h1>${l.title}</h1>
+    <p class="subtitle">${l.subtitle}</p>
+    ${l.body}
+    <div class="analogy">
+      <div class="tag">前端类比对照</div>
+      <table>
+        <tr><th>JavaScript</th><th>Python</th><th>说明</th></tr>
+        ${analogyHtml}
+      </table>
+    </div>
+    <h2>可运行示例</h2>
+    ${codeBlock(l.example, '示例代码')}
+    <h2>动手练习</h2>
+    <div class="exercise">
+      <div class="ex-head">练习题</div>
+      <div class="ex-prompt">${l.exercise.prompt}</div>
+      ${codeBlock(l.exercise.starter, '你的代码')}
+      <div class="ex-hint">提示：${l.exercise.hint}</div>
+    </div>
+    <div class="lesson-foot">
+      <button class="done-btn ${progress[l.id] ? 'checked' : ''}" id="doneBtn">
+        ${progress[l.id] ? '✓ 已完成' : '标记完成'}
+      </button>
+      <div class="pager">
+        <button id="prevBtn" ${currentLesson === 0 ? 'disabled' : ''}>← 上一课</button>
+        <button id="nextBtn" ${currentLesson === LESSONS.length-1 ? 'disabled' : ''}>下一课 →</button>
+      </div>
+    </div>
+  `;
+  bindLessonEvents(l);
+}
+
+function codeBlock(code, label) {
+  const id = 'cb_' + Math.random().toString(36).slice(2, 9);
+  return `
+    <div class="code-block">
+      <div class="code-head">
+        <span class="label">${label}</span>
+        <button class="run-btn" data-target="${id}"><span class="play"></span>运行</button>
+      </div>
+      <textarea id="${id}" spellcheck="false">${code.replace(/</g,'&lt;')}</textarea>
+      <div class="output empty" id="${id}_out"></div>
+    </div>
+  `;
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.max(160, el.scrollHeight + 4) + 'px';
+}
+
+function bindLessonEvents(l) {
+  document.querySelectorAll('.code-block textarea').forEach(ta => {
+    autoResize(ta);
+    ta.addEventListener('input', () => autoResize(ta));
+  });
+  document.querySelectorAll('.run-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.target;
+      const code = document.getElementById(id).value;
+      const out = document.getElementById(id + '_out');
+      out.classList.remove('empty');
+      btn.disabled = true;
+      await runCode(code, out);
+      btn.disabled = false;
+    });
+  });
+  document.getElementById('doneBtn').addEventListener('click', () => {
+    if (progress[l.id]) {
+      delete progress[l.id];
+    } else {
+      progress[l.id] = true;
+    }
+    saveProgress(progress);
+    renderNav();
+    renderLesson();
+  });
+  document.getElementById('prevBtn')?.addEventListener('click', () => {
+    if (currentLesson > 0) { currentLesson--; renderNav(); renderLesson(); window.scrollTo(0,0); }
+  });
+  document.getElementById('nextBtn')?.addEventListener('click', () => {
+    if (currentLesson < LESSONS.length-1) { currentLesson++; renderNav(); renderLesson(); window.scrollTo(0,0); }
+  });
+}
+
+/* 侧边栏移动端 */
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('backdrop').classList.remove('show');
+}
+document.getElementById('menuBtn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('backdrop').classList.toggle('show');
+});
+document.getElementById('backdrop').addEventListener('click', closeSidebar);
+
+/* 启动 */
+renderNav();
+renderLesson();
+initPyodide();
+</script>
+</body>
+</html>
