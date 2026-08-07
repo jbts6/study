@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import {
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
+  renameSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -17,6 +20,7 @@ import {
   selectLessonFile,
   writeGeneratedLessons,
 } from './sync-course.mjs';
+import { replaceFileWithRollback } from './course-output.mjs';
 
 function createFixture() {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'python-course-'));
@@ -52,7 +56,11 @@ function createFixture() {
     const dayDirectory = `${String(day).padStart(2, '0')}_Day_Lesson`;
     writeFixture(
       `${dayDirectory}/${String(day).padStart(2, '0')}_lesson.md`,
-      `# Day ${day}: Lesson\n\nLesson ${day}.\n`,
+      day === 4
+        ? '导言\n## 第四天：首个标题\n# 后续标题\n'
+        : day === 5
+          ? '这一天没有 Markdown 标题。\n'
+          : `# Day ${day}: Lesson\n\nLesson ${day}.\n`,
     );
   }
 
@@ -95,6 +103,24 @@ test('课程生成严格包含 30 天且按 day 排序', (t) => {
   assert.match(lessons[1].sourceUrl, /Asabeneh\/30-Days-Of-Python/);
 });
 
+test('课程标题取首个一级或二级标题', (t) => {
+  const fixtureRoot = createFixture();
+  t.after(() => rmSync(fixtureRoot, { recursive: true, force: true }));
+
+  const lessons = buildLessons(fixtureRoot);
+
+  assert.equal(lessons[3].title, '第四天：首个标题');
+});
+
+test('课程没有标题时回退为带两位数的日期标题', (t) => {
+  const fixtureRoot = createFixture();
+  t.after(() => rmSync(fixtureRoot, { recursive: true, force: true }));
+
+  const lessons = buildLessons(fixtureRoot);
+
+  assert.equal(lessons[4].title, '第 05 天');
+});
+
 test('生成文件使用可执行的 window 数据结构', (t) => {
   const fixtureRoot = createFixture();
   const pythonRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -112,4 +138,37 @@ test('生成文件使用可执行的 window 数据结构', (t) => {
   runInNewContext(readFileSync(outputPath, 'utf8'), context);
   assert.equal(context.window.PYTHON_COURSE.lessons.length, 30);
   assert.equal(context.window.PYTHON_COURSE.source, 'Asabeneh/30-Days-Of-Python');
+});
+
+test('生成文件替换失败时保留旧文件并清理临时文件', (t) => {
+  const fixtureRoot = createFixture();
+  t.after(() => rmSync(fixtureRoot, { recursive: true, force: true }));
+  const outputPath = join(fixtureRoot, 'lessons.js');
+  const temporaryPath = join(fixtureRoot, 'lessons.js.tmp');
+  writeFileSync(outputPath, '旧生成文件', 'utf8');
+  writeFileSync(temporaryPath, '新生成文件', 'utf8');
+
+  let renameCount = 0;
+  const fileSystem = {
+    existsSync,
+    renameSync(source, destination) {
+      renameCount += 1;
+      if (renameCount === 2) {
+        throw new Error('模拟替换失败');
+      }
+      renameSync(source, destination);
+    },
+    rmSync,
+  };
+
+  assert.throws(
+    () => replaceFileWithRollback(temporaryPath, outputPath, fileSystem),
+    /模拟替换失败/,
+  );
+  assert.equal(readFileSync(outputPath, 'utf8'), '旧生成文件');
+  assert.equal(existsSync(temporaryPath), false);
+  assert.equal(
+    readdirSync(fixtureRoot).some((name) => name.includes('.backup-')),
+    false,
+  );
 });
