@@ -140,6 +140,58 @@ test('生成文件使用可执行的 window 数据结构', (t) => {
   assert.equal(context.window.PYTHON_COURSE.source, 'Asabeneh/30-Days-Of-Python');
 });
 
+test('临时文件写入失败时保留已有生成文件并清理临时文件', (t) => {
+  const fixtureRoot = createFixture();
+  const pythonRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+  const outputRoot = mkdtempSync(join(pythonRoot, '.python-course-generated-'));
+  t.after(() => {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+    rmSync(outputRoot, { recursive: true, force: true });
+  });
+
+  const outputPath = join(outputRoot, 'lessons.js');
+  const oldContent = '旧生成文件';
+  writeFileSync(outputPath, oldContent, 'utf8');
+  const fileSystem = {
+    existsSync,
+    mkdirSync,
+    renameSync,
+    rmSync,
+    writeFileSync(filePath, ...args) {
+      if (filePath.endsWith('.tmp')) {
+        throw new Error('模拟临时文件写入失败');
+      }
+      return writeFileSync(filePath, ...args);
+    },
+  };
+
+  assert.throws(
+    () => writeGeneratedLessons(outputPath, buildLessons(fixtureRoot), fileSystem),
+    /模拟临时文件写入失败/,
+  );
+  assert.equal(readFileSync(outputPath, 'utf8'), oldContent);
+  assert.deepEqual(readdirSync(outputRoot), ['lessons.js']);
+});
+
+test('生成文件临时文件必须与输出文件位于同一目录', (t) => {
+  const outputRoot = mkdtempSync(join(tmpdir(), 'python-course-output-'));
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'python-course-temp-'));
+  t.after(() => {
+    rmSync(outputRoot, { recursive: true, force: true });
+    rmSync(temporaryRoot, { recursive: true, force: true });
+  });
+  const outputPath = join(outputRoot, 'lessons.js');
+  const temporaryPath = join(temporaryRoot, 'lessons.js.tmp');
+  writeFileSync(temporaryPath, '新生成文件', 'utf8');
+
+  assert.throws(
+    () => replaceFileWithRollback(temporaryPath, outputPath),
+    /same directory/,
+  );
+  assert.equal(existsSync(outputPath), false);
+  assert.equal(existsSync(temporaryPath), true);
+});
+
 test('生成文件替换失败时保留旧文件并清理临时文件', (t) => {
   const fixtureRoot = createFixture();
   t.after(() => rmSync(fixtureRoot, { recursive: true, force: true }));

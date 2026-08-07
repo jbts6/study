@@ -53,27 +53,33 @@ export function replaceFileWithRollback(
   outputPath,
   fileSystem = defaultFileSystem,
 ) {
-  const backupPath = `${outputPath}.backup-${randomUUID()}`;
+  const resolvedTemporaryPath = resolve(temporaryPath);
+  const resolvedOutputPath = resolve(outputPath);
+  if (dirname(resolvedTemporaryPath) !== dirname(resolvedOutputPath)) {
+    throw new Error('temporary and output files must be in the same directory');
+  }
+
+  const backupPath = `${resolvedOutputPath}.backup-${randomUUID()}`;
   let backupCreated = false;
 
   try {
-    if (fileSystem.existsSync(outputPath)) {
-      fileSystem.renameSync(outputPath, backupPath);
+    if (fileSystem.existsSync(resolvedOutputPath)) {
+      fileSystem.renameSync(resolvedOutputPath, backupPath);
       backupCreated = true;
     }
 
-    fileSystem.renameSync(temporaryPath, outputPath);
+    fileSystem.renameSync(resolvedTemporaryPath, resolvedOutputPath);
     if (backupCreated) {
       fileSystem.rmSync(backupPath, { force: true });
     }
   } catch (error) {
     if (backupCreated) {
       try {
-        if (fileSystem.existsSync(outputPath)) {
-          fileSystem.rmSync(outputPath, { force: true });
+        if (fileSystem.existsSync(resolvedOutputPath)) {
+          fileSystem.rmSync(resolvedOutputPath, { force: true });
         }
         if (fileSystem.existsSync(backupPath)) {
-          fileSystem.renameSync(backupPath, outputPath);
+          fileSystem.renameSync(backupPath, resolvedOutputPath);
         }
       } catch (rollbackError) {
         error.rollbackError = rollbackError;
@@ -81,7 +87,7 @@ export function replaceFileWithRollback(
     }
     throw error;
   } finally {
-    fileSystem.rmSync(temporaryPath, { force: true });
+    fileSystem.rmSync(resolvedTemporaryPath, { force: true });
   }
 }
 
