@@ -159,6 +159,10 @@ func isDockerUnavailable(message string) bool {
 		"error during connect",
 		"failed to connect to the docker api",
 		"docker daemon",
+		"error response from daemon",
+		"unable to find image",
+		"pull access denied",
+		"permission denied while trying to connect",
 		"no such file or directory",
 	} {
 		if strings.Contains(lower, marker) {

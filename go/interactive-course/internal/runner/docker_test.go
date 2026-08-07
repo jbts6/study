@@ -16,6 +16,7 @@ func TestClassifyDockerRunError(t *testing.T) {
 		{name: "deadline", err: context.DeadlineExceeded, want: StatusTimeout},
 		{name: "daemon unavailable", err: errors.New("exit status 1"), stderr: "Cannot connect to the Docker daemon", want: StatusRunnerUnavailable},
 		{name: "docker api unavailable", err: errors.New("exit status 1"), stderr: "failed to connect to the Docker API at npipe:////./pipe/dockerDesktopLinuxEngine", want: StatusRunnerUnavailable},
+		{name: "runner image unavailable", err: errors.New("exit status 1"), stderr: "Unable to find image 'study-go-runner:1.25.1' locally\nError response from daemon: pull access denied", want: StatusRunnerUnavailable},
 		{name: "test failure", err: errors.New("exit status 1"), stderr: "FAIL\n", want: StatusTestFailed},
 	}
 
