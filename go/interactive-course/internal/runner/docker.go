@@ -157,6 +157,7 @@ func isDockerUnavailable(message string) bool {
 		"cannot connect to the docker daemon",
 		"is the docker daemon running",
 		"error during connect",
+		"failed to connect to the docker api",
 		"docker daemon",
 		"no such file or directory",
 	} {
