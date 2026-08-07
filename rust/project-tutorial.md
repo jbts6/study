@@ -1,225 +1,774 @@
-# Rust 项目实战手册：从练习到异步功能切片
 
-> 这份手册把 [课程主线](course.md)、[上游资源索引](resources.md) 和 [六阶段路线图](roadmap.md) 收束为一条可执行的项目实践路径。它负责安排阅读、动手、观察和验收，不复制任何上游教程、练习答案或 `mini-redis` 实现。
 
-## 使用方式
+这是课程的综合项目，不是只读的架构示意。你将从零实现一个命令行任务管理器，先完成不依赖第三方库的同步版本，再选择性增加文件保存和 Tokio 异步事件流。
 
-项目实践不是把上游项目重新抄一遍，而是用上游材料验证自己的理解，再把已经验证的概念迁移到一个范围明确的功能切片。每个阶段都按以下顺序推进：
+## 最终结果
 
-1. 阅读指定材料，只记录本阶段要验证的一个或几个问题。
-2. 关闭资料后独立动手，保留命令、工具链版本和第一条相关错误。
-3. 观察编译器、测试、日志或程序输出，写下结果与原先预期的差异。
-4. 对照完成标准决定是否进入下一阶段；未达标时缩小问题，不用增加阅读量代替验证。
+程序支持：
 
-上游仓库的安装、启动和检查命令以当前 README 为准。本地手册只固定学习动作和验收维度，避免把容易过期的参数当作课程 API。
+- add 标题：新增任务；
+- list：列出任务；
+- done id：完成任务；
+- remove id：删除任务；
+- quit：退出；
+- 错误输入返回明确的业务错误；
+- 业务规则可以脱离终端单独测试；
+- 可选：保存和加载本地文件；
+- 可选：把命令交给 Tokio worker 处理。
 
-## 路径总览
+项目重点不是命令行外观，而是练习 Rust 的所有权、enum、Result、模块、测试、线程和异步边界。
 
-| 阶段 | 实践主题 | 阶段产出 |
-|---|---|---|
-| 1 | Rustlings 知识点复现 | 一条编译反馈记录和一个独立修复的练习 |
-| 2 | 100 Exercises 连续练习 | 一组按顺序完成的练习和错误类型复盘 |
-| 3 | Async Book 异步预备 | 一个带测试的最小异步示例和执行模型记录 |
-| 4 | mini-redis 阅读与运行 | 一份模块边界图和异步项目概念映射 |
-| 5 | 个人项目迁移设计 | 一个小型 API 或 CLI 功能切片设计及运行说明 |
-| 6 | 项目验收 | 可运行功能、失败路径测试、并发或异步说明和错误复盘 |
+## 先定范围
 
-阶段 1 和阶段 2 负责把编译反馈变成日常练习；阶段 3 和阶段 4 负责建立异步项目的阅读模型；阶段 5 和阶段 6 只实现并验收个人项目的一个功能切片，不把范围扩大成完整产品。
+第一版只做内存任务，不加 serde、clap 或数据库依赖。这样每个类型和错误都由你自己设计，编译器反馈不会被框架配置掩盖。完成同步版并写完测试后，再决定是否需要依赖。
 
-## 阶段 1：Rustlings 知识点复现
-
-### 阅读材料
-
-- 当前 Rust 主线中正在学习的知识点和对应阶段完成条件。
-- [rust-lang/rustlings](https://github.com/rust-lang/rustlings) 当前 README，以及与该知识点对应的练习说明。
-- 遇到概念分歧时，回查 [rust-lang/book](https://github.com/rust-lang/book) 或 [rust-lang/rust-by-example](https://github.com/rust-lang/rust-by-example)，只查解决当前卡点所需的范围。
-
-### 动手动作
-
-1. 选一个能复现当前知识点的 Rustlings 练习，先记录 Rust 和练习仓库版本。
-2. 在自己的练习目录中运行上游当前推荐的检查命令，先观察原始失败，不直接搜索答案。
-3. 保存编译器第一条相关错误，标注它涉及的类型、所有权、借用、匹配或错误处理约束。
-4. 独立修改并重新运行同一命令；通过后再写一句“为什么这个改动能解决错误”。
-
-### 可观察结果
-
-- 第一次运行的命令、第一条相关错误和出错位置可复现。
-- 修复后的练习能够按当前上游入口通过检查，且结果不是依赖跳过练习或复制答案。
-- 记录能把编译器提示翻译成具体的 Rust 规则，例如某个值被移动、某个分支没有覆盖或某个结果没有处理。
-
-### 完成标准
-
-- 至少独立复现并修复一个当前知识点的 Rustlings 练习。
-- 能从空白副本重新运行练习，并解释原始错误和修复原因。
-- 记录包含工具链版本、命令、第一条相关错误、改动理由和最终结果。
-
-## 阶段 2：100 Exercises 连续练习
-
-### 阅读材料
-
-- [mainmatter/100-exercises-to-learn-rust](https://github.com/mainmatter/100-exercises-to-learn-rust) 当前 README、练习顺序和运行说明。
-- 课程路线图中与当前连续练习对应的所有权、trait、泛型或错误处理完成条件。
-- 只在独立完成一组练习后阅读该仓库的 `solutions` 分支，用于比较思路和复盘取舍。
-
-### 动手动作
-
-1. 从当前基础位置选一组连续练习，明确起止位置，不跨题跳读。
-2. 每道题先独立尝试，保存自己的版本和第一次编译反馈，再运行该题的检查。
-3. 只有完成这一组的独立尝试后，才查看 `solutions` 分支；比较时记录“我的实现已经满足什么、上游解法解决了什么额外问题”。
-4. 把连续练习中重复出现的错误归类，例如移动与借用、trait bound、迭代器类型或 `Result` 传播，并挑一个写最小复现。
-
-### 可观察结果
-
-- 练习按连续顺序留下命令和结果，能区分“首次独立尝试失败”和“复盘后通过”。
-- 每道练习都有可验证的编译或测试结果，而不是只保存最终答案。
-- 错误复盘能说明编译器约束怎样影响函数签名、数据流或抽象边界。
-
-### 完成标准
-
-- 独立完成一组连续练习，并按当前上游入口通过对应检查。
-- 每道题在查看 `solutions` 分支前都有自己的尝试记录；对照答案不会替代首次完成。
-- 能用自己的话解释至少两类反复出现的错误，并把其中一类迁移为一个小测试或可运行例子。
-
-## 阶段 3：异步预备
-
-### 阅读材料
-
-- [rust-lang/async-book](https://github.com/rust-lang/async-book) 的 `async`/`await`、运行时、任务、Future 驱动、Pin/await 基础和共享状态相关章节。
-- 阶段 5 的路线图完成条件，重点确认运行时、任务、共享状态和阻塞操作的边界。
-- 需要核对语法或同步原语时，再查官方 Book；不提前阅读综合项目的实现细节。
-
-### 动手动作
-
-1. 在独立 Cargo 项目中写一个最小异步场景：创建任务、等待任务完成，并通过测试验证结果。
-2. 增加一个共享状态场景，明确状态由谁拥有、任务如何访问，以及何时需要同步原语。
-3. 单独记录一个阻塞操作隔离方案，说明它为什么不能无条件放进异步任务。
-4. 用日志、计数器或测试断言观察 Future 是否被运行时驱动、任务何时结束以及共享状态是否符合预期。
-
-### 可观察结果
-
-- 最小异步项目能按本地记录的命令运行，测试能稳定复现成功结果。
-- 日志或断言能显示任务调度、等待和共享状态更新的先后关系。
-- 记录能指出 Future、运行时、任务和 Pin/await 基础之间的关系，也能指出一次阻塞调用的风险和隔离位置。
-
-### 完成标准
-
-- 完成 Async Book 指定章节，并能解释 `async`/`await` 不等同于自动并行，以及 Future 如何被运行时推进。
-- 最小异步示例通过 `cargo +stable check` 和测试命令。
-- 能说明任务生命周期、共享状态所有权和阻塞操作隔离方式，再进入 mini-redis 阅读。
-
-## 阶段 4：mini-redis 阅读与运行
-
-### 阅读材料
-
-- [tokio-rs/mini-redis](https://github.com/tokio-rs/mini-redis) 当前 README、官方示例和仓库目录结构。
-- 按以下顺序阅读项目职责，不跳过前面的运行结果：协议与帧解析、TCP server、client、共享状态、连接限制、Pub/Sub、优雅退出、异步测试。
-- 遇到运行时或任务模型疑问时，回查 [rust-lang/async-book](https://github.com/rust-lang/async-book) 的对应章节。
-
-### 动手动作
-
-1. 在独立目录按 mini-redis 当前 README 先运行官方示例，记录启动命令、输入、输出和失败时的第一条错误。
-2. 示例可运行后，再按“协议/帧解析 -> TCP server -> client -> 共享状态 -> 连接限制 -> Pub/Sub -> 优雅退出 -> 异步测试”的顺序阅读。
-3. 每读完一个职责，画出输入、输出、状态所有权和错误传播方向；只记录调用关系和工程取舍，不复制实现代码。
-4. 用自己的语言写一份 Async Book 概念到 mini-redis 模块的映射，标出仍不理解的边界并用最小实验验证。
-
-### 可观察结果
-
-- 官方示例能够按当前 README 启动或完成检查，运行结果和环境限制有记录。
-- 模块图能区分协议解析、TCP 连接、client、共享状态、连接限制、Pub/Sub、优雅退出和异步测试各自的职责。
-- 能从日志、测试或代码入口定位一次请求如何经过网络层进入状态处理，并说明并发连接或关闭流程的可观察信号。
-
-### 完成标准
-
-- 先运行官方示例，再按规定顺序完成阅读，不能以“看过目录”替代运行。
-- 能用自己的话解释主要模块之间的调用关系、共享状态边界、连接限制和优雅退出处理。
-- 产出包含模块边界图、概念映射和至少一次可复现的检查或测试结果；不包含复制的 mini-redis 实现代码。
-
-## 阶段 5：个人项目迁移设计
-
-### 阅读材料
-
-- 阶段 4 的模块边界记录和 [roadmap.md](roadmap.md) 的异步综合项目完成条件。
-- 个人选择的小型 API 或 CLI 功能的现有入口、输入输出和运行说明。
-- mini-redis 中值得借鉴的职责分离和工程取舍；只借鉴边界，不借用其实现语义或代码。
-
-### 动手动作
-
-1. 选择一个能在一次短迭代内完成的小功能，明确输入、输出和不包含的范围。
-2. 先写模块边界：入口层、核心逻辑、状态存储、错误类型和测试分别负责什么，哪些数据由谁拥有。
-3. 写出错误类型及其转换路径，说明输入错误、状态冲突、外部失败和并发或异步失败如何被观察。
-4. 列出至少一个成功用例、一个失败用例和一条从干净目录启动或运行功能的命令，再开始实现。
-
-### 可观察结果
-
-- 一份短设计记录能让别人只看边界就知道每个模块的输入、输出和所有权责任。
-- 功能切片能执行自己的运行命令，正常输入得到预期输出，错误输入得到可解释的错误结果。
-- `cargo +stable check`、必要的测试、格式化或 Clippy 检查结果被记录；不适用的检查项有原因说明。
-
-### 完成标准
-
-- 个人项目只实现一个范围明确的 API 或 CLI 功能，不把 mini-redis 改名后当作自己的项目。
-- 设计记录明确模块边界、错误类型、状态所有权、测试用例和运行命令。
-- 代码保持个人项目自身语义，且至少有一个成功路径和一个失败路径可以在阶段 6 重复验收。
-
-## 阶段 6：项目验收
-
-### 阅读材料
-
-- 阶段 5 的功能切片设计、模块边界和运行说明。
-- [roadmap.md](roadmap.md) 的阶段 6 完成标准，以及项目自身 README、测试和检查配置。
-- 之前保存的编译反馈和错误复盘，确认最终实现没有用跳过检查掩盖问题。
-
-### 动手动作
-
-1. 从干净环境或明确的项目目录运行功能命令，记录工具链版本、输入、输出和退出码。
-2. 运行成功路径测试和失败路径测试；失败测试要验证错误类型、错误信息或错误状态，而不是只验证程序崩溃。
-3. 写一段并发或异步行为说明：指出任务、共享状态、连接或阻塞操作的边界，并说明如何观察到该行为。
-4. 完成一份错误复盘，包含失败现象、最小复现、第一条相关错误、定位依据、修复改动和修复后的验证命令。
-
-### 可观察结果
-
-- 至少一个个人功能能实际运行，且运行命令、输入输出和退出结果可被他人复现。
-- 至少一个失败路径测试稳定通过，能证明错误被显式处理。
-- 并发或异步说明与测试、日志或代码结构一致；错误复盘包含修复前后的证据，不只写结论。
-
-### 完成标准
-
-项目只有同时满足以下条件才算验收完成：
-
-- [ ] 至少有一个可运行的个人项目功能。
-- [ ] 至少有一个失败路径测试，并能稳定重复。
-- [ ] 有一份并发或异步行为说明，涵盖运行时、任务、共享状态或阻塞边界中的相关部分。
-- [ ] 有一份错误复盘，记录现象、定位、修复和验证。
-- [ ] 能说明个人实现借鉴了哪些模块边界，以及哪些语义和实现没有复制 mini-redis 或其他上游项目。
-
-## 个人项目迁移检查清单
-
-在开始编码和提交验收记录前逐项检查：
-
-- [ ] 功能范围只有一个可交付切片，明确列出不做什么。
-- [ ] 每个模块都有职责、输入、输出和状态所有权说明。
-- [ ] 错误类型覆盖主要输入、状态和外部失败路径。
-- [ ] 至少一个成功测试和一个失败路径测试已经列入运行命令。
-- [ ] 运行命令不依赖个人机器上的隐藏步骤或未记录服务。
-- [ ] 并发或异步行为说明能被测试、日志或代码结构验证。
-- [ ] 错误复盘保留第一条相关编译或测试错误，以及修复后的同一命令结果。
-- [ ] 没有复制 mini-redis、Rustlings、100 Exercises 或其他上游仓库的实现代码和答案。
-
-## 阶段记录模板
-
-每次阶段实践至少保存以下内容；命令和输出应以实际运行结果为准：
+推荐项目目录：
 
 ```text
-阶段：
-阅读材料：仓库、章节或 README 入口
-要验证的问题：
-动手动作：
-命令与工具链版本：
-第一条相关错误：
-修复原因：
-可观察结果：编译、测试、日志、输入输出或退出码
-完成标准：逐项写明通过或未通过及证据
-下一步：只写一个可执行动作
+task-board/
+├── Cargo.toml
+├── src/
+│   ├── main.rs
+│   ├── command.rs
+│   ├── error.rs
+│   └── task.rs
+├── tests/
+│   └── task_book.rs
+└── notes/
+    └── decisions.md
 ```
 
-阶段完成后再进入下一阶段；如果某项完成标准没有证据，就保留为未完成，并回到最小可复现案例继续验证。
+# 第 0 步：创建项目和验收基线
+
+执行：
+
+```bash
+cargo new task-board
+cd task-board
+cargo check
+cargo test
+cargo fmt
+```
+
+在 notes/decisions.md 写下三项决定：
+
+1. 第一版任务只保存 id、title、done。
+2. TaskBook 拥有任务集合。
+3. 终端输入只在 main 中出现，业务模块不读取 stdin。
+
+每天结束运行：
+
+```bash
+cargo fmt --check
+cargo check
+cargo test
+```
+
+如果这三条命令不能通过，不进入下一步。先保留编译器输出，再处理一个最小错误。
+
+# 第 1 步：设计领域类型
+
+## 1.1 Task
+
+在 src/task.rs 中先写数据，不急着写所有功能：
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Task {
+    pub id: u32,
+    pub title: String,
+    pub done: bool,
+}
+
+impl Task {
+    pub fn new(id: u32, title: String) -> Result<Self, TaskError> {
+        let title = title.trim().to_owned();
+        if title.is_empty() {
+            return Err(TaskError::EmptyTitle);
+        }
+
+        Ok(Self {
+            id,
+            title,
+            done: false,
+        })
+    }
+
+    pub fn finish(&mut self) {
+        self.done = true;
+    }
+}
+```
+
+这里让 Task::new 拥有传入的 String，因为任务需要长期保存标题；但调用方仍然可以把 &str 转成 String 后传入。不要在 new 内部保存一个局部字符串的引用。
+
+## 1.2 TaskError
+
+在 src/error.rs 中定义业务错误：
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskError {
+    EmptyTitle,
+    MissingTask(u32),
+    InvalidCommand(String),
+    Storage(String),
+}
+```
+
+第一版只会用前三个变体。Storage 先保留给后面的文件扩展，真正使用时再补 I/O 错误转换。
+
+## 1.3 TaskBook
+
+TaskBook 是状态的唯一拥有者：
+
+```rust
+use crate::error::TaskError;
+use crate::task::Task;
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct TaskBook {
+    tasks: Vec<Task>,
+    next_id: u32,
+}
+
+impl TaskBook {
+    pub fn new() -> Self {
+        Self {
+            tasks: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    pub fn add(&mut self, title: String) -> Result<&Task, TaskError> {
+        let task = Task::new(self.next_id, title)?;
+        self.next_id += 1;
+        self.tasks.push(task);
+        Ok(self.tasks.last().expect("刚刚插入的任务必须存在"))
+    }
+}
+```
+
+这里的 expect 只用于内部不变量：push 成功后 last 必然存在。用户输入的失败不能用 expect 处理，应该在 Task::new 中返回错误。
+
+## 1.4 完成、删除和查询
+
+继续给 TaskBook 增加方法：
+
+```rust
+impl TaskBook {
+    pub fn all(&self) -> &[Task] {
+        &self.tasks
+    }
+
+    pub fn find(&self, id: u32) -> Option<&Task> {
+        self.tasks.iter().find(|task| task.id == id)
+    }
+
+    pub fn done(&mut self, id: u32) -> Result<&Task, TaskError> {
+        let task = self
+            .tasks
+            .iter_mut()
+            .find(|task| task.id == id)
+            .ok_or(TaskError::MissingTask(id))?;
+
+        task.finish();
+        Ok(task)
+    }
+
+    pub fn remove(&mut self, id: u32) -> Result<Task, TaskError> {
+        let index = self
+            .tasks
+            .iter()
+            .position(|task| task.id == id)
+            .ok_or(TaskError::MissingTask(id))?;
+
+        Ok(self.tasks.remove(index))
+    }
+}
+```
+
+练习重点：
+
+- all 返回切片，调用方只能借用读取；
+- done 使用 iter_mut，因为它要修改任务；
+- remove 用 remove 把 Task 的所有权交给调用方；
+- ok_or 把 Option 转成带原因的 Result。
+
+## 第 1 步检查
+
+先在 task.rs 末尾加测试：
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn adds_trimmed_task() {
+        let mut book = TaskBook::new();
+        let task = book.add(String::from("  学 Rust  ")).unwrap();
+
+        assert_eq!(task.title, "学 Rust");
+        assert_eq!(task.id, 1);
+        assert!(!task.done);
+    }
+
+    #[test]
+    fn rejects_empty_title() {
+        let mut book = TaskBook::new();
+        assert_eq!(
+            book.add(String::from("   ")),
+            Err(TaskError::EmptyTitle)
+        );
+    }
+
+    #[test]
+    fn completes_and_removes_task() {
+        let mut book = TaskBook::new();
+        book.add(String::from("写测试")).unwrap();
+
+        assert!(book.done(1).unwrap().done);
+        assert_eq!(book.remove(1).unwrap().title, "写测试");
+        assert!(book.all().is_empty());
+    }
+
+    #[test]
+    fn reports_missing_task() {
+        let mut book = TaskBook::new();
+        assert_eq!(book.done(99), Err(TaskError::MissingTask(99)));
+    }
+}
+```
+
+运行：
+
+```bash
+cargo fmt
+cargo test task
+```
+
+完成标准：
+
+- [ ] 空标题失败。
+- [ ] id 从 1 开始递增。
+- [ ] 完成会修改 done。
+- [ ] 删除会把 Task 所有权返回。
+- [ ] 不存在 id 返回 MissingTask。
+
+# 第 2 步：模块和公开接口
+
+src/main.rs 先只声明模块：
+
+```rust
+mod command;
+mod error;
+mod task;
+
+use command::Command;
+use task::TaskBook;
+
+fn main() {
+    let _book = TaskBook::new();
+    let _command = Command::List;
+    println!("Task Board 已启动");
+}
+```
+
+模块可见性规则：
+
+- 文件内的函数默认私有；
+- 其他模块要使用的类型和方法加 pub；
+- TaskBook 的 tasks 字段不必公开，避免 main 直接绕过业务规则；
+- error.rs 中的错误类型需要公开，因为 command 和 task 都要返回它。
+
+如果出现 unresolved import，先检查 main.rs 是否声明了 mod，再检查类型和方法是否加 pub。
+
+# 第 3 步：解析命令
+
+## 3.1 定义 Command
+
+src/command.rs：
+
+```rust
+use crate::error::TaskError;
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Command {
+    Add(String),
+    List,
+    Done(u32),
+    Remove(u32),
+    Quit,
+}
+
+impl Command {
+    pub fn parse(input: &str) -> Result<Self, TaskError> {
+        let mut parts = input.split_whitespace();
+        let name = parts.next().unwrap_or("");
+
+        match name {
+            "add" => {
+                let title = parts.collect::<Vec<_>>().join(" ");
+                if title.is_empty() {
+                    Err(TaskError::EmptyTitle)
+                } else {
+                    Ok(Self::Add(title))
+                }
+            }
+            "list" => Ok(Self::List),
+            "done" => Ok(Self::Done(parse_id(parts.next())?)),
+            "remove" => Ok(Self::Remove(parse_id(parts.next())?)),
+            "quit" | "exit" => Ok(Self::Quit),
+            _ => Err(TaskError::InvalidCommand(input.to_owned())),
+        }
+    }
+}
+
+fn parse_id(value: Option<&str>) -> Result<u32, TaskError> {
+    value
+        .ok_or_else(|| TaskError::InvalidCommand(String::from("缺少 id")))?
+        .parse()
+        .map_err(|_| TaskError::InvalidCommand(String::from("id 必须是数字")))
+}
+```
+
+这里的 parse 只负责把文本变成类型，不负责修改 TaskBook。这样测试不需要启动终端。
+
+## 3.2 解析测试
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_add_with_spaces() {
+        assert_eq!(
+            Command::parse("add 学 Rust"),
+            Ok(Command::Add(String::from("学 Rust")))
+        );
+    }
+
+    #[test]
+    fn parses_numeric_commands() {
+        assert_eq!(Command::parse("done 3"), Ok(Command::Done(3)));
+        assert_eq!(Command::parse("remove 4"), Ok(Command::Remove(4)));
+    }
+
+    #[test]
+    fn rejects_bad_input() {
+        assert!(Command::parse("done abc").is_err());
+        assert!(Command::parse("unknown").is_err());
+    }
+}
+```
+
+## 第 3 步检查
+
+```bash
+cargo fmt
+cargo test command
+cargo clippy -- -D warnings
+```
+
+不要在 parse 中调用 TaskBook。解析器只回答“这是什么命令”，业务层再回答“这个命令能否执行”。
+
+# 第 4 步：执行命令和终端边界
+
+在 task.rs 增加一个只负责展示的函数：
+
+```rust
+impl TaskBook {
+    pub fn render(&self) -> String {
+        if self.tasks.is_empty() {
+            return String::from("暂无任务");
+        }
+
+        self.tasks
+            .iter()
+            .map(|task| {
+                let mark = if task.done { "x" } else { " " };
+                format!("[{mark}] {} {}", task.id, task.title)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+```
+
+main.rs 负责读取输入和控制循环：
+
+```rust
+use std::io::{self, Write};
+
+fn main() {
+    let mut book = TaskBook::new();
+
+    loop {
+        print!("task> ");
+        io::stdout().flush().expect("终端输出应可用");
+
+        let mut input = String::new();
+        if io::stdin().read_line(&mut input).is_err() {
+            eprintln!("读取输入失败");
+            break;
+        }
+
+        match Command::parse(&input) {
+            Ok(Command::Add(title)) => match book.add(title) {
+                Ok(task) => println!("已添加 {}：{}", task.id, task.title),
+                Err(error) => eprintln!("添加失败：{error:?}"),
+            },
+            Ok(Command::List) => println!("{}", book.render()),
+            Ok(Command::Done(id)) => match book.done(id) {
+                Ok(task) => println!("已完成：{}", task.title),
+                Err(error) => eprintln!("操作失败：{error:?}"),
+            },
+            Ok(Command::Remove(id)) => match book.remove(id) {
+                Ok(task) => println!("已删除：{}", task.title),
+                Err(error) => eprintln!("操作失败：{error:?}"),
+            },
+            Ok(Command::Quit) => break,
+            Err(error) => eprintln!("命令错误：{error:?}"),
+        }
+    }
+}
+```
+
+这里的两个 expect 是进程边界上的固定不变量：终端输出失败时程序无法继续交互。用户输入、任务 id 和标题都没有使用 expect。
+
+为了让错误更适合用户，把 error.rs 增加 Display：
+
+```rust
+use std::fmt;
+
+impl fmt::Display for TaskError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyTitle => write!(formatter, "任务标题不能为空"),
+            Self::MissingTask(id) => write!(formatter, "找不到任务 {id}"),
+            Self::InvalidCommand(message) => write!(formatter, "命令错误：{message}"),
+            Self::Storage(message) => write!(formatter, "存储错误：{message}"),
+        }
+    }
+}
+```
+
+完成后把 eprintln 中的 {:?} 改成 {}。Debug 方便开发，Display 负责用户看到的文字。
+
+# 第 5 步：集成测试
+
+单元测试验证模块内部规则，tests/task_book.rs 验证公开行为：
+
+```rust
+use task_board::task::TaskBook;
+
+#[test]
+fn user_can_add_and_complete_task() {
+    let mut book = TaskBook::new();
+
+    let created = book.add(String::from("完成项目")).unwrap();
+    assert_eq!(created.id, 1);
+
+    let completed = book.done(1).unwrap();
+    assert!(completed.done);
+}
+```
+
+如果项目还是二进制包，先把共享模块移到 src/lib.rs：
+
+```rust
+pub mod command;
+pub mod error;
+pub mod task;
+```
+
+然后 src/main.rs 用同名包路径导入。Cargo 的包名来自 Cargo.toml 中的 name 字段。
+
+集成测试还要覆盖：
+
+```rust
+#[test]
+fn missing_id_is_a_business_error() {
+    let mut book = TaskBook::new();
+    let error = book.remove(404).unwrap_err();
+    assert_eq!(error.to_string(), "找不到任务 404");
+}
+```
+
+运行：
+
+```bash
+cargo test
+cargo test -- --nocapture
+```
+
+完成标准：
+
+- [ ] 单元测试覆盖模型和解析器。
+- [ ] 集成测试只使用公开接口。
+- [ ] 测试不读取 stdin、不依赖终端顺序。
+- [ ] 失败路径的错误文字稳定。
+
+# 第 6 步：文件持久化扩展
+
+同步内存版通过后再加持久化。先不引入序列化库，使用一个简单的文本格式：
+
+```text
+id<TAB>done<TAB>title
+```
+
+标题中的换行和制表符需要拒绝，或者设计转义规则。学习项目先拒绝它们，避免把重点变成写序列化器。
+
+## 6.1 保存
+
+在 task.rs 中添加：
+
+```rust
+use std::fs;
+use std::path::Path;
+
+impl TaskBook {
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), TaskError> {
+        let mut output = String::new();
+
+        for task in &self.tasks {
+            if task.title.contains(['\n', '\t']) {
+                return Err(TaskError::Storage(String::from(
+                    "标题不能包含换行或制表符",
+                )));
+            }
+
+            output.push_str(&format!(
+                "{}\t{}\t{}\n",
+                task.id, task.done, task.title
+            ));
+        }
+
+        fs::write(path, output)
+            .map_err(|error| TaskError::Storage(error.to_string()))
+    }
+}
+```
+
+## 6.2 加载
+
+加载时不要直接替换当前状态，先构造临时 TaskBook，全部解析成功后再返回：
+
+```rust
+impl TaskBook {
+    pub fn load(path: impl AsRef<Path>) -> Result<Self, TaskError> {
+        let text = fs::read_to_string(path)
+            .map_err(|error| TaskError::Storage(error.to_string()))?;
+        let mut book = Self::new();
+
+        for line in text.lines() {
+            let mut fields = line.splitn(3, '\t');
+            let id = fields
+                .next()
+                .ok_or_else(|| TaskError::Storage(String::from("缺少 id")))?
+                .parse::<u32>()
+                .map_err(|_| TaskError::Storage(String::from("id 无效")))?;
+            let done = fields
+                .next()
+                .ok_or_else(|| TaskError::Storage(String::from("缺少完成状态")))?
+                .parse::<bool>()
+                .map_err(|_| TaskError::Storage(String::from("完成状态无效")))?;
+            let title = fields
+                .next()
+                .ok_or_else(|| TaskError::Storage(String::from("缺少标题")))?
+                .to_owned();
+
+            book.tasks.push(Task { id, title, done });
+            book.next_id = book.next_id.max(id + 1);
+        }
+
+        Ok(book)
+    }
+}
+```
+
+需要注意 id 溢出。如果要把这个项目用于长期保存，应增加重复 id 和最大 id 的校验；学习项目可以把它作为额外练习。
+
+## 6.3 持久化测试
+
+```rust
+#[test]
+fn saves_and_loads_tasks() {
+    let path = std::env::temp_dir().join("task-board-test.txt");
+    let mut original = TaskBook::new();
+    original.add(String::from("保存我")).unwrap();
+    original.done(1).unwrap();
+
+    original.save(&path).unwrap();
+    let loaded = TaskBook::load(&path).unwrap();
+
+    assert_eq!(loaded.all(), original.all());
+    let _ = std::fs::remove_file(path);
+}
+```
+
+测试失败时检查临时文件是否残留，不要把测试路径写死到项目目录。
+
+# 第 7 步：Tokio 异步扩展
+
+只有同步版测试稳定后才进入本节。异步版本的目标是练习事件处理，不是把所有方法改成 async。
+
+Cargo.toml 增加：
+
+```toml
+[dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
+```
+
+设计原则：
+
+- 一个 worker 拥有 TaskBook；
+- 主任务只发送 Command；
+- worker 返回执行结果；
+- Stop 关闭循环；
+- 业务类型仍然使用同步的 TaskBook 方法。
+
+消息类型：
+
+```rust
+use tokio::sync::oneshot;
+
+pub enum WorkerMessage {
+    Execute(Command, oneshot::Sender<Result<String, TaskError>>),
+    Stop,
+}
+```
+
+worker：
+
+```rust
+async fn run_worker(
+    mut book: TaskBook,
+    mut receiver: tokio::sync::mpsc::Receiver<WorkerMessage>,
+) {
+    while let Some(message) = receiver.recv().await {
+        match message {
+            WorkerMessage::Execute(command, response) => {
+                let result = execute_command(&mut book, command);
+                let _ = response.send(result);
+            }
+            WorkerMessage::Stop => break,
+        }
+    }
+}
+```
+
+这里的 execute_command 可以是同步函数，因为它只是内存操作。不要为了“异步”给纯计算和纯内存逻辑加无意义的 await。
+
+## 7.1 异步测试
+
+```rust
+#[tokio::test]
+async fn worker_returns_command_result() {
+    let (sender, receiver) = tokio::sync::mpsc::channel(4);
+    let worker = tokio::spawn(run_worker(TaskBook::new(), receiver));
+    let (response_sender, response_receiver) = oneshot::channel();
+
+    sender
+        .send(WorkerMessage::Execute(
+            Command::Add(String::from("异步任务")),
+            response_sender,
+        ))
+        .await
+        .unwrap();
+
+    assert!(response_receiver.await.unwrap().is_ok());
+    sender.send(WorkerMessage::Stop).await.unwrap();
+    worker.await.unwrap();
+}
+```
+
+异步扩展的验收：
+
+- [ ] worker 是 TaskBook 的唯一拥有者。
+- [ ] 主任务不直接修改 worker 内的状态。
+- [ ] Stop 后 worker 能结束。
+- [ ] response channel 关闭时没有 panic。
+- [ ] 同步业务测试仍然全部通过。
+
+# 第 8 步：重构与代码审查
+
+完成功能后做一次反向审查：
+
+## 所有权审查
+
+- TaskBook 是否唯一拥有任务集合？
+- 返回 Task 的方法是否真的需要转移所有权？
+- 是否存在为了过编译而添加的 clone？
+- 公开切片是否让调用方意外依赖内部结构？
+
+## 错误审查
+
+- 用户输入是否都通过 Result 返回？
+- 文件错误是否保留原始信息？
+- worker 停止和响应 channel 关闭是否可区分？
+- main 是否只负责展示错误？
+
+## 测试审查
+
+- 空列表、空标题、未知命令、不存在 id 是否覆盖？
+- 持久化文件损坏时是否失败？
+- 测试是否依赖真实用户目录？
+- 异步测试是否有明确的退出和等待？
+
+## 工程命令
+
+```bash
+cargo fmt --check
+cargo check
+cargo clippy -- -D warnings
+cargo test
+```
+
+# 最终验收
+
+## 功能
+
+- [ ] add、list、done、remove、quit 均可使用。
+- [ ] 空标题、未知命令、无效 id、有不存在任务均有明确错误。
+- [ ] 任务 id 稳定递增。
+- [ ] list 的输出顺序稳定。
+- [ ] 持久化可选功能通过保存和加载测试。
+
+## Rust 能力
+
+- [ ] TaskBook 通过所有权拥有任务。
+- [ ] 查询使用借用，修改使用可变借用。
+- [ ] enum 表达命令和错误。
+- [ ] Result 传播失败，不用 panic 处理用户输入。
+- [ ] 至少一个线程或 Tokio worker 有明确停止路径。
+
+## 交付物
+
+完成后应留下：
+
+```text
+src/
+├── main.rs
+├── command.rs
+├── error.rs
+└── task.rs
+
+tests/
+└── task_book.rs
+
+notes/
+└── decisions.md
+```
+
+在 decisions.md 中写下：
+
+1. 为什么 TaskBook 拥有 Vec<Task>；
+2. 为什么解析和执行分开；
+3. 为什么第一版先不用依赖；
+4. 为什么持久化或异步扩展被放在同步版之后；
+5. 一次真实编译错误以及你的修复原因。
+
+这个项目完成后，再回到 course.md 的最终验收表，并使用 resources.md 选择下一项针对性练习，不要继续堆无关链接。
