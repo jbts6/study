@@ -7,12 +7,18 @@
     const setRuntimeStatus = options.setRuntimeStatus || (() => {});
     let pythonRunner = null;
 
+    function forwardRunnerStatus(status = {}) {
+      const state = status.state || 'idle';
+      const kind = state === 'running' ? 'loading' : state;
+      setRuntimeStatus(status.message || '等待 Python 运行时', kind);
+    }
+
     async function initialize() {
       try {
         const factory = runtimeGlobal.createPythonRunner
           || runtimeGlobal.PythonCourseRunner?.createPythonRunner;
         pythonRunner = typeof factory === 'function'
-          ? factory({ loadPyodide: runtimeGlobal.loadPyodide, document })
+          ? factory({ loadPyodide: runtimeGlobal.loadPyodide, document, onStatus: forwardRunnerStatus })
           : null;
         if (!pythonRunner || typeof pythonRunner.init !== 'function') {
           setRuntimeStatus('运行器待 Task 3 接入', 'idle');

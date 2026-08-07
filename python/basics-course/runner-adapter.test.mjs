@@ -12,6 +12,7 @@ test('运行器适配器初始化并执行 Python 代码', async () => {
   runInNewContext(source, context);
 
   const statuses = [];
+  let reportRunnerStatus;
   const runner = {
     async init() {},
     async run(code) {
@@ -22,6 +23,7 @@ test('运行器适配器初始化并执行 Python 代码', async () => {
     loadPyodide: 'loadPyodide',
     createPythonRunner(options) {
       assert.equal(options.loadPyodide, 'loadPyodide');
+      reportRunnerStatus = options.onStatus;
       return runner;
     },
   };
@@ -47,4 +49,7 @@ test('运行器适配器初始化并执行 Python 代码', async () => {
   assert.equal(output.className, 'code-output is-success');
   assert.equal(output.textContent, '输出：print(1)');
   assert.equal(button.disabled, false);
+  assert.equal(typeof reportRunnerStatus, 'function');
+  reportRunnerStatus({ state: 'running', message: '正在运行 Python 代码…' });
+  assert.deepEqual(statuses.at(-1), ['正在运行 Python 代码…', 'loading']);
 });
