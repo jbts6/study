@@ -1,0 +1,67 @@
+{
+  "id": "go-start",
+  "title": "Go 起步",
+  "lessons": [
+    {
+      "id": "go-start-01",
+      "title": "第一个 Go 程序",
+      "goal": "认识 package main、func main 和 fmt.Println，完成第一个可运行的 Go 程序。",
+      "explanation": "Go 的可执行程序从 package main 开始，func main 是程序入口。fmt.Println 会把文本写到标准输出并自动补上换行。\n\n先把程序结构看完整，再修改输出内容；编译器会在运行前检查语法和类型。",
+      "exerciseGoal": "让程序严格输出 Hello, Go!，并保留结尾换行。",
+      "hints": [
+        "入口函数必须叫 main，并且不接收参数。",
+        "使用 fmt.Println 而不是手动拼接换行符。"
+      ],
+      "tests": [
+        {"id": "hello-output", "label": "输出 Hello, Go!"}
+      ]
+    },
+    {
+      "id": "go-start-02",
+      "title": "变量与基础类型",
+      "goal": "使用 string 和 int 参数，理解字符串空值与整数零值，并组合出稳定的英文简介。",
+      "explanation": "Go 的变量有明确类型：string 保存文本，int 保存整数。函数参数的类型写在参数名后面，fmt.Sprintf 可以把不同类型按格式组合成字符串。\n\n字符串的零值是空字符串，整数的零值是 0。本节约定空姓名显示为 Guest，年龄仍然按传入的整数显示。",
+      "exerciseGoal": "实现 formatProfile(name string, age int) string，返回 Name: <name>, Age: <age> 格式的英文描述；name 为空时使用 Guest。",
+      "hints": [
+        "先判断 name == \"\"，再决定要格式化的姓名。",
+        "%s 用于字符串，%d 用于整数。"
+      ],
+      "tests": [
+        {"id": "profile-values", "label": "格式化字符串和整数"},
+        {"id": "profile-zero-values", "label": "处理空姓名和零年龄"}
+      ]
+    },
+    {
+      "id": "go-start-03",
+      "title": "if 与 for 控制流",
+      "goal": "用 if 和 else if 按分数边界分类，并通过 main 输出一个分类示例。",
+      "explanation": "Go 的 if 条件不需要括号，花括号必须保留。多个分支按从特殊到一般的顺序排列：90 分及以上是 excellent，60 到 89 分是 pass，其余是 retry。\n\n边界值最容易暴露条件错误，所以要特别检查 100、60 和 59。",
+      "exerciseGoal": "实现 classify(score int) string，正确返回 excellent、pass 或 retry，并让 main 输出一个示例分类。",
+      "hints": [
+        "先判断 score >= 90，再判断 score >= 60。",
+        "最后一个 else 覆盖低于 60 的分数。"
+      ],
+      "tests": [
+        {"id": "score-100", "label": "100 分为 excellent"},
+        {"id": "score-60", "label": "60 分为 pass"},
+        {"id": "score-59", "label": "59 分为 retry"}
+      ]
+    },
+    {
+      "id": "go-start-04",
+      "title": "函数与返回值",
+      "goal": "定义接收整数切片并返回整数的函数，使用 for range 累加结果。",
+      "explanation": "函数签名同时描述参数和返回值：sum(numbers []int) int 接收一组整数，返回一个整数。切片可以为空，遍历空切片时循环体不会执行，因此累加器的零值 0 正好就是正确答案。\n\n完成函数后，让 main 调用它并输出一个示例，观察函数返回值如何回到调用处。",
+      "exerciseGoal": "实现 sum(numbers []int) int，覆盖空切片、单元素和多元素输入，并让 main 输出一个示例结果。",
+      "hints": [
+        "先声明 total := 0。",
+        "使用 for _, number := range numbers 累加 total，最后 return total。"
+      ],
+      "tests": [
+        {"id": "sum-empty", "label": "空切片返回 0"},
+        {"id": "sum-single", "label": "单元素正确返回"},
+        {"id": "sum-many", "label": "多元素正确累加"}
+      ]
+    }
+  ]
+}
