@@ -44,8 +44,10 @@ function assertPythonOutputPath(outputPath) {
 
 const defaultFileSystem = {
   existsSync,
+  mkdirSync,
   renameSync,
   rmSync,
+  writeFileSync,
 };
 
 export function replaceFileWithRollback(
@@ -91,7 +93,11 @@ export function replaceFileWithRollback(
   }
 }
 
-export function writeGeneratedLessons(outputPath, lessons) {
+export function writeGeneratedLessons(
+  outputPath,
+  lessons,
+  fileSystem = defaultFileSystem,
+) {
   if (!Array.isArray(lessons) || lessons.length !== COURSE_DAYS) {
     throw new Error(`expected exactly ${COURSE_DAYS} lessons`);
   }
@@ -104,12 +110,12 @@ export function writeGeneratedLessons(outputPath, lessons) {
   const generated = `window.PYTHON_COURSE = ${JSON.stringify(payload, null, 2)};\n`;
   const temporaryPath = `${resolvedOutputPath}.${process.pid}.${randomUUID()}.tmp`;
 
-  mkdirSync(dirname(resolvedOutputPath), { recursive: true });
+  fileSystem.mkdirSync(dirname(resolvedOutputPath), { recursive: true });
   try {
-    writeFileSync(temporaryPath, generated, 'utf8');
-    replaceFileWithRollback(temporaryPath, resolvedOutputPath);
+    fileSystem.writeFileSync(temporaryPath, generated, 'utf8');
+    replaceFileWithRollback(temporaryPath, resolvedOutputPath, fileSystem);
   } catch (error) {
-    rmSync(temporaryPath, { force: true });
+    fileSystem.rmSync(temporaryPath, { force: true });
     throw error;
   }
 }
