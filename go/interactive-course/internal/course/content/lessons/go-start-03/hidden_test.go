@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"io"
 	"os"
 	"testing"
@@ -24,9 +25,16 @@ func TestClassifyScoreBoundaries(t *testing.T) {
 }
 
 func TestMainPrintsClassificationExample(t *testing.T) {
-	if output := captureProgramOutput(t, main); output != "pass\n" {
+	output := captureProgramOutput(t, main)
+	reportProgramOutput(t, output)
+	if output != "pass\n" {
 		t.Fatalf("main output = %q, want %q", output, "pass\n")
 	}
+}
+
+func reportProgramOutput(t *testing.T, output string) {
+	t.Helper()
+	t.Log("GO_COURSE_STDOUT:" + base64.StdEncoding.EncodeToString([]byte(output)))
 }
 
 func captureProgramOutput(t *testing.T, run func()) string {

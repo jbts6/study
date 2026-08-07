@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"io"
 	"os"
 	"testing"
@@ -27,9 +28,16 @@ func TestSumHandlesEmptySingleAndManyValues(t *testing.T) {
 }
 
 func TestMainPrintsSumExample(t *testing.T) {
-	if output := captureProgramOutput(t, main); output != "6\n" {
+	output := captureProgramOutput(t, main)
+	reportProgramOutput(t, output)
+	if output != "6\n" {
 		t.Fatalf("main output = %q, want %q", output, "6\n")
 	}
+}
+
+func reportProgramOutput(t *testing.T, output string) {
+	t.Helper()
+	t.Log("GO_COURSE_STDOUT:" + base64.StdEncoding.EncodeToString([]byte(output)))
 }
 
 func captureProgramOutput(t *testing.T, run func()) string {

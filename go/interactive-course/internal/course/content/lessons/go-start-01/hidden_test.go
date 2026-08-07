@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"io"
 	"os"
 	"testing"
@@ -8,9 +9,15 @@ import (
 
 func TestHelloGoOutput(t *testing.T) {
 	output := captureProgramOutput(t, main)
+	reportProgramOutput(t, output)
 	if output != "Hello, Go!\n" {
 		t.Fatalf("main output = %q, want %q", output, "Hello, Go!\n")
 	}
+}
+
+func reportProgramOutput(t *testing.T, output string) {
+	t.Helper()
+	t.Log("GO_COURSE_STDOUT:" + base64.StdEncoding.EncodeToString([]byte(output)))
 }
 
 func captureProgramOutput(t *testing.T, run func()) string {
