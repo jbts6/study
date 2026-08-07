@@ -77,4 +77,4 @@ npx playwright install chromium
 npx playwright test
 ```
 
-Playwright 测试使用 mock API 验证桌面和移动端的页面状态、通过后解锁和布局；`internal/runner/integration_test.go` 在 Docker daemon 和 runner 镜像可用时验证可选的真实容器执行，否则会明确跳过。
+Playwright 测试使用 mock API 验证桌面和移动端的页面状态、通过后解锁和布局；设置 `GO_COURSE_DOCKER_INTEGRATION=1` 后，`internal/runner/integration_test.go` 才会验证真实容器执行，否则会明确跳过。

@@ -2,11 +2,15 @@ package runner
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"testing"
 )
 
 func TestDockerRunnerWithBuiltImage(t *testing.T) {
+	if os.Getenv("GO_COURSE_DOCKER_INTEGRATION") != "1" {
+		t.Skip("Docker integration is opt-in; set GO_COURSE_DOCKER_INTEGRATION=1")
+	}
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("Docker CLI unavailable")
 	}
