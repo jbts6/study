@@ -13,7 +13,7 @@
         "使用 fmt.Println 而不是手动拼接换行符。"
       ],
       "tests": [
-        {"id": "hello-output", "label": "输出 Hello, Go!"}
+        {"id": "TestHelloGoOutput", "label": "输出 Hello, Go!"}
       ]
     },
     {
@@ -27,8 +27,9 @@
         "%s 用于字符串，%d 用于整数。"
       ],
       "tests": [
-        {"id": "profile-values", "label": "格式化字符串和整数"},
-        {"id": "profile-zero-values", "label": "处理空姓名和零年龄"}
+        {"id": "TestFormatProfileUsesStringAndIntValues", "label": "格式化字符串和整数"},
+        {"id": "TestFormatProfileHandlesZeroValues", "label": "处理空姓名和零年龄"},
+        {"id": "TestMainPrintsProfileExample", "label": "输出简介示例"}
       ]
     },
     {
@@ -42,9 +43,8 @@
         "最后一个 else 覆盖低于 60 的分数。"
       ],
       "tests": [
-        {"id": "score-100", "label": "100 分为 excellent"},
-        {"id": "score-60", "label": "60 分为 pass"},
-        {"id": "score-59", "label": "59 分为 retry"}
+        {"id": "TestClassifyScoreBoundaries", "label": "检查分数边界"},
+        {"id": "TestMainPrintsClassificationExample", "label": "输出分类示例"}
       ]
     },
     {
@@ -58,9 +58,8 @@
         "使用 for _, number := range numbers 累加 total，最后 return total。"
       ],
       "tests": [
-        {"id": "sum-empty", "label": "空切片返回 0"},
-        {"id": "sum-single", "label": "单元素正确返回"},
-        {"id": "sum-many", "label": "多元素正确累加"}
+        {"id": "TestSumHandlesEmptySingleAndManyValues", "label": "覆盖空、单元素和多元素"},
+        {"id": "TestMainPrintsSumExample", "label": "输出求和示例"}
       ]
     }
   ]
