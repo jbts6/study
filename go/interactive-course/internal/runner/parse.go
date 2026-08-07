@@ -19,7 +19,7 @@ type goTestEvent struct {
 	Elapsed float64 `json:"Elapsed"`
 }
 
-var diagnosticPattern = regexp.MustCompile(`(?:^|\s)(?:\./)?(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.go:([0-9]+)(?::([0-9]+))?:\s*(.+)$`)
+var diagnosticPattern = regexp.MustCompile(`(?:^|\s)(?:\./|\.\\)?(?:[A-Za-z0-9_.-]+[/\\])*[A-Za-z0-9_.-]+\.go:([0-9]+)(?::([0-9]+))?:\s*(.+)$`)
 
 func parseGoTestJSON(stdout, stderr string, labels map[string]string) Result {
 	result := Result{Status: StatusPassed, Tests: make([]TestResult, 0)}

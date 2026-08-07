@@ -37,6 +37,15 @@ func TestParseGoTestJSONDetectsCompileDiagnostic(t *testing.T) {
 	}
 }
 
+func TestParseGoTestJSONDetectsWindowsCompileDiagnostic(t *testing.T) {
+	output := `{"ImportPath":"exercise","Action":"build-output","Output":".\\main.go:2:15: undefined: missing\n"}`
+	result := parseGoTestJSON(output, "", nil)
+
+	if result.Status != StatusCompileError || len(result.Diagnostics) != 1 || result.Diagnostics[0].Line != 2 || result.Diagnostics[0].Column != 15 {
+		t.Fatalf("windows diagnostics = %#v, want main.go line 2 column 15", result.Diagnostics)
+	}
+}
+
 func TestParseGoTestJSONDetectsTestFailureMessage(t *testing.T) {
 	output := strings.Join([]string{
 		`{"Action":"run","Package":"exercise","Test":"TestSum"}`,
