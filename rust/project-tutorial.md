@@ -72,6 +72,12 @@ cargo test
 
 在 src/task.rs 中先写数据，不急着写所有功能：
 
+文件顶部先导入错误类型：
+
+```rust
+use crate::error::TaskError;
+```
+
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Task {
@@ -126,7 +132,7 @@ TaskBook 是状态的唯一拥有者：
 use crate::error::TaskError;
 use crate::task::Task;
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct TaskBook {
     tasks: Vec<Task>,
     next_id: u32,
@@ -525,6 +531,13 @@ id<TAB>done<TAB>title
 
 在 task.rs 中添加：
 
+先补充文件读写所需的导入：
+
+```rust
+use std::fs;
+use std::path::Path;
+```
+
 ```rust
 use std::fs;
 use std::path::Path;
@@ -534,7 +547,7 @@ impl TaskBook {
         let mut output = String::new();
 
         for task in &self.tasks {
-            if task.title.contains(['\n', '\t']) {
+            if task.title.contains('\n') || task.title.contains('\t') {
                 return Err(TaskError::Storage(String::from(
                     "标题不能包含换行或制表符",
                 )));
