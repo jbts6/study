@@ -32,6 +32,7 @@ func TestBuildDockerArgsEnforcesSandbox(t *testing.T) {
 		"run", "--rm", "--network=none", "--read-only", "--user", "10001:10001",
 		"--cpus=0.5", "--memory=128m", "--pids-limit=64", "--cap-drop=ALL",
 		"--security-opt=no-new-privileges", "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+		"--tmpfs", "/run/go-tmp:rw,nosuid,size=32m", "--env", "GOTMPDIR=/run/go-tmp",
 		"--workdir", "/workspace", DefaultImage, "go", "test", "-json", "-v", "-count=1", "./...",
 	}
 	for _, want := range required {

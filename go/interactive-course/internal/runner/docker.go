@@ -73,8 +73,7 @@ func (r *DockerRunner) Run(ctx context.Context, request Request) Result {
 	runContext, cancel := context.WithTimeout(ctx, limits.Timeout)
 	defer cancel()
 	command := exec.CommandContext(runContext, r.dockerBinary, buildDockerArgs(workDir, r.image, limits)...)
-	stdout := newLimitedWriter(limits.MaxOutputBytes)
-	stderr := newLimitedWriter(limits.MaxOutputBytes)
+	stdout, stderr := newSharedLimitedWriters(limits.MaxOutputBytes)
 	command.Stdout = stdout
 	command.Stderr = stderr
 	err = command.Run()
@@ -116,9 +115,11 @@ func buildDockerArgs(sourceDir, image string, limits Limits) []string {
 		"--cpus=" + limits.CPUs, "--memory=" + limits.Memory,
 		fmt.Sprintf("--pids-limit=%d", limits.PidsLimit), "--cap-drop=ALL",
 		"--security-opt=no-new-privileges", "--tmpfs", limits.Tmpfs,
+		"--tmpfs", "/run/go-tmp:rw,nosuid,size=32m",
 		"--mount", mount, "--workdir", "/workspace",
 		"--env", "GOCACHE=/tmp/go-build", "--env", "GOMODCACHE=/tmp/go-mod",
 		"--env", "GOPATH=/tmp/go-path", "--env", "GOPROXY=off",
+		"--env", "GOTMPDIR=/run/go-tmp",
 		"--env", "GOSUMDB=off", "--env", "GOTOOLCHAIN=local", "--env", "GOTELEMETRY=off",
 		image, "go", "test", "-json", "-v", "-count=1", "./...",
 	}

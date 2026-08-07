@@ -64,6 +64,19 @@ func TestLimitedWriterTruncatesOutput(t *testing.T) {
 	}
 }
 
+func TestSharedLimitedWritersCapCombinedOutput(t *testing.T) {
+	stdout, stderr := newSharedLimitedWriters(4)
+	if _, err := stdout.Write([]byte("abc")); err != nil {
+		t.Fatalf("stdout Write() error = %v", err)
+	}
+	if _, err := stderr.Write([]byte("def")); err != nil {
+		t.Fatalf("stderr Write() error = %v", err)
+	}
+	if len(stdout.String())+len(stderr.String()) > 4 || (!stdout.Truncated() && !stderr.Truncated()) {
+		t.Fatalf("shared output = %q/%q, truncated = %v/%v, want combined limit 4", stdout.String(), stderr.String(), stdout.Truncated(), stderr.Truncated())
+	}
+}
+
 func TestParseGoTestJSONIgnoresUnknownEvents(t *testing.T) {
 	result := parseGoTestJSON(`{"Action":"skip","Package":"exercise","Test":"TestOptional"}`, "", nil)
 	if result.Status != StatusPassed || len(result.Tests) != 0 {
