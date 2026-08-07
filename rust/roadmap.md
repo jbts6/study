@@ -626,4 +626,4 @@ cargo test
 2. 测试能证明一个成功路径和一个失败路径；
 3. 能用自己的话解释本阶段最重要的所有权或错误边界。
 
-只满足“看懂了”不切换阶段。课程正文见 course.md，完整项目步骤见 project-tutorial.md，GitHub 项目的使用时机见 resources.md。
+只满足“看懂了”不切换阶段。课程正文见 [course.md](course.md)，完整项目步骤见 [project-tutorial.md](project-tutorial.md)，GitHub 项目的使用时机见 [resources.md](resources.md)。

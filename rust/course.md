@@ -979,7 +979,7 @@ mod tests {
 4. 先写单元测试，再接入命令行输入。
 5. 最后增加文件保存或 Tokio 异步事件流。
 
-项目的逐步实现说明见 project-tutorial.md。本文件负责教概念，项目文件负责把概念串起来，不要跳过中间检查点直接复制最终代码。
+项目的逐步实现说明见 [project-tutorial.md](project-tutorial.md)。本文件负责教概念，项目文件负责把概念串起来，不要跳过中间检查点直接复制最终代码。
 
 ```rust
 enum Command {
@@ -1038,7 +1038,7 @@ fn main() {
 
 ## 延伸阅读
 
-完成本地课程后，再按需要使用 resources.md 中的 GitHub 项目：
+完成本地课程后，再按需要使用 [resources.md](resources.md) 中的 GitHub 项目：
 
 - Rustlings：把已学概念变成编译器练习；
 - 100 Exercises to Learn Rust：按小题继续加深；
