@@ -1,0 +1,14 @@
+{
+  "title": "Struct、enum 与 Option",
+  "goal": "把业务数据和可能不存在的结果表达成类型。",
+  "explanation": "struct 组织领域字段，impl 放置相关行为，Option 表达查询可能找不到，而不是用 -1 或空字符串伪装失败。",
+  "exerciseGoal": "定义任务类型，并按标题查询任务。",
+  "hints": [
+    "让 Task 的字段公开，隐藏测试才能通过公开接口构造数据。",
+    "Iterator::find 会返回 Option<&Task>，正好表达找不到的情况。"
+  ],
+  "tests": [
+    {"id": "task_model", "label": "构造任务模型"},
+    {"id": "find_task", "label": "查询不存在任务"}
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "title": "Trait、迭代器与闭包",
+  "goal": "用 trait 约定行为，用惰性迭代器组合查询。",
+  "explanation": "trait 描述类型能够做什么，迭代器链在消费前不会执行。filter、map 和 collect 能把重复的数据处理逻辑写成可测试的组合。",
+  "exerciseGoal": "为任务摘要实现 Summary trait，并筛选未完成任务标题。",
+  "hints": [
+    "Summary 的实现可以返回标题和状态组成的 String。",
+    "pending_titles 返回迭代器，消费点由调用者决定。"
+  ],
+  "tests": [
+    {"id": "summary", "label": "实现任务摘要 trait"},
+    {"id": "pending_titles", "label": "筛选未完成标题"}
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "title": "字符串、向量与哈希表",
+  "goal": "选择合适的集合类型，并用借用读取输入。",
+  "explanation": "String 拥有文本，切片只借用文本；Vec 保存有序数据，HashMap 适合按键统计。集合操作先确定所有权边界，再决定是否需要 clone。",
+  "exerciseGoal": "统计文本中的单词频率，并计算未完成项目数量。",
+  "hints": [
+    "split_whitespace 会跳过连续空白，to_lowercase 可以统一统计键。",
+    "对 bool 切片使用 iter 和 filter，不要复制整个集合。"
+  ],
+  "tests": [
+    {"id": "word_counts", "label": "统计单词频率"},
+    {"id": "pending_count", "label": "统计未完成项目"}
+  ]
+}

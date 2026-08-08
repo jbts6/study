@@ -1,0 +1,14 @@
+{
+  "title": "模块、命令解析与测试边界",
+  "goal": "让输入解析、业务逻辑和终端边界可以分别测试。",
+  "explanation": "模块负责组织公开接口，命令解析应该把字符串转换成 enum，业务层不应该直接读取 stdin。这样测试可以直接构造 Command，不依赖终端顺序。",
+  "exerciseGoal": "把 add、list 和 quit 字符串解析为 Command。",
+  "hints": [
+    "splitn(2, ' ') 可以保留 add 后的完整标题。",
+    "空标题不是有效的 Add 命令，遇到未知命令返回 None。"
+  ],
+  "tests": [
+    {"id": "commands", "label": "解析三个命令变体"},
+    {"id": "invalid_command", "label": "拒绝无效命令"}
+  ]
+}

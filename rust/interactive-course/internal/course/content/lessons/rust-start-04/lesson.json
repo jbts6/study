@@ -1,0 +1,14 @@
+{
+  "title": "所有权、移动与 Clone",
+  "goal": "从函数签名判断值会被移动、借用还是复制。",
+  "explanation": "String 的所有权只能有一个拥有者。优先设计清晰的借用边界；clone 可以复制数据，但不应该成为逃避所有权设计的默认按钮。",
+  "exerciseGoal": "给拥有所有权的字符串追加后缀，并显式创建归档副本。",
+  "hints": [
+    "add_suffix 接收 String 后可以直接修改原值，再返回它。",
+    "archive_copy 只需要读取输入，返回新的 String。"
+  ],
+  "tests": [
+    {"id": "suffix", "label": "追加字符串后缀"},
+    {"id": "archive", "label": "创建归档副本"}
+  ]
+}

@@ -5,6 +5,50 @@
     {
       "id": "rust-start-00",
       "path": "lessons/rust-start-00"
+    },
+    {
+      "id": "rust-start-01",
+      "path": "lessons/rust-start-01"
+    },
+    {
+      "id": "rust-start-02",
+      "path": "lessons/rust-start-02"
+    },
+    {
+      "id": "rust-start-03",
+      "path": "lessons/rust-start-03"
+    },
+    {
+      "id": "rust-start-04",
+      "path": "lessons/rust-start-04"
+    },
+    {
+      "id": "rust-start-05",
+      "path": "lessons/rust-start-05"
+    },
+    {
+      "id": "rust-start-06",
+      "path": "lessons/rust-start-06"
+    },
+    {
+      "id": "rust-start-07",
+      "path": "lessons/rust-start-07"
+    },
+    {
+      "id": "rust-start-08",
+      "path": "lessons/rust-start-08"
+    },
+    {
+      "id": "rust-start-09",
+      "path": "lessons/rust-start-09"
+    },
+    {
+      "id": "rust-start-10",
+      "path": "lessons/rust-start-10"
+    },
+    {
+      "id": "rust-start-11",
+      "path": "lessons/rust-start-11"
     }
   ]
 }

@@ -1,0 +1,14 @@
+{
+  "title": "变量、类型与控制流",
+  "goal": "用明确的类型和 match 表达分支逻辑。",
+  "explanation": "Rust 的每个分支必须返回兼容类型。先让函数签名表达意图，再用 match 或条件表达式处理边界。",
+  "exerciseGoal": "实现温度分类，并计算从 0 到上限的偶数和。",
+  "hints": [
+    "先写出 cold、comfortable 和 hot 的边界，再让 match 覆盖所有输入。",
+    "RangeInclusive 可以配合 filter 和 sum 完成偶数统计。"
+  ],
+  "tests": [
+    {"id": "temperature", "label": "覆盖温度边界"},
+    {"id": "sum_even", "label": "计算偶数和"}
+  ]
+}

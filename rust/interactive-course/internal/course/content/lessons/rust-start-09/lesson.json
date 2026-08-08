@@ -1,0 +1,14 @@
+{
+  "title": "异步边界：Future 与 runtime",
+  "goal": "判断什么时候 async 真正解决了等待问题。",
+  "explanation": "async 函数返回 Future，Future 需要 runtime 才会被驱动。I/O 等待适合异步，纯 CPU 计算不应为了形式上的 async 增加调度复杂度。",
+  "exerciseGoal": "根据是否存在 I/O 等待和 CPU 密集计算，判断是否适合 async。",
+  "hints": [
+    "有 I/O 等待且不是 CPU 密集任务时，异步通常能提高并发利用率。",
+    "只把函数标记为 async 不会自动创建 runtime，也不会让 CPU 计算变快。"
+  ],
+  "tests": [
+    {"id": "async_boundary", "label": "判断异步适用边界"},
+    {"id": "future_shape", "label": "保留 Future 返回形态"}
+  ]
+}

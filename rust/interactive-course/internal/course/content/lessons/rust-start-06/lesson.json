@@ -1,0 +1,14 @@
+{
+  "title": "Result、错误处理与模块测试",
+  "goal": "用 Result 区分成功和可预期的业务失败。",
+  "explanation": "Result<T, E> 让调用者必须处理失败路径。自定义错误类型可以表达业务语义，问号运算符负责传播，不替用户输入调用 unwrap。",
+  "exerciseGoal": "实现一个不会 panic 的年龄解析器。",
+  "hints": [
+    "空白输入先返回 Empty，其他无法解析为 u8 的输入返回 Invalid。",
+    "parse::<u8>() 的错误可以通过 map_err 转换成自己的错误类型。"
+  ],
+  "tests": [
+    {"id": "valid_age", "label": "解析有效年龄"},
+    {"id": "invalid_age", "label": "返回明确错误"}
+  ]
+}

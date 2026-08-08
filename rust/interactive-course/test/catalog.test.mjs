@@ -7,13 +7,14 @@ import { loadCatalog } from '../server/catalog.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const contentRoot = path.resolve(here, '../internal/course/content');
 
-test('catalog exposes the first lesson without leaking hidden test source', () => {
+test('catalog exposes the course without leaking hidden test source', () => {
   const catalog = loadCatalog(contentRoot);
   const course = catalog.publicCourse();
 
   assert.equal(course.id, 'rust-core');
-  assert.equal(course.lessons.length, 1);
+  assert.equal(course.lessons.length, 12);
   assert.deepEqual(course.lessons[0].id, 'rust-start-00');
+  assert.deepEqual(course.lessons.at(-1).id, 'rust-start-11');
   assert.equal('hiddenTest' in course.lessons[0], false);
   assert.equal('hidden_test.rs' in course.lessons[0], false);
   assert.match(catalog.lesson('rust-start-00').hiddenTest, /#\[test\]/);
