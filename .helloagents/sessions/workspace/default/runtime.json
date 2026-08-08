@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "scope": "project-session",
+  "key": "C:\\git\\study::workspace::default",
+  "cwd": "C:\\git\\study",
+  "branch": "workspace",
+  "workspace": "workspace",
+  "session": "default",
+  "sessionMode": "active-session",
+  "updatedAt": "2026-08-07T13:19:00.586Z",
+  "turn": null,
+  "route": null,
+  "artifacts": {},
+  "turnUpdatedAt": "2026-08-07T13:19:00.579Z"
+}

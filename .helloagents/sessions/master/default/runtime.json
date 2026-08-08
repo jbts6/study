@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "scope": "project-session",
+  "key": "C:\\git\\study::master::default",
+  "cwd": "C:\\git\\study",
+  "branch": "master",
+  "workspace": "master",
+  "session": "",
+  "sessionMode": "unidentified",
+  "updatedAt": "2026-08-08T03:33:28.531Z",
+  "turn": {
+    "cwd": "C:\\git\\study",
+    "key": "C:\\git\\study::master::default",
+    "scope": "project-session",
+    "updatedAt": "2026-08-08T03:33:28.520Z",
+    "kind": "complete",
+    "role": "main",
+    "phase": "",
+    "source": "manual",
+    "requiresDeliveryGate": false,
+    "reasonCategory": "",
+    "reason": ""
+  },
+  "route": null,
+  "artifacts": {},
+  "turnUpdatedAt": "2026-08-08T03:33:28.526Z"
+}
