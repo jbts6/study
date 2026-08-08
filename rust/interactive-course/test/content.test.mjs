@@ -43,3 +43,8 @@ test('every lesson example passes its server-side hidden tests', async () => {
     assert.equal(result.status, 'passed', `${lesson.id}: ${result.stderr}`);
   }
 });
+
+test('the concurrency lesson demonstrates a channel ownership boundary', () => {
+  const catalog = loadCatalog(contentRoot);
+  assert.match(catalog.lesson('rust-start-08').exampleCode, /mpsc::channel/);
+});
