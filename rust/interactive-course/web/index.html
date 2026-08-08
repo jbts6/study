@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1f292b">
+    <title>Rust 核心训练</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand-block">
+        <span class="brand-mark">R</span>
+        <div><p class="brand-overline">本地编程训练场</p><strong id="courseTitle">Rust 核心训练</strong></div>
+      </div>
+      <div class="progress-block"><span>当前进度</span><strong id="progressText">0 / 12</strong></div>
+    </header>
+    <div class="storage-notice" id="storageNotice" aria-live="polite"></div>
+    <div class="course-layout">
+      <aside class="course-sidebar" aria-label="课程导航">
+        <div class="sidebar-heading"><p class="section-label">学习路径</p><h2>Rust 基础到工程</h2></div>
+        <nav id="courseNav" class="course-nav" aria-label="课节列表"></nav>
+      </aside>
+      <main class="lesson-main" id="lessonMain" aria-live="polite"><p class="page-message">正在载入课程...</p></main>
+    </div>
+    <p class="course-error" id="courseError" role="alert" hidden></p>
+    <template id="lesson-template"><textarea id="editor"></textarea><button id="runButton" type="button">运行代码</button><pre id="output"></pre><span id="lessonStatus"></span></template>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
