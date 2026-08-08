@@ -1,0 +1,8 @@
+{
+  "title": "重复课节",
+  "goal": "验证目录约束",
+  "explanation": "fixture",
+  "exerciseGoal": "fixture",
+  "hints": ["fixture"],
+  "tests": [{"id": "fixture", "label": "fixture"}]
+}

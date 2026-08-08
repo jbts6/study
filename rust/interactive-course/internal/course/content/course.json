@@ -1,0 +1,10 @@
+{
+  "id": "rust-core",
+  "title": "Rust 核心训练",
+  "lessons": [
+    {
+      "id": "rust-start-00",
+      "path": "lessons/rust-start-00"
+    }
+  ]
+}

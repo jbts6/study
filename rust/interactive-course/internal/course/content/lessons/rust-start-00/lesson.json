@@ -1,0 +1,17 @@
+{
+  "id": "rust-start-00",
+  "title": "工具链与第一个 Cargo 项目",
+  "goal": "认识 Rust 工具链，并完成第一个可测试的函数。",
+  "explanation": "Rust 项目通常使用 Cargo 管理。函数签名说明输入和输出类型，测试会验证函数行为而不是只看代码是否能够编译。",
+  "exerciseGoal": "实现 greeting(name)，返回 Hello, <name>!。",
+  "hints": [
+    "先保留函数签名，再使用 format! 组合字符串。",
+    "问候语中的姓名来自 name 参数。"
+  ],
+  "tests": [
+    {
+      "id": "greeting",
+      "label": "返回正确问候"
+    }
+  ]
+}
