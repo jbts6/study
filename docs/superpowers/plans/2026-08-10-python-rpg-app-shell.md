@@ -567,11 +567,12 @@ git commit -m "feat: recover and migrate RPG saves"
 // rpg/src/app/app-controller.test.ts
 it("sends manual and runner commands through the same resolver", async () => {
   const resolveTurn = vi.fn().mockReturnValue({ accepted: true, command: commandWithPath, state: nextBattle, events: [movedEvent, attackEvent] });
-  const controller = createAppController({ initialBattle, initialWorld, initialSave, runner: fakeRunner(commandWithPath), resolveTurn, saves: fakeSaves(), content: fakeContent() });
+  const content = fakeContent(); const worldViewFor = vi.spyOn(content, "worldViewFor").mockReturnValue(nextWorld);
+  const controller = createAppController({ initialBattle, initialWorld, initialSave, runner: fakeRunner(commandWithPath), resolveTurn, saves: fakeSaves(), content });
   await controller.submitManual({ actorId: "scout", movePath: [{ x: 2, y: 1 }], action: { type: "attack", targetId: "golem" } });
   await controller.runCode();
   expect(resolveTurn.mock.calls.map(([, command]) => command)).toEqual([commandWithPath, commandWithPath]);
-  expect(controller.snapshot().battle).toBe(nextBattle);
+  expect(worldViewFor).toHaveBeenCalledWith(nextBattle); expect(controller.snapshot()).toMatchObject({ battle: nextBattle, world: nextWorld });
 });
 
 it("keeps battle identity on a rejected command even when Python completed", async () => {
@@ -676,7 +677,7 @@ private submitInput(input: unknown, source: "manual" | "runner"): void {
     this.patch({ result: { kind: "command_rejected", code: error.code, fieldPath: error.path, message: error.message, action: "edit" } });
     return;
   }
-  this.patch({ battle: resolution.state, world: resolution.world, pendingEventBatch: { batchId: crypto.randomUUID(), events: resolution.events }, result: resolution.state.phase === "won" ? { kind: "battle_outcome", outcome: "won", message: "战斗胜利。", action: "replay" } : resolution.state.phase === "lost" ? { kind: "battle_outcome", outcome: "lost", message: "战斗失败，可从初始快照重试。", action: "restart" } : { kind: "empty" } });
+  this.patch({ battle: resolution.state, world: this.dependencies.content.worldViewFor(resolution.state), pendingEventBatch: { batchId: crypto.randomUUID(), events: resolution.events }, result: resolution.state.phase === "won" ? { kind: "battle_outcome", outcome: "won", message: "战斗胜利。", action: "replay" } : resolution.state.phase === "lost" ? { kind: "battle_outcome", outcome: "lost", message: "战斗失败，可从初始快照重试。", action: "restart" } : { kind: "empty" } });
   void this.persistAcceptedState(source, before, resolution);
 }
 
