@@ -295,9 +295,10 @@ git commit -m "test: prove pyodide worker compatibility"
 - Create: `rpg/src/runners/protocol/types.ts`
 - Create: `rpg/src/runners/protocol/validate-request.ts`
 - Create: `rpg/src/runners/protocol/validate-request.test.ts`
+- Modify: `rpg/src/game/testing/fixture.ts`
 
 **Interfaces:**
-- Consumes: `import type { TurnCommand, WorldView } from "../../game/combat/types"` 和 `import { worldViewFixture } from "../../game/combat/fixtures"`；战斗计划必须先导出完整类型及共享 fixture，fixture 至少含 `battleId`、`contentVersion`、`revision`、`round`、`activeUnitId`、`map`、`units`、`objectives`。
+- Consumes: `import type { TurnCommand, WorldView } from "../../game/combat/types"` 和 `import { worldViewFixture } from "../../game/testing/fixture"`；战斗计划必须先导出完整类型及共享 fixture，fixture 至少含 `battleId`、`contentVersion`、`revision`、`round`、`activeUnitId`、`board`、`units`、`objectives`。
 - Produces: `PROTOCOL_VERSION`、`JsonValue`、`ExecutionLimits`、`RunRequest`、`RunResult`、`ExecutionStatus`、`RunnerDiagnostic`、`TraceEvent`、`validateRunRequest(value): RequestValidationResult`；Task 3--7 仅使用这些导出。
 
 - [ ] **Step 1: 写失败的协议校验测试**
@@ -306,7 +307,7 @@ git commit -m "test: prove pyodide worker compatibility"
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { worldViewFixture } from "../../game/combat/fixtures";
+import { worldViewFixture } from "../../game/testing/fixture";
 import { validateRunRequest } from "./validate-request";
 
 const valid = {
@@ -323,6 +324,11 @@ const valid = {
 };
 
 describe("validateRunRequest", () => {
+  it("使用投影后的共享 WorldView fixture，且不泄露旧 map 字段", () => {
+    expect(worldViewFixture).toMatchObject({ battleId: "core-fixture", contentVersion: "python-slice-1", revision: 0, round: 1, activeUnitId: "scout", board: { width: 3, height: 2 }, units: expect.any(Array), objectives: expect.any(Array) });
+    expect("map" in worldViewFixture).toBe(false);
+  });
+
   it("接受版本化、多文件 Python 请求", () => {
     expect(validateRunRequest(valid)).toMatchObject({ ok: true, value: valid });
   });
@@ -339,9 +345,16 @@ describe("validateRunRequest", () => {
 
 预期：FAIL，因为模块尚不存在。
 
-- [ ] **Step 2: 实现精确类型、稳定状态和诊断形状**
+- [ ] **Step 2: 实现共享 WorldView fixture、精确类型、稳定状态和诊断形状**
 
-在 `types.ts` 写入以下公共定义。`returnValue` 必须保持 `JsonValue | undefined`，不得声明为 `TurnCommand`：
+在 `rpg/src/game/testing/fixture.ts` 顶部加入前两条 import，并在既有 `createFixtureState` 定义后加入 export；不得复制字段或手工构造 `WorldView`，必须经战斗计划的投影函数剔除内部状态。再在 `types.ts` 写入以下公共定义。`returnValue` 必须保持 `JsonValue | undefined`，不得声明为 `TurnCommand`：
+
+```ts
+import type { WorldView } from "../combat/types";
+import { projectWorldView } from "../world/project-world-view";
+
+export const worldViewFixture: WorldView = projectWorldView(createFixtureState());
+```
 
 ```ts
 import type { TurnCommand, WorldView } from "../../game/combat/types";
@@ -400,7 +413,7 @@ npm --prefix rpg run build
 - [ ] **Step 5: 提交协议任务**
 
 ```bash
-git add rpg/src/runners/protocol/types.ts rpg/src/runners/protocol/validate-request.ts rpg/src/runners/protocol/validate-request.test.ts
+git add rpg/src/runners/protocol/types.ts rpg/src/runners/protocol/validate-request.ts rpg/src/runners/protocol/validate-request.test.ts rpg/src/game/testing/fixture.ts
 git commit -m "feat: define runner execution protocol"
 ```
 
@@ -421,7 +434,7 @@ git commit -m "feat: define runner execution protocol"
 
 ```ts
 import { describe, expect, it, vi } from "vitest";
-import { worldViewFixture } from "../../game/combat/fixtures";
+import { worldViewFixture } from "../../game/testing/fixture";
 import type { RunRequest } from "../protocol/types";
 import { PythonRunnerAdapter } from "./adapter";
 
@@ -710,7 +723,7 @@ git commit -m "feat: add python runner lifecycle adapter"
 ```ts
 import { beforeAll, describe, expect, it } from "vitest";
 import { loadPyodide } from "pyodide";
-import { worldViewFixture } from "../../../game/combat/fixtures";
+import { worldViewFixture } from "../../../game/testing/fixture";
 import executeSource from "./execute.py?raw";
 
 let pyodide: Awaited<ReturnType<typeof loadPyodide>>;
@@ -1125,7 +1138,7 @@ git commit -m "feat: add bounded safe python traces"
 
 ```ts
 import { expect, test } from "@playwright/test";
-import { worldViewFixture } from "../src/game/combat/fixtures";
+import { worldViewFixture } from "../src/game/testing/fixture";
 
 const validRequest = {
   protocolVersion: 1 as const, runId: "run-browser-01", attemptId: "attempt-browser-01", questId: "python-marsh-03", language: "python" as const,
@@ -1258,7 +1271,7 @@ git commit -m "feat: run python strategies in worker"
 `rpg/src/runners/protocol/validate-request.test.ts`
 ```ts
 import { expect, it } from "vitest";
-import { worldViewFixture } from "../../game/combat/fixtures";
+import { worldViewFixture } from "../../game/testing/fixture";
 import { validateRunRequest } from "./validate-request";
 const valid = { protocolVersion: 1, runId: "run-validate", attemptId: "attempt-validate", questId: "python-marsh-03", language: "python", files: { "main.py": "pass" }, entrypoint: { file: "main.py", callable: "choose_turn" }, worldView: worldViewFixture, allowedModules: [], limits: { timeoutMs: 2_000, interruptGraceMs: 250, maxFiles: 8, maxFileBytes: 16_384, maxSourceBytes: 65_536, maxOutputBytes: 16_384, maxTraceEvents: 1_000, maxValueDepth: 3 } };
 it("协议拒绝零 value depth 和非法路径", () => {
