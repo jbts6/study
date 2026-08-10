@@ -12,10 +12,16 @@ function assertCanonicalInput(value: unknown, seen = new Set<object>()): void {
 
   seen.add(value);
   try {
-    const toJson = (value as { toJSON?: unknown }).toJSON;
-    if (typeof toJson === "function") {
-      assertCanonicalInput(toJson.call(value), seen);
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.hasOwn(value, index)) throw new TypeError("Hash input contains a sparse array");
+        assertCanonicalInput(value[index], seen);
+      }
       return;
+    }
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError("Hash input contains a non-JSON object");
     }
     for (const nested of Object.values(value)) assertCanonicalInput(nested, seen);
   } finally {

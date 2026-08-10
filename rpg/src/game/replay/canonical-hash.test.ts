@@ -22,6 +22,11 @@ describe("canonicalSha256", () => {
   it("rejects non-canonical values", async () => {
     const circular: { self?: unknown } = {};
     circular.self = circular;
+    const sparse = new Array<string>(2);
+    sparse[0] = "present";
+    class ValueObject {
+      value = "present";
+    }
 
     await expect(canonicalSha256(undefined)).rejects.toThrow(TypeError);
     await expect(canonicalSha256({ value: undefined })).rejects.toThrow(TypeError);
@@ -29,5 +34,10 @@ describe("canonicalSha256", () => {
     await expect(canonicalSha256(Number.NaN)).rejects.toThrow(TypeError);
     await expect(canonicalSha256(Number.POSITIVE_INFINITY)).rejects.toThrow(TypeError);
     await expect(canonicalSha256(circular)).rejects.toThrow(TypeError);
+    await expect(canonicalSha256(sparse)).rejects.toThrow(TypeError);
+    await expect(canonicalSha256(new Map([["key", "value"]]))).rejects.toThrow(TypeError);
+    await expect(canonicalSha256(new Set(["value"]))).rejects.toThrow(TypeError);
+    await expect(canonicalSha256(new Date("2026-08-10T00:00:00.000Z"))).rejects.toThrow(TypeError);
+    await expect(canonicalSha256(new ValueObject())).rejects.toThrow(TypeError);
   });
 });

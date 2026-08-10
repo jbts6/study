@@ -62,7 +62,7 @@ export async function createReplay(
     initialState: initialStateSnapshot,
     initialStateHash,
     steps: [],
-    outcome: initialState.phase,
+    outcome: initialStateSnapshot.phase,
     finalStateHash: initialStateHash,
   };
 }
@@ -100,27 +100,30 @@ export async function recordAcceptedTurn(
 
 /** Replays each command from the initial state and verifies all canonical evidence. */
 export async function verifyReplay(replay: Replay): Promise<ReplayVerification> {
-  if (replay.replayVersion !== 1) return mismatch(0, "replayVersion", 1, replay.replayVersion, replay);
-  if (replay.metadata.engineVersion !== ENGINE_VERSION) {
-    return mismatch(0, "engineVersion", ENGINE_VERSION, replay.metadata.engineVersion, replay);
+  const replaySnapshot = structuredClone(replay);
+  if (replaySnapshot.replayVersion !== 1) {
+    return mismatch(0, "replayVersion", 1, replaySnapshot.replayVersion, replaySnapshot);
   }
-  if (replay.metadata.contentVersion !== CONTENT_VERSION) {
-    return mismatch(0, "contentVersion", CONTENT_VERSION, replay.metadata.contentVersion, replay);
+  if (replaySnapshot.metadata.engineVersion !== ENGINE_VERSION) {
+    return mismatch(0, "engineVersion", ENGINE_VERSION, replaySnapshot.metadata.engineVersion, replaySnapshot);
   }
-  if (replay.metadata.runnerProtocolVersion !== RUNNER_PROTOCOL_VERSION) {
-    return mismatch(0, "runnerProtocolVersion", RUNNER_PROTOCOL_VERSION, replay.metadata.runnerProtocolVersion, replay);
+  if (replaySnapshot.metadata.contentVersion !== CONTENT_VERSION) {
+    return mismatch(0, "contentVersion", CONTENT_VERSION, replaySnapshot.metadata.contentVersion, replaySnapshot);
   }
-
-  const actualInitialHash = await canonicalSha256(replay.initialState);
-  if (actualInitialHash !== replay.initialStateHash) {
-    return mismatch(0, "initialStateHash", replay.initialStateHash, actualInitialHash, replay);
+  if (replaySnapshot.metadata.runnerProtocolVersion !== RUNNER_PROTOCOL_VERSION) {
+    return mismatch(0, "runnerProtocolVersion", RUNNER_PROTOCOL_VERSION, replaySnapshot.metadata.runnerProtocolVersion, replaySnapshot);
   }
 
-  let state = replay.initialState;
-  for (const [index, step] of replay.steps.entries()) {
+  const actualInitialHash = await canonicalSha256(replaySnapshot.initialState);
+  if (actualInitialHash !== replaySnapshot.initialStateHash) {
+    return mismatch(0, "initialStateHash", replaySnapshot.initialStateHash, actualInitialHash, replaySnapshot);
+  }
+
+  let state = replaySnapshot.initialState;
+  for (const [index, step] of replaySnapshot.steps.entries()) {
     const stepNumber = index + 1;
     const result = resolveTurn(state, step.command);
-    if (!result.accepted) return mismatch(stepNumber, "command", "accepted", "rejected", replay);
+    if (!result.accepted) return mismatch(stepNumber, "command", "accepted", "rejected", replaySnapshot);
 
     const checks: readonly [ReplayMismatch["field"], string | number, string | number][] = [
       ["rngBefore", step.rngBefore, state.rngState],
@@ -129,13 +132,13 @@ export async function verifyReplay(replay: Replay): Promise<ReplayVerification> 
       ["stateHash", step.stateHash, await canonicalSha256(result.state)],
     ];
     for (const [field, expected, actual] of checks) {
-      if (expected !== actual) return mismatch(stepNumber, field, expected, actual, replay);
+      if (expected !== actual) return mismatch(stepNumber, field, expected, actual, replaySnapshot);
     }
     state = result.state;
   }
 
-  if (state.phase === replay.outcome && await canonicalSha256(state) === replay.finalStateHash) {
-    return { verified: true, finalStateHash: replay.finalStateHash };
+  if (state.phase === replaySnapshot.outcome && await canonicalSha256(state) === replaySnapshot.finalStateHash) {
+    return { verified: true, finalStateHash: replaySnapshot.finalStateHash };
   }
-  return finalMismatch(replay, state);
+  return finalMismatch(replaySnapshot, state);
 }

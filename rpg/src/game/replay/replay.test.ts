@@ -52,6 +52,18 @@ describe("replay", () => {
     await expect(verifyReplay(replay)).resolves.toMatchObject({ verified: true });
   });
 
+  it("uses the creation-time state snapshot after hashing yields", async () => {
+    const inputState = createFixtureState();
+    const expectedState = structuredClone(inputState);
+    const pending = createReplay(metadata, inputState);
+    (inputState as unknown as { phase: string }).phase = "lost";
+    const replay = await pending;
+
+    expect(replay.initialState).toEqual(expectedState);
+    expect(replay.initialStateHash).toBe(await canonicalSha256(expectedState));
+    expect(replay.outcome).toBe(expectedState.phase);
+  });
+
   it("keeps recorded replay evidence isolated from all input graphs", async () => {
     const before = createFixtureState();
     const replay = await createReplay(metadata, before);
@@ -139,5 +151,15 @@ describe("replay", () => {
       verified: false,
       mismatch: { field: "eventsHash", step: 1, expected: eventsHash, actual: firstStep.eventsHash },
     });
+  });
+
+  it("uses a verification-time replay snapshot after hashing yields", async () => {
+    const replay = await createFixtureReplay();
+    const expectedFinalStateHash = replay.finalStateHash;
+    const pending = verifyReplay(replay);
+    (replay as unknown as { finalStateHash: string }).finalStateHash = "sha256:tampered";
+    (replay as unknown as { initialState: { units: Array<{ hp: number }> } }).initialState.units[0]!.hp = 1;
+
+    await expect(pending).resolves.toEqual({ verified: true, finalStateHash: expectedFinalStateHash });
   });
 });
