@@ -62,7 +62,7 @@ export type BattleEvent = Readonly<{ protocolVersion: 1; seq: number; stateRevis
 export type ReducedBattle = Readonly<{ state: BattleState; events: readonly BattleEvent[] }>;
 export type CommandResolution = Readonly<{ accepted: true; command: TurnCommand; state: BattleState; events: readonly BattleEvent[] }>|Readonly<{ accepted: false; errors: readonly CommandError[]; state: BattleState }>;
 export type WorldUnit = Readonly<{ id: string; team: Team; cell: Cell; hp: number; maxHp: number; disabled: boolean; statuses: readonly Status[]; move?: number; attack?: number; defense?: number; skills?: readonly Readonly<Pick<Skill,"id"|"range"|"power"|"target"|"kind">>[] }>;
-export type WorldView = Readonly<{ battleId: string; contentVersion: string; revision: number; round: number; activeUnitId: string; board: Readonly<Pick<BattleBoard,"width"|"height"|"blockedCells"|"hazardCells"|"coverCells">>; objectives: readonly Readonly<Pick<Objective,"id"|"cell"|"durability"|"completed">>[]; units: readonly WorldUnit[] }>;
+export type WorldView = Readonly<{ battleId: string; contentVersion: string; revision: number; round: number; activeUnitId: string|null; board: Readonly<Pick<BattleBoard,"width"|"height"|"blockedCells"|"hazardCells"|"coverCells">>; objectives: readonly Readonly<Pick<Objective,"id"|"cell"|"durability"|"completed">>[]; units: readonly WorldUnit[] }>;
 export function xorshift32(state: number): Readonly<{ value: number; nextState: number }> { let value=state>>>0; value^=value<<13; value^=value>>>17; value^=value<<5; value>>>=0; return { value, nextState:value }; }
 \`\`\`
 
@@ -314,13 +314,15 @@ function deepFreeze<T>(value:T):T{if(value&&typeof value==="object"&&!Object.isF
 const copyCell=(cell:Cell):Cell=>({x:cell.x,y:cell.y});
 function projectUnit(unit:BattleUnit):WorldUnit{return unit.team==="allies"?{id:unit.id,team:unit.team,cell:copyCell(unit.cell),hp:unit.hp,maxHp:unit.maxHp,disabled:unit.disabled,statuses:unit.statuses.map((status)=>({...status})),move:unit.move,attack:unit.attack,defense:unit.defense,skills:unit.skills.map(({id,range,power,target,kind})=>({id,range,power,target,kind}))}:{id:unit.id,team:unit.team,cell:copyCell(unit.cell),hp:unit.hp,maxHp:unit.maxHp,disabled:unit.disabled,statuses:unit.statuses.map((status)=>({...status}))};}
 export function projectWorldView(state:Readonly<BattleState>):WorldView {
-  const activeUnitId=state.turnOrder[state.turnIndex]!;
+  const visibleUnits=state.units.filter((unit)=>unit.team==="allies"||unit.visibility==="revealed");
+  const currentId=state.turnOrder[state.turnIndex];
+  const activeUnitId=currentId!==undefined&&visibleUnits.some((unit)=>unit.id===currentId)?currentId:null;
   return deepFreeze({battleId:state.battleId,contentVersion:state.contentVersion,revision:state.revision,round:state.round,activeUnitId,
     board:{width:state.board.width,height:state.board.height,blockedCells:state.board.blockedCells.map(copyCell),hazardCells:state.board.hazardCells.map(copyCell),coverCells:state.board.coverCells.map(copyCell)},
     objectives:state.objectives.map(({id,cell,durability,completed})=>({id,cell:copyCell(cell),durability,completed})),
-    units:state.units.filter((unit)=>unit.team==="allies"||unit.visibility==="revealed").map(projectUnit)}); }
+    units:visibleUnits.map(projectUnit)}); }
 \`\`\`
-\`projectUnit\` 对 allies 映射 id/team/cell/hp/maxHp/disabled/statuses/move/attack/defense/技能 id-range-power-target-kind；对 enemies 仅映射 id/team/cell/hp/maxHp/disabled/statuses，绝不映射 visibility、skills 或 remainingCooldown。hidden enemies 在 map 前过滤。
+\`projectUnit\` 对 allies 映射 id/team/cell/hp/maxHp/disabled/statuses/move/attack/defense/技能 id-range-power-target-kind；对 enemies 仅映射 id/team/cell/hp/maxHp/disabled/statuses，绝不映射 visibility、skills 或 remainingCooldown。hidden enemies 在 map 前过滤；隐藏、缺失或其他不可投影的当前行动者将 \`activeUnitId\` 投影为 \`null\`，不得泄露单位 id。
 
 - [ ] **Step 4: 验证**
 Run: \`npm --prefix rpg run build\`
@@ -389,6 +391,8 @@ export async function recordAcceptedTurn(replay:Replay,before:BattleState,resolu
 export async function verifyReplay(replay:Replay):Promise<ReplayVerification>{if(replay.replayVersion!==1)return mismatch(0,"replayVersion",1,replay.replayVersion,replay);if(replay.metadata.engineVersion!==ENGINE_VERSION)return mismatch(0,"engineVersion",ENGINE_VERSION,replay.metadata.engineVersion,replay);if(replay.metadata.contentVersion!==CONTENT_VERSION)return mismatch(0,"contentVersion",CONTENT_VERSION,replay.metadata.contentVersion,replay);if(replay.metadata.runnerProtocolVersion!==RUNNER_PROTOCOL_VERSION)return mismatch(0,"runnerProtocolVersion",RUNNER_PROTOCOL_VERSION,replay.metadata.runnerProtocolVersion,replay);const initial=await canonicalSha256(replay.initialState);if(initial!==replay.initialStateHash)return mismatch(0,"initialStateHash",replay.initialStateHash,initial,replay);let state=replay.initialState;for(const step of replay.steps){const actualStep=step.seq;const result=resolveTurn(state,step.command);if(!result.accepted)return mismatch(actualStep,"command","accepted","rejected",replay);const checks:[ReplayMismatch["field"],string|number,string|number][]=[["rngBefore",step.rngBefore,state.rngState],["rngAfter",step.rngAfter,result.state.rngState],["eventsHash",step.eventsHash,await canonicalSha256(result.events)],["stateHash",step.stateHash,await canonicalSha256(result.state)]];for(const [field,expected,actual] of checks)if(expected!==actual)return mismatch(actualStep,field,expected,actual,replay);state=result.state;}return state.phase===replay.outcome&&await canonicalSha256(state)===replay.finalStateHash?{verified:true,finalStateHash:replay.finalStateHash}:await finalMismatch(replay,state);}
 \`\`\`
 \`mismatch\` 与 \`finalMismatch\` 只构造 \`ReplayVerification\`，包含 metadata 的 engineVersion/contentVersion。该模块只导入 combat types、resolveTurn 和 canonical hash。
+
+最终实现还必须满足以下证据边界：\`canonicalSha256\` 递归拒绝非整数数字、稀疏数组和非普通 JSON 容器；\`createReplay\`、\`recordAcceptedTurn\` 与 \`verifyReplay\` 均在首次 \`await\` 前建立调用时深快照；验证步骤以数组位置定位，先校验记录的 \`events\` 与 \`eventsHash\` 一致，再校验 \`resolveTurn\` 重演事件产生同一哈希。
 
 - [ ] **Step 4: 验证**
 Run: \`npm --prefix rpg run build\`
