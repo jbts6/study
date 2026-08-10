@@ -42,7 +42,11 @@ function projectUnit(unit: BattleUnit): WorldUnit {
  * Creates an immutable public combat projection that excludes engine-only state.
  */
 export function projectWorldView(state: Readonly<BattleState>): WorldView {
-  const activeUnitId = state.turnOrder[state.turnIndex]!;
+  const units = state.units
+    .filter((unit) => unit.team === "allies" || unit.visibility === "revealed")
+    .map(projectUnit);
+  const activeActorId = state.turnOrder[state.turnIndex];
+  const activeUnitId = activeActorId !== undefined && units.some((unit) => unit.id === activeActorId) ? activeActorId : null;
   const view: WorldView = {
     battleId: state.battleId,
     contentVersion: state.contentVersion,
@@ -62,9 +66,7 @@ export function projectWorldView(state: Readonly<BattleState>): WorldView {
       durability,
       completed,
     })),
-    units: state.units
-      .filter((unit) => unit.team === "allies" || unit.visibility === "revealed")
-      .map(projectUnit),
+    units,
   };
 
   return deepFreeze(view);

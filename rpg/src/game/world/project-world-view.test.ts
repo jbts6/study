@@ -97,4 +97,20 @@ describe("projectWorldView", () => {
 
     expect(projectWorldView(state).activeUnitId).toBe("golem");
   });
+
+  it("conceals a hidden enabled unit when it is the current actor", () => {
+    const fixture = createFixtureState();
+    const state = {
+      ...fixture,
+      turnIndex: 2,
+      turnOrder: ["scout", "golem", "lurker"],
+      units: fixture.units.map((unit) => (unit.id === "lurker" ? { ...unit, disabled: false } : unit)),
+    };
+    const view = projectWorldView(state);
+    const serializedView = JSON.stringify(view);
+
+    expect(view.units.map((unit) => unit.id)).not.toContain("lurker");
+    expect(serializedView).not.toContain("lurker");
+    expect(view.activeUnitId).toBeNull();
+  });
 });
