@@ -19,14 +19,15 @@ describe("core fixture", () => {
       let state = createFixtureState();
       let replay = await createReplay(metadata, state);
       const expected = [
-        { revision: 1, types: ["moved", "damaged", "turn_advanced"], hp: 6 },
-        { revision: 2, types: ["turn_advanced"], hp: 6 },
-        { revision: 3, types: ["damaged", "cooldown_changed", "turn_advanced"], hp: 2 },
-        { revision: 4, types: ["turn_advanced"], hp: 2 },
+        { revision: 1, types: ["moved", "damaged", "turn_advanced"], hp: 6, sparkCooldown: 0 },
+        { revision: 2, types: ["cooldown_changed", "turn_advanced"], hp: 6, sparkCooldown: 0 },
+        { revision: 3, types: ["damaged", "cooldown_changed", "turn_advanced"], hp: 2, sparkCooldown: 1 },
+        { revision: 4, types: ["turn_advanced"], hp: 2, sparkCooldown: 1 },
         {
           revision: 5,
-          types: ["damaged", "cooldown_changed", "unit_disabled", "battle_finished", "turn_advanced"],
+          types: ["damaged", "cooldown_changed", "unit_disabled", "battle_finished"],
           hp: 0,
+          sparkCooldown: 0,
         },
       ] as const;
 
@@ -48,6 +49,8 @@ describe("core fixture", () => {
         expect(result.state.revision).toBe(expected[index]!.revision);
         expect(result.events.map((event) => event.type)).toEqual(expected[index]!.types);
         expect(result.state.units.find((unit) => unit.id === "golem")?.hp).toBe(expected[index]!.hp);
+        expect(result.state.units.find((unit) => unit.id === "scout")?.skills?.find((skill) => skill.id === "spark")?.remainingCooldown)
+          .toBe(expected[index]!.sparkCooldown);
 
         for (const [eventIndex, event] of result.events.entries()) {
           expect(event.seq).toBe(eventIndex + 1);
