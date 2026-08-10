@@ -38,11 +38,13 @@ function expectNoForbiddenKeys(value: unknown): void {
 describe("projectWorldView", () => {
   it("creates a frozen JSON-safe whitelist projection without state references", () => {
     const state = createFixtureState();
+    const snapshot = JSON.parse(JSON.stringify(state));
     const view = projectWorldView(state);
     const scout = view.units.find((unit) => unit.id === "scout");
     const golem = view.units.find((unit) => unit.id === "golem");
 
     expect(() => JSON.parse(JSON.stringify(view))).not.toThrow();
+    expect(state).toEqual(snapshot);
     expect(view.units.map((unit) => unit.id)).toEqual(["scout", "golem"]);
     expect(scout).toEqual({
       id: "scout",
@@ -88,5 +90,11 @@ describe("projectWorldView", () => {
     expect(scout?.cell).toEqual({ x: 0, y: 0 });
     expect(view.board.hazardCells).toEqual([{ x: 2, y: 1 }]);
     expect(view.objectives[0]?.cell).toEqual({ x: 0, y: 1 });
+  });
+
+  it("uses the active unit from the current turn index", () => {
+    const state = { ...createFixtureState(), turnIndex: 1 };
+
+    expect(projectWorldView(state).activeUnitId).toBe("golem");
   });
 });
