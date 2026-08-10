@@ -41,10 +41,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function isObject(value: unknown): value is object {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
 function invalid(code: string, message: string): RequestValidationFailure {
   const diagnostic: RunnerDiagnostic = {
     code,
@@ -71,8 +67,17 @@ function byteLength(source: string): number {
 
 function validateLimits(value: unknown): value is ExecutionLimits {
   if (!isPlainObject(value)) return false;
-  const keys = Object.keys(value);
-  if (keys.length !== LIMIT_FIELDS.length || keys.some((key) => !LIMIT_FIELDS.includes(key as (typeof LIMIT_FIELDS)[number]))) return false;
+  const keys = Reflect.ownKeys(value);
+  if (
+    keys.length !== LIMIT_FIELDS.length ||
+    keys.some(
+      (key) =>
+        typeof key !== "string" ||
+        !LIMIT_FIELDS.includes(key as (typeof LIMIT_FIELDS)[number]),
+    )
+  ) {
+    return false;
+  }
   return LIMIT_FIELDS.every((key) => hasOwn(value, key) && Number.isSafeInteger(value[key]) && (value[key] as number) > 0);
 }
 
@@ -89,60 +94,72 @@ function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
   return value;
 }
 
-function cloneAndFreeze(request: Record<string, unknown>): RunRequest {
-  const snapshot = structuredClone(request) as unknown as RunRequest;
-  return deepFreeze(snapshot);
+function isJsonData(value: unknown, seen = new WeakSet<object>()): boolean {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value !== "object") return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+
+  if (Array.isArray(value)) return value.every((nestedValue) => isJsonData(nestedValue, seen));
+  if (!isPlainObject(value)) return false;
+  return Object.values(value).every((nestedValue) => isJsonData(nestedValue, seen));
 }
 
 export function validateRunRequest(input: unknown): RequestValidationResult {
   try {
     if (!isPlainObject(input)) return invalid("INVALID_REQUEST", "运行请求必须是普通对象");
-    if (input.protocolVersion !== 1) return invalid("UNSUPPORTED_PROTOCOL_VERSION", "不支持的运行协议版本");
+    const rawUnknownField = Reflect.ownKeys(input).find(
+      (key) => typeof key !== "string" || !REQUEST_FIELDS.has(key),
+    );
+    const snapshot = structuredClone(input) as unknown;
+    if (!isPlainObject(snapshot)) return invalid("INVALID_REQUEST", "运行请求必须是普通对象");
+    if (snapshot.protocolVersion !== 1) return invalid("UNSUPPORTED_PROTOCOL_VERSION", "不支持的运行协议版本");
 
-    const unknownField = Object.keys(input).find((key) => !REQUEST_FIELDS.has(key));
-    if (unknownField !== undefined) return invalid("UNKNOWN_REQUEST_FIELD", `未知运行请求字段: ${unknownField}`);
+    const unknownField =
+      rawUnknownField ?? Object.keys(snapshot).find((key) => !REQUEST_FIELDS.has(key));
+    if (unknownField !== undefined) return invalid("UNKNOWN_REQUEST_FIELD", `未知运行请求字段: ${String(unknownField)}`);
 
     for (const field of ["runId", "attemptId", "questId"] as const) {
-      const value = input[field];
+      const value = snapshot[field];
       if (typeof value !== "string" || value.trim().length === 0) return invalid("INVALID_IDENTIFIER", `${field} 必须是非空字符串`);
     }
-    if (input.language !== "python") return invalid("UNSUPPORTED_LANGUAGE", "仅支持 Python 运行请求");
+    if (snapshot.language !== "python") return invalid("UNSUPPORTED_LANGUAGE", "仅支持 Python 运行请求");
 
-    if (!isPlainObject(input.files) || Object.keys(input.files).length === 0) return invalid("INVALID_FILES", "files 必须是非空对象");
-    const files = input.files;
+    if (!validateLimits(snapshot.limits)) return invalid("INVALID_LIMIT", "limits 必须包含八个正安全整数");
+    const limits = snapshot.limits;
+
+    if (!isPlainObject(snapshot.files) || Object.keys(snapshot.files).length === 0) return invalid("INVALID_FILES", "files 必须是非空对象");
+    const files = snapshot.files;
+    if (Object.keys(files).length > limits.maxFiles) return invalid("FILE_LIMIT_EXCEEDED", "文件数量超过限制");
     let totalSourceBytes = 0;
     for (const [file, source] of Object.entries(files)) {
       if (!isSafePythonPath(file)) return invalid("INVALID_FILE_PATH", `不安全的 Python 文件路径: ${file}`);
       if (typeof source !== "string") return invalid("INVALID_FILES", `文件内容必须是字符串: ${file}`);
-      totalSourceBytes += byteLength(source);
+      const sourceBytes = byteLength(source);
+      if (sourceBytes > limits.maxFileBytes) return invalid("FILE_LIMIT_EXCEEDED", `单文件源码超过限制: ${file}`);
+      totalSourceBytes += sourceBytes;
     }
-    const stringFiles = files as Record<string, string>;
-
-    if (!isPlainObject(input.entrypoint)) return invalid("INVALID_ENTRYPOINT", "entrypoint 必须是对象");
-    const entrypoint = input.entrypoint;
+    if (totalSourceBytes > limits.maxSourceBytes) return invalid("SOURCE_LIMIT_EXCEEDED", "源码总字节数超过限制");
+    if (!isPlainObject(snapshot.entrypoint)) return invalid("INVALID_ENTRYPOINT", "entrypoint 必须是对象");
+    const entrypoint = snapshot.entrypoint;
     if (typeof entrypoint.file !== "string" || typeof entrypoint.callable !== "string") return invalid("INVALID_ENTRYPOINT", "entrypoint 必须包含文件和 callable");
     if (!hasOwn(files, entrypoint.file)) return invalid("ENTRYPOINT_FILE_MISSING", "入口文件不存在");
     if (!SAFE_IDENTIFIER.test(entrypoint.callable)) return invalid("INVALID_IDENTIFIER", "入口 callable 不是 Python 标识符");
 
-    if (!Array.isArray(input.allowedModules)) return invalid("INVALID_ALLOWED_MODULE", "allowedModules 必须是字符串数组");
+    if (!Array.isArray(snapshot.allowedModules)) return invalid("INVALID_ALLOWED_MODULE", "allowedModules 必须是字符串数组");
     const modules = new Set<string>();
-    for (const module of input.allowedModules) {
+    for (const module of snapshot.allowedModules) {
       if (typeof module !== "string" || !SAFE_IDENTIFIER.test(module)) return invalid("INVALID_ALLOWED_MODULE", "allowedModules 必须是不带点的 Python 标识符");
       if (modules.has(module)) return invalid("DUPLICATE_ALLOWED_MODULE", `allowedModules 重复: ${module}`);
       modules.add(module);
     }
 
-    if (!validateLimits(input.limits)) return invalid("INVALID_LIMIT", "limits 必须包含八个正安全整数");
-    const limits = input.limits;
-    if (Object.keys(stringFiles).length > limits.maxFiles) return invalid("FILE_LIMIT_EXCEEDED", "文件数量超过限制");
-    for (const [file, source] of Object.entries(stringFiles)) {
-      if (byteLength(source) > limits.maxFileBytes) return invalid("FILE_LIMIT_EXCEEDED", `单文件源码超过限制: ${file}`);
+    if (!isPlainObject(snapshot.worldView) || !isJsonData(snapshot.worldView)) {
+      return invalid("INVALID_WORLD_VIEW", "worldView 必须是 JSON 数据对象");
     }
-    if (totalSourceBytes > limits.maxSourceBytes) return invalid("SOURCE_LIMIT_EXCEEDED", "源码总字节数超过限制");
 
-    if (!isObject(input.worldView)) return invalid("INVALID_WORLD_VIEW", "worldView 必须是非数组对象");
-
-    return { ok: true, value: cloneAndFreeze(input) };
+    return { ok: true, value: deepFreeze(snapshot as unknown as RunRequest) };
   } catch {
     return invalid("INVALID_REQUEST", "运行请求无法读取");
   }

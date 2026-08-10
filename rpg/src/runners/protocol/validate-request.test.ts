@@ -136,9 +136,91 @@ describe("validateRunRequest", () => {
     expect(diagnosticCode({ ...validRequest(), limits: null })).toBe("INVALID_LIMIT");
   });
 
+  it("reports file budgets before entrypoint and module errors", () => {
+    const tooManyFiles = Object.fromEntries(
+      Array.from({ length: 9 }, (_, index) => [`${index}.py`, "pass"]),
+    );
+    expect(
+      diagnosticCode({
+        ...validRequest(),
+        files: tooManyFiles,
+        entrypoint: { file: "missing.py", callable: "choose_turn" },
+      }),
+    ).toBe("FILE_LIMIT_EXCEEDED");
+    expect(
+      diagnosticCode({
+        ...validRequest(),
+        files: { "main.py": "汉" },
+        allowedModules: ["math", "math"],
+        limits: { ...limits, maxSourceBytes: 2 },
+      }),
+    ).toBe("SOURCE_LIMIT_EXCEEDED");
+  });
+
   it("requires worldView to be a non-array object", () => {
     expect(diagnosticCode({ ...validRequest(), worldView: null })).toBe("INVALID_WORLD_VIEW");
     expect(diagnosticCode({ ...validRequest(), worldView: [] })).toBe("INVALID_WORLD_VIEW");
+  });
+
+  it("clones once before validation so accessors cannot replace validated values", () => {
+    const request = validRequest();
+    const files = request.files;
+    let reads = 0;
+    Object.defineProperty(request, "files", {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return reads === 1 ? files : { "../escaped.py": "pass" };
+      },
+    });
+
+    const result = validateRunRequest(request);
+
+    expect(result.ok).toBe(true);
+    expect(reads).toBe(1);
+    if (result.ok) expect(result.value.files).toEqual(files);
+  });
+
+  it("rejects mutable non-JSON containers nested in worldView", () => {
+    expect(
+      diagnosticCode({
+        ...validRequest(),
+        worldView: { ...worldViewFixture, mutable: new Date(0) },
+      }),
+    ).toBe("INVALID_WORLD_VIEW");
+    expect(
+      diagnosticCode({
+        ...validRequest(),
+        worldView: { ...worldViewFixture, mutable: new Map([["key", "value"]]) },
+      }),
+    ).toBe("INVALID_WORLD_VIEW");
+  });
+
+  it("converts throwing accessors and proxies into one stable diagnostic", () => {
+    const throwing = validRequest();
+    Object.defineProperty(throwing, "files", {
+      enumerable: true,
+      get() {
+        throw new Error("private value");
+      },
+    });
+
+    expect(() => validateRunRequest(throwing)).not.toThrow();
+    expect(() => validateRunRequest(new Proxy(validRequest(), {}))).not.toThrow();
+    for (const value of [throwing, new Proxy(validRequest(), {})]) {
+      const result = validateRunRequest(value);
+      expect(result).toEqual({
+        ok: false,
+        diagnostics: [
+          {
+            code: "INVALID_REQUEST",
+            severity: "error",
+            message: "运行请求无法读取",
+            recoveryAction: "修正运行请求后重新运行",
+          },
+        ],
+      });
+    }
   });
 
   it("returns a recursively frozen snapshot detached from every caller-owned value", () => {
