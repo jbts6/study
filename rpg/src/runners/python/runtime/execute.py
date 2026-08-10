@@ -14,7 +14,7 @@ import importlib.util
 
 
 BLOCKED_MODULES = frozenset({"js", "pyodide", "micropip", "socket", "ssl", "http", "urllib", "requests", "subprocess", "multiprocessing", "ctypes", "webbrowser"})
-SAFE_BUILTINS = {"__build_class__": __build_class__, "abs": abs, "all": all, "any": any, "AssertionError": AssertionError, "bool": bool, "dict": dict, "enumerate": enumerate, "Exception": Exception, "float": float, "int": int, "len": len, "list": list, "map": map, "max": max, "min": min, "object": object, "print": print, "range": range, "reversed": reversed, "round": round, "set": set, "sorted": sorted, "str": str, "sum": sum, "tuple": tuple, "ValueError": ValueError, "zip": zip}
+SAFE_BUILTINS = {"__build_class__": __build_class__, "abs": abs, "all": all, "any": any, "AssertionError": AssertionError, "bool": bool, "dict": dict, "enumerate": enumerate, "Exception": Exception, "filter": filter, "float": float, "int": int, "len": len, "list": list, "map": map, "max": max, "min": min, "object": object, "print": print, "range": range, "reversed": reversed, "round": round, "set": set, "sorted": sorted, "str": str, "sum": sum, "tuple": tuple, "ValueError": ValueError, "zip": zip}
 
 ORIGINAL_IMPORT = __import__
 

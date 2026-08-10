@@ -112,6 +112,14 @@ describe("python execution isolation and policy", () => {
     expect(allowed).toMatchObject({ executionStatus: "completed", returnValue: 3 });
   });
 
+  it("exposes filter through the controlled safe builtins", async () => {
+    const result = await run({
+      ...baseRequest,
+      files: { "main.py": "def choose_turn(world): return list(filter(lambda value: value > 1, [1, 2, 3]))\n" },
+    });
+    expect(result).toMatchObject({ executionStatus: "completed", returnValue: [2, 3] });
+  });
+
   it("uses the same restricted builtins for imported player modules", async () => {
     const result = await run({
       ...baseRequest,
