@@ -52,7 +52,7 @@
 - `rpg/playwright.config.ts` 在基线中不存在，Task 1 必须新建完整配置，并同时定义 `testDir`、`use.baseURL` 与 `webServer`。测试继续使用相对 `page.goto()`，不得依赖调用者碰巧设置 URL。
 - `rpg/tsconfig.json` 必须保留既有严格选项和 `skipLibCheck`，并显式覆盖 `src`、`tools`、`e2e`、`vite.config.ts`、`playwright.config.ts` 以及 `vite/client` 类型；所有 proof 源码必须通过 `noUnusedLocals`。
 - `RunnerProof` 只在 `tools/runner-proof/types.ts` 定义一次，页面与 Playwright 测试共同导入该类型；不得分别扩展不一致的 `Window.runnerProof`，不得保留未使用的通用 `call()` 包装器。
-- Task 1 的硬超时依赖 Worker 工厂保留的原生 `Worker` 引用并调用 `worker.terminate()`；不假定 `PyodideClient` 存在未验证的 `terminate()` API。门禁必须证明终止后由新 Worker 恢复。
+- 固定依赖的公开类型和实现确认 `PyodideClient` 继承 `terminate(): void`：它拒绝当前 RPC、释放 Comlink 代理并终止原生 Worker。Task 1 的硬超时必须调用该公开方法，再创建全新的 Client/Worker；Worker 工厂仍保留代际计数以证明实际重建，不得只终止原生 Worker 而绕过客户端清理。
 - Task 1 的隔离断言必须连续运行两组同名 `helper.py` 且值不同，并证明第二次不读取第一次遗留的 `sys.modules` 项；仅检查入口脚本全局变量不算隔离证明。
 - Task 2 的请求快照若要承诺不可变，必须递归冻结或使用只读值对象；单独 `structuredClone()` 只能证明与调用方断开别名，文档不得把它描述成不可变。
 - Task 3 在首次 `ensureClient()` 的第一个异步边界前就必须登记同一个初始化 Promise，保证并发调用只创建一次客户端；`dispose()`、初始化失败和重建失败都必须让全部等待者以稳定诊断结束，不能留下悬挂 Promise。Task 3 只注入 Worker 工厂，默认浏览器 Worker 工厂由 Task 6 增加。
@@ -231,7 +231,7 @@ const api = {
 Comlink.expose(api);
 ```
 
-在 `main.ts` 使用给定的公开调用形式，并由 Worker 工厂保留当前 Worker 引用，使硬超时可以显式 `terminate()` 后创建新的 `PyodideClient`：
+在 `main.ts` 使用给定的公开调用形式，并由 Worker 工厂保留当前 Worker 引用和代际计数；硬超时调用公开 `client.terminate()` 完成 RPC/Comlink/Worker 清理，再创建新的 `PyodideClient`：
 
 ```ts
 import { PyodideClient } from "pyodide-worker-runner";
@@ -263,7 +263,7 @@ const runnerProof = {
     const active = client ?? createClient();
     void active.call(active.workerProxy.execute, source).catch(() => undefined);
     await new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
-    worker?.terminate();
+    active.terminate();
     createClient();
     return { status: "timeout" as const, rebuilt: true };
   },
