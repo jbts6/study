@@ -124,6 +124,23 @@ describe("validateTurnCommand", () => {
     expect(state).toEqual(before);
   });
 
+  it("requires a legal occupant for damage and heal cell-target skills", () => {
+    const state = createFixtureState();
+    const cellTargetState = {
+      ...state,
+      units: state.units.map((unit) => unit.id === "scout"
+        ? { ...unit, skills: unit.skills.map((skill) => skill.id === "spark" || skill.id === "mend" ? { ...skill, target: "cell" as const } : skill) }
+        : unit),
+    };
+
+    expect(validateTurnCommand(cellTargetState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 2, y: 0 } } })).toMatchObject({ accepted: true });
+    expectRejected(cellTargetState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 1, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
+    expectRejected(cellTargetState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 0, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
+    expectRejected({ ...cellTargetState, units: cellTargetState.units.map((unit) => unit.id === "lurker" ? { ...unit, cell: { x: 1, y: 0 } } : unit) }, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 1, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
+    expect(validateTurnCommand(cellTargetState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "mend", targetCell: { x: 0, y: 0 } } })).toMatchObject({ accepted: true });
+    expectRejected({ ...cellTargetState, units: cellTargetState.units.map((unit) => unit.id === "golem" ? { ...unit, cell: { x: 1, y: 0 } } : unit) }, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "mend", targetCell: { x: 1, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
+  });
+
   it("validates skill existence, cooldown, target kind, and interaction objectives", () => {
     const state = createFixtureState();
 

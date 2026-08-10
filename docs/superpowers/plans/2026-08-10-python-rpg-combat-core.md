@@ -210,6 +210,8 @@ Expected: PASS。
 Run: \`npm --prefix rpg test -- src/game/combat/validate-turn-command.test.ts\`
 Expected: PASS。
 
+`Skill.target === "cell"` 的 damage/heal 技能必须指向 `targetCell` 中唯一单位：damage 仅允许非 disabled 敌方单位，heal 仅允许非 disabled 同队单位（含自身）；空格、disabled 或错误阵营均为 `INVALID_TARGET`。
+
 - [ ] **Step 5: 提交**
 \`\`\`bash
 git add rpg/src/game/combat/validate-turn-command.ts rpg/src/game/combat/validate-turn-command.test.ts
@@ -277,6 +279,10 @@ Run: \`npm --prefix rpg run build\`
 Expected: PASS。
 Run: \`npm --prefix rpg test -- src/game/combat/reduce-battle.test.ts\`
 Expected: PASS，包含 guard/interact/heal/hazard/cooldown/status/outcome/rng 的表格断言。
+
+- cell-target cast 的结算目标是校验器已确认存在且合法的格内唯一单位，归约器不得重新选择其他目标。
+- effect 含 `chancePermille` 字段时恰好消费一次 `xorshift32`；当且仅当 `value % 1000 < chancePermille` 时命中。
+- status ID 必须唯一；同 ID 重施替换或刷新 `duration` 与 `defenseBonus` 后按 id 排序。拥有者下一次已接受回合开始时，`remainingTurns <= 1` 的 status 按 id 移除，否则 `remainingTurns` 减一。
 
 - [ ] **Step 5: 提交**
 \`\`\`bash
