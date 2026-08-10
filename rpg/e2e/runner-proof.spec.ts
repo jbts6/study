@@ -37,7 +37,8 @@ const validRequest: RunRequest = {
   },
 };
 
-const UNSAFE_DIAGNOSTIC_PATTERN = /[A-Z]:\\|\/Users\/|\$[A-Z_]+|pyodide/i;
+const UNSAFE_DIAGNOSTIC_PATTERN =
+  /(?:[A-Z]:\\|\/(?:Users|home|tmp|lib\/python)|Traceback \(most recent call last\):|\bFile ["'][^"']+["']|\b[A-Z_][A-Z0-9_]*=(?:[A-Z]:\\|\/)|[$%][A-Z_][A-Z0-9_]*%?|pyodide)/i;
 
 function expectSafeDiagnostics(result: RunResult): void {
   expect(JSON.stringify(result.diagnostics)).not.toMatch(UNSAFE_DIAGNOSTIC_PATTERN);
@@ -146,6 +147,27 @@ test.describe("Pyodide Worker compatibility", () => {
     ).resolves.toEqual(8);
   });
 
+  test("诊断检测器覆盖宿主路径、栈行和环境变量", () => {
+    const unsafeSamples = [
+      String.raw`C:\Users\player\main.py`,
+      "/Users/player/main.py",
+      "/home/player/main.py",
+      "/tmp/python-run-abc123/main.py",
+      "/lib/python3.12/site-packages/example.py",
+      'Traceback (most recent call last):\n  File "/tmp/python-run-abc123/main.py", line 1, in choose_turn',
+      "HOME=/home/player",
+      "PYTHONPATH=/tmp/python-run-abc123",
+      "$HOME",
+      "%USERPROFILE%",
+      "pyodide",
+    ];
+
+    for (const sample of unsafeSamples) {
+      expect(sample, `未识别的敏感诊断样本: ${sample}`).toMatch(UNSAFE_DIAGNOSTIC_PATTERN);
+    }
+    expect("玩家入口返回受限运行时错误").not.toMatch(UNSAFE_DIAGNOSTIC_PATTERN);
+  });
+
   test("正式 Worker 返回受限 JSON、硬超时与主动中断", async () => {
     await expect(
       page.evaluate(
@@ -170,6 +192,20 @@ test.describe("Pyodide Worker compatibility", () => {
       diagnostics: [{ code: "RETURN_NOT_SERIALIZABLE" }],
     });
     expectSafeDiagnostics(nonSerializable);
+
+    const runtimeError = await page.evaluate(
+      (request) =>
+        (window.runnerProof as StrategyRunnerProof).runRequest({
+          ...request,
+          files: { "main.py": "def choose_turn(world):\n  raise RuntimeError('boom')" },
+        }),
+      validRequest,
+    );
+    expect(runtimeError).toMatchObject({
+      executionStatus: "runtime_error",
+      diagnostics: [{ code: "PYTHON_RUNTIME_ERROR" }],
+    });
+    expectSafeDiagnostics(runtimeError);
 
     const timedOut = await page.evaluate(
       (request) =>
