@@ -40,4 +40,10 @@ describe("canonicalSha256", () => {
     await expect(canonicalSha256(new Date("2026-08-10T00:00:00.000Z"))).rejects.toThrow(TypeError);
     await expect(canonicalSha256(new ValueObject())).rejects.toThrow(TypeError);
   });
+
+  it("rejects decimal numbers at every JSON nesting level", async () => {
+    await expect(canonicalSha256(1.5)).rejects.toThrow(TypeError);
+    await expect(canonicalSha256({ nested: { value: 1.5 } })).rejects.toThrow(TypeError);
+    await expect(canonicalSha256([0, [1.5]])).rejects.toThrow(TypeError);
+  });
 });

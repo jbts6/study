@@ -153,6 +153,25 @@ describe("replay", () => {
     });
   });
 
+  it("detects recorded event payload tampering with the original hash", async () => {
+    const replay = await createFixtureReplay();
+    const firstStep = replay.steps[0]!;
+    const events = firstStep.events.map((event, index) => index === 0
+      ? { ...event, payload: { ...event.payload, sourceId: "tampered" } }
+      : event);
+    const recordedEventsHash = await canonicalSha256(events);
+
+    await expect(verifyReplay({ ...replay, steps: [{ ...firstStep, events }, ...replay.steps.slice(1)] })).resolves.toMatchObject({
+      verified: false,
+      mismatch: {
+        field: "eventsHash",
+        step: 1,
+        expected: firstStep.eventsHash,
+        actual: recordedEventsHash,
+      },
+    });
+  });
+
   it("uses a verification-time replay snapshot after hashing yields", async () => {
     const replay = await createFixtureReplay();
     const expectedFinalStateHash = replay.finalStateHash;

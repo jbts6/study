@@ -48,6 +48,23 @@ async function finalMismatch(replay: Replay, state: BattleState): Promise<Replay
   );
 }
 
+async function eventsEvidenceMismatch(
+  replay: Replay,
+  step: ReplayStep,
+  stepNumber: number,
+  replayedEvents: ReplayStep["events"],
+): Promise<ReplayVerification | undefined> {
+  const recordedEventsHash = await canonicalSha256(step.events);
+  if (recordedEventsHash !== step.eventsHash) {
+    return mismatch(stepNumber, "eventsHash", step.eventsHash, recordedEventsHash, replay);
+  }
+  const replayedEventsHash = await canonicalSha256(replayedEvents);
+  if (replayedEventsHash !== step.eventsHash) {
+    return mismatch(stepNumber, "eventsHash", step.eventsHash, replayedEventsHash, replay);
+  }
+  return undefined;
+}
+
 /** Starts an immutable replay record from a deterministic battle state. */
 export async function createReplay(
   metadata: ReplayMetadata,
@@ -124,11 +141,12 @@ export async function verifyReplay(replay: Replay): Promise<ReplayVerification> 
     const stepNumber = index + 1;
     const result = resolveTurn(state, step.command);
     if (!result.accepted) return mismatch(stepNumber, "command", "accepted", "rejected", replaySnapshot);
+    const eventsMismatch = await eventsEvidenceMismatch(replaySnapshot, step, stepNumber, result.events);
+    if (eventsMismatch !== undefined) return eventsMismatch;
 
     const checks: readonly [ReplayMismatch["field"], string | number, string | number][] = [
       ["rngBefore", step.rngBefore, state.rngState],
       ["rngAfter", step.rngAfter, result.state.rngState],
-      ["eventsHash", step.eventsHash, await canonicalSha256(result.events)],
       ["stateHash", step.stateHash, await canonicalSha256(result.state)],
     ];
     for (const [field, expected, actual] of checks) {

@@ -4,8 +4,8 @@ function assertCanonicalInput(value: unknown, seen = new Set<object>()): void {
   if (value === undefined || typeof value === "bigint" || typeof value === "function" || typeof value === "symbol") {
     throw new TypeError("Hash input is not canonical JSON");
   }
-  if (typeof value === "number" && !Number.isFinite(value)) {
-    throw new TypeError("Hash input contains NaN or Infinity");
+  if (typeof value === "number" && (!Number.isFinite(value) || !Number.isInteger(value))) {
+    throw new TypeError("Hash input contains a non-integer number");
   }
   if (value === null || typeof value !== "object") return;
   if (seen.has(value)) throw new TypeError("Hash input contains a circular reference");
