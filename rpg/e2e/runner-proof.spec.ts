@@ -47,7 +47,20 @@ function expectSafeDiagnostics(result: RunResult): void {
 async function loadRunner(
   page: Page,
 ): Promise<Awaited<ReturnType<RunnerProof["load"]>>> {
-  return page.evaluate(() => window.runnerProof.load());
+  let navigationError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await page.evaluate(() => window.runnerProof.load());
+    } catch (error) {
+      if (!/Execution context was destroyed.*navigation/i.test(String(error))) {
+        throw error;
+      }
+      navigationError = error;
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForFunction(() => typeof window.runnerProof === "object");
+    }
+  }
+  throw navigationError;
 }
 
 test.describe("Pyodide Worker compatibility", () => {
