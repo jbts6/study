@@ -197,9 +197,9 @@ def _safe_relative_path(root: Path, filename: str) -> Path:
     return destination
 
 
-def _write_player_files(root: Path, files) -> tuple[set[str], set[Path]]:
+def _write_player_files(root: Path, files) -> tuple[set[str], dict[str, str]]:
     player_module_roots = set()
-    written_files = set()
+    player_file_names = {}
     written_parents = set()
     for filename, source in files.items():
         destination = _safe_relative_path(root, filename)
@@ -207,7 +207,7 @@ def _write_player_files(root: Path, files) -> tuple[set[str], set[Path]]:
             raise RuntimeError("INVALID_PLAYER_FILE")
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(source, encoding="utf-8")
-        written_files.add(destination.resolve())
+        player_file_names[str(destination)] = filename
         parts = Path(filename).parts
         if parts:
             player_module_roots.add(parts[0].split(".", 1)[0])
@@ -216,7 +216,7 @@ def _write_player_files(root: Path, files) -> tuple[set[str], set[Path]]:
             (parent / "__init__.py").touch(exist_ok=True)
             written_parents.add(parent)
             parent = parent.parent
-    return player_module_roots, written_files
+    return player_module_roots, player_file_names
 
 
 def _entry_module_name(filename: str) -> str:
@@ -226,24 +226,31 @@ def _entry_module_name(filename: str) -> str:
 def _trace_function(player_files: dict[str, str], max_events: int):
     events = []
     depths = {}
+    entry_trace = {"frame": None, "returnSeq": None}
 
     def trace(frame, event, argument):
         relative_path = player_files.get(frame.f_code.co_filename)
         if relative_path is None:
             return None
+        frame_id = TRACE_ID(frame)
         if event == "call":
-            depths[TRACE_ID(frame)] = TRACE_LEN(depths)
+            depths[frame_id] = TRACE_LEN(depths)
+            if entry_trace["frame"] is None:
+                entry_trace["frame"] = frame_id
         if event not in ("call", "line", "return", "exception"):
             return trace
         if TRACE_LEN(events) >= max_events:
             raise TraceLimitReached(events)
         locals_snapshot = {name: safe_value(value) for name, value in frame.f_locals.items() if TRACE_TYPE(name) is TRACE_STR_TYPE and not name.startswith("_")}
-        events.append({"seq": TRACE_LEN(events) + 1, "file": relative_path, "line": frame.f_lineno, "event": event, "function": frame.f_code.co_name, "depth": depths.get(TRACE_ID(frame), 0), "locals": locals_snapshot})
+        event_data = {"seq": TRACE_LEN(events) + 1, "file": relative_path, "line": frame.f_lineno, "event": event, "function": frame.f_code.co_name, "depth": depths.get(frame_id, 0), "locals": locals_snapshot}
+        events.append(event_data)
         if event == "return":
-            depths.pop(TRACE_ID(frame), None)
+            if entry_trace["frame"] == frame_id:
+                entry_trace["returnSeq"] = event_data["seq"]
+            depths.pop(frame_id, None)
         return trace
 
-    return trace, events
+    return trace, events, entry_trace
 
 
 def _load_entry(root: Path, entry_file: str, callable_name: str, builtins):
@@ -263,11 +270,9 @@ def _load_entry(root: Path, entry_file: str, callable_name: str, builtins):
     return target
 
 
-def _completed_result(request, started, value, events, callable_name, stdout, stderr, limits):
+def _completed_result(request, started, value, events, return_trace_seq, stdout, stderr, limits):
     stdout_text, stdout_truncated = clip_utf8(stdout.getvalue(), int(limits["maxOutputBytes"]))
     stderr_text, stderr_truncated = clip_utf8(stderr.getvalue(), int(limits["maxOutputBytes"]))
-    entry_name = callable_name.rsplit(".", 1)[-1]
-    return_trace_seq = next((event["seq"] for event in reversed(events) if event["event"] == "return" and event["function"] == entry_name), None)
     return {"protocolVersion": 1, "runId": request["runId"], "attemptId": request["attemptId"], "executionStatus": "completed", "returnValue": value, "returnValueTraceSeq": return_trace_seq, "trace": events, "diagnostics": [], "streams": {"stdout": stdout_text, "stderr": stderr_text, "truncated": stdout_truncated or stderr_truncated}, "metrics": {"durationMs": int((time.perf_counter() - started) * 1000), "traceEvents": len(events)}}
 
 
@@ -292,7 +297,7 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
     try:
         os.chdir(root)
         files = request.get("files", {})
-        player_module_roots, player_files = _write_player_files(root, files)
+        player_module_roots, player_file_names = _write_player_files(root, files)
         allowed = set(request.get("allowedModules", []))
         guarded = guarded_import(allowed, player_module_roots)
         loader = RestrictedPlayerLoader(root, guarded)
@@ -303,8 +308,7 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
         limits = request["limits"]
         entrypoint = request["entrypoint"]
         entry = _load_entry(root, entrypoint["file"], entrypoint["callable"], loader.builtins)
-        player_file_names = {str(path): str(path.relative_to(root).as_posix()) for path in player_files}
-        trace_function, events = _trace_function(player_file_names, int(limits["maxTraceEvents"]))
+        trace_function, events, entry_trace = _trace_function(player_file_names, int(limits["maxTraceEvents"]))
         sys.settrace(trace_function)
         try:
             raw_value = entry(request["worldView"])
@@ -314,7 +318,7 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
             value = json_value(raw_value, 0, int(limits["maxValueDepth"]))
         except RecursionError as error:
             raise ReturnNotSerializable() from error
-        return _completed_result(request, started, value, events, entrypoint["callable"], stdout, stderr, limits)
+        return _completed_result(request, started, value, events, entry_trace["returnSeq"], stdout, stderr, limits)
     finally:
         sys.settrace(previous_trace)
         sys.stdout = previous_stdout

@@ -282,4 +282,28 @@ describe("python execution isolation and policy", () => {
     });
     expect(result).toMatchObject({ executionStatus: "completed", returnValue: { called: false } });
   });
+
+  it("在加载入口前构造轨迹文件映射，不调用玩家替换的 relative_to", async () => {
+    const result = await run({
+      ...baseRequest,
+      allowedModules: ["pathlib"],
+      files: {
+        "main.py": "import pathlib\noriginal_relative_to = pathlib.Path.relative_to\nrelative_to_called = [False]\ndef injected(path, other, walk_up=False):\n relative_to_called[0] = True\n pathlib.Path.relative_to = original_relative_to\n return original_relative_to(path, other, walk_up=walk_up)\npathlib.Path.relative_to = injected\ndef choose_turn(world):\n pathlib.Path.relative_to = original_relative_to\n return {'action': {'type': 'wait'}, 'relativeToCalled': relative_to_called[0]}",
+      },
+    });
+    expect(result).toMatchObject({ executionStatus: "completed", returnValue: { relativeToCalled: false } });
+  });
+
+  it("入口别名关联实际入口帧的返回轨迹序号", async () => {
+    const result = await run({
+      ...baseRequest,
+      files: {
+        "main.py": "def original(world):\n return {'action': {'type': 'wait'}}\nchoose_turn = original",
+      },
+    });
+    const entryReturn = result.trace.find((event: { event: string; function: string }) => event.event === "return" && event.function === "original");
+    expect(result.executionStatus).toBe("completed");
+    expect(entryReturn).toBeDefined();
+    expect(result.returnValueTraceSeq).toBe(entryReturn?.seq);
+  });
 });
