@@ -197,14 +197,15 @@ function validateCast(state: BattleState, actor: BattleUnit, origin: Cell, actio
 /** Validates that a cell-target skill points to one legal unit occupant. */
 function validateCellTarget(state: BattleState, actor: BattleUnit, origin: Cell, cell: Cell, range: number, kind: "damage" | "heal"): CommandValidation | undefined {
   if (!isOnBoard(state, cell)) return rejected("INVALID_TARGET", "$.action.targetCell", "技能目标不在战场内");
-  if (manhattanDistance(origin, cell) > range) return rejected("TARGET_OUT_OF_RANGE", "$.action.targetCell", "技能目标超出距离");
   const occupants = state.units.filter((unit) => sameCell(unit.cell, cell));
   const target = occupants[0];
   const hasRequiredTeam = kind === "damage" ? target?.team !== actor.team : target?.team === actor.team;
   if (occupants.length !== 1 || target === undefined || !hasRequiredTeam || target.visibility !== "revealed" || target.disabled) {
     return rejected("INVALID_TARGET", "$.action.targetCell", "技能目标无效");
   }
-  return undefined;
+  return manhattanDistance(origin, cell) <= range
+    ? undefined
+    : rejected("TARGET_OUT_OF_RANGE", "$.action.targetCell", "技能目标超出距离");
 }
 
 /** Validates a living unit target, its team, and its range. */

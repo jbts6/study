@@ -136,9 +136,41 @@ describe("validateTurnCommand", () => {
     expect(validateTurnCommand(cellTargetState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 2, y: 0 } } })).toMatchObject({ accepted: true });
     expectRejected(cellTargetState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 1, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
     expectRejected(cellTargetState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 0, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
-    expectRejected({ ...cellTargetState, units: cellTargetState.units.map((unit) => unit.id === "lurker" ? { ...unit, cell: { x: 1, y: 0 } } : unit) }, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 1, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
+    expectRejected({ ...cellTargetState, units: cellTargetState.units.map((unit) => unit.id === "lurker" ? { ...unit, cell: { x: 1, y: 0 }, visibility: "revealed" as const } : unit) }, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 1, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
     expect(validateTurnCommand(cellTargetState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "mend", targetCell: { x: 0, y: 0 } } })).toMatchObject({ accepted: true });
     expectRejected({ ...cellTargetState, units: cellTargetState.units.map((unit) => unit.id === "golem" ? { ...unit, cell: { x: 1, y: 0 } } : unit) }, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "mend", targetCell: { x: 1, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
+  });
+
+  it("reports invalid cell occupants before their out-of-range distance", () => {
+    const state = createFixtureState();
+    const cellTargetState = {
+      ...state,
+      units: state.units.map((unit) => unit.id === "scout"
+        ? { ...unit, skills: unit.skills.map((skill) => skill.id === "spark" || skill.id === "mend" ? { ...skill, target: "cell" as const } : skill) }
+        : unit),
+    };
+    const farCell = { x: 2, y: 1 };
+    const emptyFarState = { ...cellTargetState, units: cellTargetState.units.map((unit) => unit.id === "lurker" ? { ...unit, cell: { x: 1, y: 0 } } : unit) };
+    const disabledFarState = { ...cellTargetState, units: cellTargetState.units.map((unit) => unit.id === "lurker" ? { ...unit, visibility: "revealed" as const } : unit) };
+    const wrongTeamFarState = { ...cellTargetState, units: cellTargetState.units.map((unit) => unit.id === "golem" ? { ...unit, cell: farCell } : unit.id === "lurker" ? { ...unit, cell: { x: 1, y: 0 } } : unit) };
+    const legalFarState = { ...cellTargetState, units: cellTargetState.units.map((unit) => unit.id === "golem" ? { ...unit, cell: farCell } : unit.id === "lurker" ? { ...unit, cell: { x: 1, y: 0 } } : unit) };
+
+    expectRejected(emptyFarState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: farCell } }, "INVALID_TARGET", "$.action.targetCell");
+    expectRejected(disabledFarState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: farCell } }, "INVALID_TARGET", "$.action.targetCell");
+    expectRejected(wrongTeamFarState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "mend", targetCell: farCell } }, "INVALID_TARGET", "$.action.targetCell");
+    expectRejected(legalFarState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: farCell } }, "TARGET_OUT_OF_RANGE", "$.action.targetCell");
+  });
+
+  it("rejects cell-target skills when a cell has multiple occupants", () => {
+    const state = createFixtureState();
+    const duplicateOccupantState = {
+      ...state,
+      units: state.units.map((unit) => unit.id === "scout"
+        ? { ...unit, skills: unit.skills.map((skill) => skill.id === "spark" ? { ...skill, target: "cell" as const } : skill) }
+        : unit.id === "lurker" ? { ...unit, cell: { x: 2, y: 0 }, visibility: "revealed" as const, disabled: false } : unit),
+    };
+
+    expectRejected(duplicateOccupantState, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 2, y: 0 } } }, "INVALID_TARGET", "$.action.targetCell");
   });
 
   it("validates skill existence, cooldown, target kind, and interaction objectives", () => {
