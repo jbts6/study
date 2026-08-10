@@ -178,4 +178,108 @@ describe("python execution isolation and policy", () => {
       expect(result.diagnostics[0]?.code).toBe(builtin === "__import__" ? "MODULE_NOT_ALLOWED" : "PYTHON_RUNTIME_ERROR");
     }
   });
+
+  it("安全轨迹不执行 repr 或容器子类协议，并在预算处停止", async () => {
+    const result = await run({
+      ...baseRequest,
+      limits: { ...baseRequest.limits, maxTraceEvents: 2 },
+      files: {
+        "main.py": "class Explosive:\n def __repr__(self): raise AssertionError('repr called')\nclass Trap(list):\n def __iter__(self): raise AssertionError('iter called')\ndef choose_turn(world):\n text = 'x' * 201\n trap = Trap([1, 2])\n return {'value': Explosive(), 'trap': trap}",
+      },
+    });
+    expect(result).toMatchObject({ executionStatus: "runtime_error", diagnostics: [{ code: "TRACE_LIMIT_REACHED" }] });
+    expect(result.trace).toHaveLength(2);
+    expect(JSON.stringify(result.trace)).not.toContain("repr called");
+    expect(JSON.stringify(result.trace)).not.toContain("iter called");
+  });
+
+  it("只记录玩家文件四类事件并保留 returnValueTraceSeq", async () => {
+    const result = await run({
+      ...baseRequest,
+      files: {
+        "main.py": "def recur(n):\n if n == 0: raise ValueError('bad')\n return recur(n - 1)\ndef choose_turn(world):\n try: recur(1)\n except ValueError: pass\n marker = 'x' * 201\n return {'action': {'type': 'wait'}}",
+      },
+    });
+    expect(result.executionStatus).toBe("completed");
+    expect(result.trace.every((event: { file: string; event: string }) => event.file === "main.py" ? ["call", "line", "return", "exception"].includes(event.event) : false)).toBe(true);
+    expect(result.trace.some((event: { event: string }) => event.event === "exception")).toBe(true);
+    expect(JSON.stringify(result.trace)).toContain("<truncated:string>");
+    expect(result.trace.some((event: { seq: number; event: string; function: string }) => event.seq === result.returnValueTraceSeq ? event.event === "return" ? event.function === "choose_turn" : false : false)).toBe(true);
+  });
+
+  it("轨迹序号连续，循环引用、集合上限和深度上限都被安全裁剪", async () => {
+    const result = await run({
+      ...baseRequest,
+      files: {
+        "main.py": "def choose_turn(world):\n a = []; a.append(a)\n many = list(range(21))\n deep = [[[[1]]]]\n return {'action': {'type': 'wait'}}",
+      },
+    });
+    expect(result.executionStatus).toBe("completed");
+    expect(result.trace.map((event: { seq: number }) => event.seq)).toEqual(result.trace.map((_: unknown, index: number) => index + 1));
+    const traceText = JSON.stringify(result.trace);
+    expect(traceText).toContain("<circular>");
+    expect(traceText).toContain("<truncated:collection>");
+    expect(traceText).toContain("<truncated:depth>");
+    expect(traceText).not.toMatch(/<exec>|<frozen>|execute\.py|[A-Za-z]:\\|\/home\//);
+  });
+
+  it("安全快照不执行玩家对象协议或描述符", async () => {
+    const result = await run({
+      ...baseRequest,
+      files: {
+        "main.py": "class Explosive:\n def __repr__(self): raise AssertionError('repr called')\nclass Trap(list):\n def __iter__(self): raise AssertionError('iter called')\nclass Descriptor:\n def __get__(self, instance, owner): raise AssertionError('descriptor called')\nclass Holder:\n value = Descriptor()\ndef choose_turn(world):\n explosive = Explosive()\n trap = Trap([1, 2])\n holder = Holder()\n return {'action': {'type': 'wait'}}",
+      },
+    });
+    expect(result.executionStatus).toBe("completed");
+    const traceText = JSON.stringify(result.trace);
+    expect(traceText).toContain("<unserializable>");
+    expect(traceText).not.toContain("repr called");
+    expect(traceText).not.toContain("iter called");
+    expect(traceText).not.toContain("descriptor called");
+  });
+
+  it("安全快照不依赖玩家可改写的模块函数", async () => {
+    const result = await run({
+      ...baseRequest,
+      allowedModules: ["math"],
+      files: {
+        "main.py": "import math\ndef choose_turn(world):\n original = math.isfinite\n math.isfinite = lambda value: False\n number = 1.0\n math.isfinite = original\n return {'action': {'type': 'wait'}}",
+      },
+    });
+    expect(result.executionStatus).toBe("completed");
+    expect(JSON.stringify(result.trace)).not.toContain("<non-finite-float>");
+  });
+
+  it("安全快照不调用玩家注入的共享内建", async () => {
+    const result = await run({
+      ...baseRequest,
+      allowedModules: ["sys"],
+      files: {
+        "main.py": "import sys\noriginal_type = sys.modules['builtins'].type\ninjected_callers = []\ndef injected(value):\n injected_callers.append(sys._getframe(1).f_code.co_name)\n return original_type(value)\ndef choose_turn(world):\n sys.modules['builtins'].type = injected\n marker = 1\n sys.modules['builtins'].type = original_type\n return {'action': {'type': 'wait'}, 'injectedCallers': injected_callers}",
+      },
+    });
+    expect(result).toMatchObject({ executionStatus: "completed", returnValue: { injectedCallers: [] } });
+  });
+
+  it("轨迹文件过滤不调用玩家改写的路径方法", async () => {
+    const result = await run({
+      ...baseRequest,
+      allowedModules: ["pathlib"],
+      files: {
+        "main.py": "import pathlib\noriginal_resolve = pathlib.Path.resolve\nresolve_called = [False]\ndef injected(path):\n resolve_called[0] = True\n return original_resolve(path)\ndef choose_turn(world):\n pathlib.Path.resolve = injected\n marker = 1\n pathlib.Path.resolve = original_resolve\n return {'action': {'type': 'wait'}, 'resolveCalled': resolve_called[0]}",
+      },
+    });
+    expect(result).toMatchObject({ executionStatus: "completed", returnValue: { resolveCalled: false } });
+  });
+
+  it("轨迹局部变量过滤不调用非字符串键协议", async () => {
+    const result = await run({
+      ...baseRequest,
+      allowedModules: ["sys"],
+      files: {
+        "main.py": "import sys\ncalled = [False]\nclass Key:\n def startswith(self, prefix):\n  called[0] = True\n  return False\ndef choose_turn(world):\n frame = sys._getframe()\n frame.f_locals[Key()] = 1\n marker = 1\n return {'action': {'type': 'wait'}, 'called': called[0]}",
+      },
+    });
+    expect(result).toMatchObject({ executionStatus: "completed", returnValue: { called: false } });
+  });
 });

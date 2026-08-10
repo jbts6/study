@@ -15,8 +15,30 @@ import importlib.util
 
 BLOCKED_MODULES = frozenset({"js", "pyodide", "micropip", "socket", "ssl", "http", "urllib", "requests", "subprocess", "multiprocessing", "ctypes", "webbrowser"})
 SAFE_BUILTINS = {"__build_class__": __build_class__, "abs": abs, "all": all, "any": any, "AssertionError": AssertionError, "bool": bool, "dict": dict, "enumerate": enumerate, "Exception": Exception, "filter": filter, "float": float, "int": int, "len": len, "list": list, "map": map, "max": max, "min": min, "object": object, "print": print, "range": range, "reversed": reversed, "round": round, "set": set, "sorted": sorted, "str": str, "sum": sum, "tuple": tuple, "ValueError": ValueError, "zip": zip}
+TRACE_STRING_LIMIT = 200
+TRACE_COLLECTION_LIMIT = 20
+TRACE_DEPTH_LIMIT = 3
 
 ORIGINAL_IMPORT = __import__
+TRACE_IS_FINITE = math.isfinite
+TRACE_TYPE = type
+TRACE_LEN = len
+TRACE_ID = id
+TRACE_MIN = min
+TRACE_RANGE = range
+TRACE_SET = set
+TRACE_ENUMERATE = enumerate
+TRACE_STRING = str
+TRACE_DICT_ITEMS = dict.items
+TRACE_BOOL_TYPE = bool
+TRACE_INT_TYPE = int
+TRACE_FLOAT_TYPE = float
+TRACE_STR_TYPE = str
+TRACE_LIST_TYPE = list
+TRACE_TUPLE_TYPE = tuple
+TRACE_DICT_TYPE = dict
+TRACE_SET_TYPE = set
+TRACE_FROZENSET_TYPE = frozenset
 
 
 class ReturnNotSerializable(Exception):
@@ -26,7 +48,7 @@ class ReturnNotSerializable(Exception):
 class TraceLimitReached(Exception):
     def __init__(self, trace):
         super().__init__("TRACE_LIMIT_REACHED")
-        self.trace = trace
+        self.trace = list(trace)
 
 
 def guarded_import(allowed_modules: set[str], player_module_roots: set[str]):
@@ -90,6 +112,48 @@ def json_value(value, depth, max_depth):
     raise ReturnNotSerializable()
 
 
+def safe_value(value, depth=0, seen=None):
+    seen = TRACE_SET() if seen is None else seen
+    if depth >= TRACE_DEPTH_LIMIT:
+        return "<truncated:depth>"
+    value_type = TRACE_TYPE(value)
+    if value is None or value_type is TRACE_BOOL_TYPE or value_type is TRACE_INT_TYPE:
+        return value
+    if value_type is TRACE_FLOAT_TYPE:
+        return value if TRACE_IS_FINITE(value) else "<non-finite-float>"
+    if value_type is TRACE_STR_TYPE:
+        return value if TRACE_LEN(value) <= TRACE_STRING_LIMIT else value[:TRACE_STRING_LIMIT] + "<truncated:string>"
+    if value_type not in (TRACE_LIST_TYPE, TRACE_TUPLE_TYPE, TRACE_DICT_TYPE, TRACE_SET_TYPE, TRACE_FROZENSET_TYPE):
+        return "<unserializable>"
+    identity = TRACE_ID(value)
+    if identity in seen:
+        return "<circular>"
+    seen.add(identity)
+    if value_type is TRACE_LIST_TYPE or value_type is TRACE_TUPLE_TYPE:
+        rendered = [safe_value(value[index], depth + 1, seen) for index in TRACE_RANGE(TRACE_MIN(TRACE_LEN(value), TRACE_COLLECTION_LIMIT))]
+        if TRACE_LEN(value) > TRACE_COLLECTION_LIMIT:
+            rendered.append("<truncated:collection>")
+        return rendered
+    if value_type is TRACE_DICT_TYPE:
+        rendered = {}
+        for index, (key, item) in TRACE_ENUMERATE(TRACE_DICT_ITEMS(value)):
+            if index == TRACE_COLLECTION_LIMIT:
+                break
+            safe_key = key if TRACE_TYPE(key) in (TRACE_STR_TYPE, TRACE_INT_TYPE, TRACE_FLOAT_TYPE, TRACE_BOOL_TYPE) else "<non-primitive-key>"
+            rendered[TRACE_STRING(safe_key)] = safe_value(item, depth + 1, seen)
+        if TRACE_LEN(value) > TRACE_COLLECTION_LIMIT:
+            rendered["<truncated:collection>"] = True
+        return rendered
+    rendered = []
+    for index, item in TRACE_ENUMERATE(value):
+        if index == TRACE_COLLECTION_LIMIT:
+            break
+        rendered.append(safe_value(item, depth + 1, seen))
+    if TRACE_LEN(value) > TRACE_COLLECTION_LIMIT:
+        rendered.append("<truncated:collection>")
+    return rendered
+
+
 def error_result(request: dict[str, object], status: str, code: str, message: str, started: float, location=None, trace=None) -> dict[str, object]:
     diagnostic = {"code": code, "severity": "error", "message": message, "recoveryAction": "修改代码后重新运行"}
     if location is not None:
@@ -133,8 +197,9 @@ def _safe_relative_path(root: Path, filename: str) -> Path:
     return destination
 
 
-def _write_player_files(root: Path, files) -> set[str]:
+def _write_player_files(root: Path, files) -> tuple[set[str], set[Path]]:
     player_module_roots = set()
+    written_files = set()
     written_parents = set()
     for filename, source in files.items():
         destination = _safe_relative_path(root, filename)
@@ -142,6 +207,7 @@ def _write_player_files(root: Path, files) -> set[str]:
             raise RuntimeError("INVALID_PLAYER_FILE")
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(source, encoding="utf-8")
+        written_files.add(destination.resolve())
         parts = Path(filename).parts
         if parts:
             player_module_roots.add(parts[0].split(".", 1)[0])
@@ -150,52 +216,37 @@ def _write_player_files(root: Path, files) -> set[str]:
             (parent / "__init__.py").touch(exist_ok=True)
             written_parents.add(parent)
             parent = parent.parent
-    return player_module_roots
+    return player_module_roots, written_files
 
 
 def _entry_module_name(filename: str) -> str:
     return ".".join(Path(filename).with_suffix("").parts)
 
 
-def _trace_function(root: Path, max_events: int, max_depth: int):
+def _trace_function(player_files: dict[str, str], max_events: int):
     events = []
-    sequence = 0
+    depths = {}
 
     def trace(frame, event, argument):
-        nonlocal sequence
-        filename = frame.f_code.co_filename
-        try:
-            relative = Path(filename).relative_to(root).as_posix()
-        except ValueError:
-            return trace
+        relative_path = player_files.get(frame.f_code.co_filename)
+        if relative_path is None:
+            return None
+        if event == "call":
+            depths[TRACE_ID(frame)] = TRACE_LEN(depths)
         if event not in ("call", "line", "return", "exception"):
             return trace
-        sequence += 1
-        if sequence > max_events:
+        if TRACE_LEN(events) >= max_events:
             raise TraceLimitReached(events)
-        locals_snapshot = {}
-        for name, value in frame.f_locals.items():
-            try:
-                locals_snapshot[name] = json_value(value, 0, max_depth)
-            except (ReturnNotSerializable, RecursionError, TypeError, ValueError):
-                continue
-        depth = 0
-        parent = frame.f_back
-        while parent is not None:
-            try:
-                Path(parent.f_code.co_filename).relative_to(root)
-            except ValueError:
-                parent = parent.f_back
-                continue
-            depth += 1
-            parent = parent.f_back
-        events.append({"seq": sequence, "file": relative, "line": frame.f_lineno, "event": event, "function": frame.f_code.co_name, "depth": depth, "locals": locals_snapshot})
+        locals_snapshot = {name: safe_value(value) for name, value in frame.f_locals.items() if TRACE_TYPE(name) is TRACE_STR_TYPE and not name.startswith("_")}
+        events.append({"seq": TRACE_LEN(events) + 1, "file": relative_path, "line": frame.f_lineno, "event": event, "function": frame.f_code.co_name, "depth": depths.get(TRACE_ID(frame), 0), "locals": locals_snapshot})
+        if event == "return":
+            depths.pop(TRACE_ID(frame), None)
         return trace
 
     return trace, events
 
 
-def _call_entry(root: Path, entry_file: str, callable_name: str, world_view, builtins, trace, max_events):
+def _load_entry(root: Path, entry_file: str, callable_name: str, builtins):
     entry_path = _safe_relative_path(root, entry_file)
     if not entry_path.is_file():
         raise RuntimeError("ENTRYPOINT_NOT_FOUND")
@@ -209,7 +260,15 @@ def _call_entry(root: Path, entry_file: str, callable_name: str, world_view, bui
         target = getattr(target, component)
     if not callable(target):
         raise RuntimeError("ENTRYPOINT_NOT_CALLABLE")
-    return target(world_view)
+    return target
+
+
+def _completed_result(request, started, value, events, callable_name, stdout, stderr, limits):
+    stdout_text, stdout_truncated = clip_utf8(stdout.getvalue(), int(limits["maxOutputBytes"]))
+    stderr_text, stderr_truncated = clip_utf8(stderr.getvalue(), int(limits["maxOutputBytes"]))
+    entry_name = callable_name.rsplit(".", 1)[-1]
+    return_trace_seq = next((event["seq"] for event in reversed(events) if event["event"] == "return" and event["function"] == entry_name), None)
+    return {"protocolVersion": 1, "runId": request["runId"], "attemptId": request["attemptId"], "executionStatus": "completed", "returnValue": value, "returnValueTraceSeq": return_trace_seq, "trace": events, "diagnostics": [], "streams": {"stdout": stdout_text, "stderr": stderr_text, "truncated": stdout_truncated or stderr_truncated}, "metrics": {"durationMs": int((time.perf_counter() - started) * 1000), "traceEvents": len(events)}}
 
 
 def execute_isolated_request(request: dict[str, object], started: float) -> dict[str, object]:
@@ -233,7 +292,7 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
     try:
         os.chdir(root)
         files = request.get("files", {})
-        player_module_roots = _write_player_files(root, files)
+        player_module_roots, player_files = _write_player_files(root, files)
         allowed = set(request.get("allowedModules", []))
         guarded = guarded_import(allowed, player_module_roots)
         loader = RestrictedPlayerLoader(root, guarded)
@@ -242,20 +301,20 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
         sys.stdout = stdout
         sys.stderr = stderr
         limits = request["limits"]
-        trace_function, events = _trace_function(root, int(limits["maxTraceEvents"]), int(limits["maxValueDepth"]))
+        entrypoint = request["entrypoint"]
+        entry = _load_entry(root, entrypoint["file"], entrypoint["callable"], loader.builtins)
+        player_file_names = {str(path): str(path.relative_to(root).as_posix()) for path in player_files}
+        trace_function, events = _trace_function(player_file_names, int(limits["maxTraceEvents"]))
         sys.settrace(trace_function)
         try:
-            entrypoint = request["entrypoint"]
-            raw_value = _call_entry(root, entrypoint["file"], entrypoint["callable"], request["worldView"], loader.builtins, trace_function, int(limits["maxTraceEvents"]))
+            raw_value = entry(request["worldView"])
         finally:
             sys.settrace(previous_trace)
         try:
             value = json_value(raw_value, 0, int(limits["maxValueDepth"]))
         except RecursionError as error:
             raise ReturnNotSerializable() from error
-        clipped_stdout, stdout_truncated = clip_utf8(stdout.getvalue(), int(limits["maxOutputBytes"]))
-        clipped_stderr, stderr_truncated = clip_utf8(stderr.getvalue(), int(limits["maxOutputBytes"]))
-        return {"protocolVersion": 1, "runId": request["runId"], "attemptId": request["attemptId"], "executionStatus": "completed", "returnValue": value, "trace": events, "diagnostics": [], "streams": {"stdout": clipped_stdout, "stderr": clipped_stderr, "truncated": stdout_truncated or stderr_truncated}, "metrics": {"durationMs": int((time.perf_counter() - started) * 1000), "traceEvents": len(events)}}
+        return _completed_result(request, started, value, events, entrypoint["callable"], stdout, stderr, limits)
     finally:
         sys.settrace(previous_trace)
         sys.stdout = previous_stdout
