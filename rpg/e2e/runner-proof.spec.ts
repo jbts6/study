@@ -4,7 +4,44 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
+import { worldViewFixture } from "../src/game/testing/fixture";
+import type { RunRequest, RunResult } from "../src/runners/protocol/types";
 import type { RunnerProof } from "../tools/runner-proof/types";
+
+type StrategyRunnerProof = RunnerProof & {
+  runRequest(request: RunRequest): Promise<RunResult>;
+  interruptRun(runId: string): Promise<void>;
+};
+
+const validRequest: RunRequest = {
+  protocolVersion: 1,
+  runId: "run-browser-01",
+  attemptId: "attempt-browser-01",
+  questId: "python-marsh-03",
+  language: "python",
+  files: {
+    "main.py": "def choose_turn(world):\n return {'action': {'type': 'wait'}}",
+  },
+  entrypoint: { file: "main.py", callable: "choose_turn" },
+  worldView: worldViewFixture,
+  allowedModules: [],
+  limits: {
+    timeoutMs: 15_000,
+    interruptGraceMs: 250,
+    maxFiles: 8,
+    maxFileBytes: 16_384,
+    maxSourceBytes: 65_536,
+    maxOutputBytes: 16_384,
+    maxTraceEvents: 1_000,
+    maxValueDepth: 3,
+  },
+};
+
+const UNSAFE_DIAGNOSTIC_PATTERN = /[A-Z]:\\|\/Users\/|\$[A-Z_]+|pyodide/i;
+
+function expectSafeDiagnostics(result: RunResult): void {
+  expect(JSON.stringify(result.diagnostics)).not.toMatch(UNSAFE_DIAGNOSTIC_PATTERN);
+}
 
 async function loadRunner(
   page: Page,
@@ -107,5 +144,80 @@ test.describe("Pyodide Worker compatibility", () => {
         ),
       ),
     ).resolves.toEqual(8);
+  });
+
+  test("正式 Worker 返回受限 JSON、硬超时与主动中断", async () => {
+    await expect(
+      page.evaluate(
+        (request) => (window.runnerProof as StrategyRunnerProof).runRequest(request),
+        validRequest,
+      ),
+    ).resolves.toMatchObject({
+      executionStatus: "completed",
+      returnValue: { action: { type: "wait" } },
+    });
+
+    const nonSerializable = await page.evaluate(
+      (request) =>
+        (window.runnerProof as StrategyRunnerProof).runRequest({
+          ...request,
+          files: { "main.py": "def choose_turn(world):\n  return {1, 2}" },
+        }),
+      validRequest,
+    );
+    expect(nonSerializable).toMatchObject({
+      executionStatus: "runtime_error",
+      diagnostics: [{ code: "RETURN_NOT_SERIALIZABLE" }],
+    });
+    expectSafeDiagnostics(nonSerializable);
+
+    const timedOut = await page.evaluate(
+      (request) =>
+        (window.runnerProof as StrategyRunnerProof).runRequest({
+          ...request,
+          files: { "main.py": "def choose_turn(world):\n  while True: pass" },
+          limits: {
+            ...request.limits,
+            timeoutMs: 500,
+            maxTraceEvents: 1_000_000_000,
+          },
+        }),
+      validRequest,
+    );
+    expect(timedOut).toMatchObject({
+      executionStatus: "timeout",
+      diagnostics: [{ code: "HARD_TIMEOUT" }],
+    });
+    expectSafeDiagnostics(timedOut);
+
+    const interruptedRequest: RunRequest = {
+      ...validRequest,
+      runId: "run-browser-interrupt",
+      files: { "main.py": "def choose_turn(world):\n  while True: pass" },
+      limits: { ...validRequest.limits, maxTraceEvents: 1_000_000_000 },
+    };
+    const pending = page.evaluate(
+      (request) => (window.runnerProof as StrategyRunnerProof).runRequest(request),
+      interruptedRequest,
+    );
+    await page.waitForTimeout(100);
+    await page.evaluate(
+      (runId) => (window.runnerProof as StrategyRunnerProof).interruptRun(runId),
+      interruptedRequest.runId,
+    );
+    const interrupted = await pending;
+    expect(interrupted).toMatchObject({
+      executionStatus: "interrupted",
+      returnValue: null,
+      diagnostics: [{ code: "INTERRUPTED", severity: "info" }],
+      streams: { stdout: "", stderr: "", truncated: false },
+    });
+    expectSafeDiagnostics(interrupted);
+    await expect(
+      page.evaluate(
+        (request) => (window.runnerProof as StrategyRunnerProof).runRequest(request),
+        validRequest,
+      ),
+    ).resolves.toMatchObject({ executionStatus: "completed" });
   });
 });

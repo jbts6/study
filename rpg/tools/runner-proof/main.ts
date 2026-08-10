@@ -1,4 +1,6 @@
 import { PyodideClient } from "pyodide-worker-runner";
+import { PythonRunnerAdapter } from "../../src/runners/python/adapter";
+import type { RunRequest, RunResult } from "../../src/runners/protocol/types";
 import type { RunnerProof } from "./types";
 
 interface ClientSession {
@@ -9,6 +11,7 @@ interface ClientSession {
 
 let generation = 0;
 let session: ClientSession | undefined;
+const strategyAdapter = new PythonRunnerAdapter();
 
 function createSession(): ClientSession {
   let worker: Worker | undefined;
@@ -104,5 +107,10 @@ const runnerProof: RunnerProof = {
     ) as Promise<unknown>;
   },
 };
+
+Object.assign(runnerProof, {
+  runRequest: (request: RunRequest): Promise<RunResult> => strategyAdapter.run(request),
+  interruptRun: (runId: string): Promise<void> => strategyAdapter.interrupt(runId),
+});
 
 window.runnerProof = runnerProof;

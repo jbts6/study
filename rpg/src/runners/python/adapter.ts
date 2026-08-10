@@ -1,3 +1,4 @@
+import { PyodideClient } from "pyodide-worker-runner";
 import { PROTOCOL_VERSION, type RunRequest, type RunResult, type RunnerDiagnostic, type RunnerState } from "../protocol/types";
 import { validateRunRequest } from "../protocol/validate-request";
 import type { PythonWorkerClient, PythonWorkerFactory } from "./worker-api";
@@ -28,6 +29,17 @@ export interface PythonRunnerAdapterDependencies {
   readonly setTimeoutFn?: TimerStarter;
   readonly clearTimeoutFn?: TimerClearer;
 }
+
+const createWorker = (): Worker =>
+  new Worker(new URL("./python.worker.ts", import.meta.url), { type: "module" });
+
+const createClient = (workerFactory: PythonWorkerFactory): PythonWorkerClient =>
+  new PyodideClient(workerFactory) as unknown as PythonWorkerClient;
+
+const defaultDependencies: PythonRunnerAdapterDependencies = {
+  createWorker,
+  createClient,
+};
 
 const RETRY_ACTION = "请稍后重新运行";
 
@@ -82,9 +94,9 @@ export class PythonRunnerAdapter {
   private readonly setTimeoutFn: TimerStarter;
   private readonly clearTimeoutFn: TimerClearer;
 
-  constructor(private readonly dependencies: PythonRunnerAdapterDependencies) {
-    this.setTimeoutFn = dependencies.setTimeoutFn ?? globalThis.setTimeout;
-    this.clearTimeoutFn = dependencies.clearTimeoutFn ?? globalThis.clearTimeout;
+  constructor(private readonly dependencies: PythonRunnerAdapterDependencies = defaultDependencies) {
+    this.setTimeoutFn = dependencies.setTimeoutFn ?? ((handler, timeoutMs) => globalThis.setTimeout(handler, timeoutMs));
+    this.clearTimeoutFn = dependencies.clearTimeoutFn ?? ((timer) => globalThis.clearTimeout(timer));
   }
 
   run(request: RunRequest): Promise<RunResult> {
