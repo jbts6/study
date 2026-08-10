@@ -1,4 +1,5 @@
-import type { BattleState, TurnCommand } from "../combat/types";
+import type { BattleState, TurnCommand, WorldView } from "../combat/types";
+import { projectWorldView } from "../world/project-world-view";
 
 export const fixtureCommands: readonly TurnCommand[] = [
   { actorId: "scout", expectedRevision: 0, movePath: [{ x: 1, y: 0 }], action: { type: "attack", targetId: "golem" } },
@@ -23,3 +24,5 @@ export function createFixtureState(): BattleState {
     ],
   };
 }
+
+export const worldViewFixture: WorldView = projectWorldView(createFixtureState());
