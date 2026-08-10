@@ -1,1 +1,7 @@
 .worktrees/
+.helloagents/
+.superpowers/
+rpg/dist/
+rpg/node_modules/
+rpg/playwright-report/
+rpg/test-results/
