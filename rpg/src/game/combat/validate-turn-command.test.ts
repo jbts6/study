@@ -69,6 +69,61 @@ describe("validateTurnCommand", () => {
     expectRejected(state, { actorId: "scout", expectedRevision: 0, action: { type: "attack", targetId: "scout" } }, "INVALID_TARGET", "$.action.targetId");
   });
 
+  it("rejects a revealed enemy unit whose cell lies outside the board", () => {
+    const state = createFixtureState();
+    const invalidTargetState = {
+      ...state,
+      units: state.units.map((unit) => unit.id === "golem" ? { ...unit, cell: { x: 3, y: 0 } } : unit),
+    };
+
+    expectRejected(invalidTargetState, { actorId: "scout", expectedRevision: 0, action: { type: "attack", targetId: "golem" } }, "INVALID_TARGET", "$.action.targetId");
+  });
+
+  it("allows the actor to return to its vacated start cell", () => {
+    const state = createFixtureState();
+
+    expect(validateTurnCommand(state, {
+      actorId: "scout",
+      expectedRevision: 0,
+      movePath: [{ x: 1, y: 0 }, { x: 0, y: 0 }],
+      action: { type: "wait" },
+    })).toMatchObject({ accepted: true });
+  });
+
+  it("returns a command detached from successful move and cell-target input", () => {
+    const state = createFixtureState();
+    const cellSkillState = {
+      ...state,
+      units: state.units.map((unit) => unit.id === "scout"
+        ? { ...unit, skills: unit.skills.map((skill) => skill.id === "spark" ? { ...skill, target: "cell" as const } : skill) }
+        : unit),
+    };
+    const input = {
+      actorId: "scout",
+      expectedRevision: 0,
+      movePath: [{ x: 1, y: 0 }],
+      action: { type: "cast" as const, skillId: "spark", targetCell: { x: 2, y: 0 } },
+    };
+    const validation = validateTurnCommand(cellSkillState, input);
+
+    expect(validation.accepted).toBe(true);
+    if (!validation.accepted) throw new Error("预期命令校验成功");
+    const commandBeforeMutation = structuredClone(validation.command);
+    input.movePath[0].x = 0;
+    input.action.targetCell.x = 0;
+
+    expect(validation.command).toEqual(commandBeforeMutation);
+  });
+
+  it("does not mutate state while rejecting a command", () => {
+    const state = createFixtureState();
+    const before = structuredClone(state);
+
+    expectRejected(state, { ...validWait() as object, movePath: [{ x: 1, y: 1 }] }, "INVALID_MOVE_PATH", "$.movePath[0]");
+
+    expect(state).toEqual(before);
+  });
+
   it("validates skill existence, cooldown, target kind, and interaction objectives", () => {
     const state = createFixtureState();
 

@@ -140,7 +140,7 @@ function validateMovePath(state: BattleState, actor: BattleUnit, path: readonly 
     if (manhattanDistance(previous, cell) !== 1) {
       return rejected("INVALID_MOVE_PATH", `$.movePath[${index}]`, "移动路径必须逐格正交相邻");
     }
-    if (!isOnBoard(state, cell) || isBlocked(state, cell)) return rejected("MOVE_BLOCKED", `$.movePath[${index}]`, "移动路径被阻挡");
+    if (!isOnBoard(state, cell) || isBlocked(state, actor.id, cell)) return rejected("MOVE_BLOCKED", `$.movePath[${index}]`, "移动路径被阻挡");
     previous = cell;
   }
   return previous;
@@ -151,9 +151,9 @@ function isOnBoard(state: BattleState, cell: Cell): boolean {
   return cell.x >= 0 && cell.x < state.board.width && cell.y >= 0 && cell.y < state.board.height;
 }
 
-/** Tests whether terrain or any unit occupies a destination. */
-function isBlocked(state: BattleState, cell: Cell): boolean {
-  return state.board.blockedCells.some((blocked) => sameCell(blocked, cell)) || state.units.some((unit) => sameCell(unit.cell, cell));
+/** Tests whether terrain or another unit occupies a destination. */
+function isBlocked(state: BattleState, actorId: string, cell: Cell): boolean {
+  return state.board.blockedCells.some((blocked) => sameCell(blocked, cell)) || state.units.some((unit) => unit.id !== actorId && sameCell(unit.cell, cell));
 }
 
 /** Compares two cells by coordinates. */
@@ -201,7 +201,7 @@ function validateCast(state: BattleState, actor: BattleUnit, origin: Cell, actio
 function validateUnitTarget(state: BattleState, actor: BattleUnit, origin: Cell, targetId: string, range: number, invalidCode: "INVALID_TARGET", path: string, targetTeam: "enemy" | "ally" = "enemy"): CommandValidation | undefined {
   const target = state.units.find((unit) => unit.id === targetId);
   const hasRequiredTeam = targetTeam === "enemy" ? target?.team !== actor.team : target?.team === actor.team;
-  if (target === undefined || !hasRequiredTeam || target.visibility !== "revealed" || target.disabled) {
+  if (target === undefined || !isOnBoard(state, target.cell) || !hasRequiredTeam || target.visibility !== "revealed" || target.disabled) {
     return rejected(invalidCode, path, "目标无效");
   }
   return manhattanDistance(origin, target.cell) <= range
