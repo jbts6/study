@@ -236,7 +236,7 @@ describe("reduceBattle", () => {
       movePath: [{ x: 1, y: 0 }],
       action: { type: "attack", targetId: "golem" },
     });
-    expect(won.events.map((event) => event.type)).toEqual(["moved", "damaged", "unit_disabled", "battle_finished", "turn_advanced"]);
+    expect(won.events.map((event) => event.type)).toEqual(["moved", "damaged", "unit_disabled", "battle_finished"]);
     expect(won.events[3]).toMatchObject({ type: "battle_finished", payload: { outcome: "won" } });
     expect(findUnit(won.state, "golem").disabled).toBe(true);
 
@@ -251,7 +251,77 @@ describe("reduceBattle", () => {
         : unit),
     };
     const lost = reduceBattle(lossState, { actorId: "golem", expectedRevision: 0, action: { type: "wait" } });
-    expect(lost.events.map((event) => event.type)).toEqual(["battle_finished", "turn_advanced"]);
+    expect(lost.events.map((event) => event.type)).toEqual(["battle_finished"]);
     expect(lost.events[0]).toMatchObject({ type: "battle_finished", payload: { outcome: "lost" } });
+  });
+
+  it("skips disabled turn entries and only advances in-progress battles", () => {
+    const base = createFixtureState();
+    const skipState: BattleState = {
+      ...base,
+      turnOrder: ["scout", "golem", "lurker"],
+      units: base.units.map((unit) => unit.id === "golem"
+        ? { ...unit, hp: 2 }
+        : unit.id === "lurker" ? { ...unit, disabled: false, visibility: "revealed" }
+        : unit),
+    };
+    const skipped = reduceBattle(skipState, {
+      actorId: "scout",
+      expectedRevision: 0,
+      movePath: [{ x: 1, y: 0 }],
+      action: { type: "attack", targetId: "golem" },
+    });
+    expect(skipped.state.phase).toBe("in_progress");
+    expect(skipped.state).toMatchObject({ round: 1, turnIndex: 2 });
+    expect(skipped.events.at(-1)).toMatchObject({ type: "turn_advanced", payload: { round: 1, turnIndex: 2, activeUnitId: "lurker" } });
+
+    const wrapBase = createFixtureState();
+    const wrapState: BattleState = {
+      ...wrapBase,
+      round: 1,
+      turnIndex: 2,
+      turnOrder: ["golem", "scout", "lurker"],
+      units: wrapBase.units.map((unit) => unit.id === "golem"
+        ? { ...unit, hp: 0, disabled: true }
+        : unit.id === "lurker" ? { ...unit, disabled: false, visibility: "revealed" }
+        : unit),
+    };
+    const wrapped = reduceBattle(wrapState, { actorId: "lurker", expectedRevision: 0, action: { type: "wait" } });
+    expect(wrapped.state.phase).toBe("in_progress");
+    expect(wrapped.state).toMatchObject({ round: 2, turnIndex: 1 });
+    expect(wrapped.events.at(-1)).toMatchObject({ type: "turn_advanced", payload: { round: 2, turnIndex: 1, activeUnitId: "scout" } });
+
+    const maxRound = reduceBattle({ ...wrapState, maxRounds: 1 }, { actorId: "lurker", expectedRevision: 0, action: { type: "wait" } });
+    expect(maxRound.state).toMatchObject({ phase: "lost", round: 2, turnIndex: 1 });
+    expect(maxRound.events).toContainEqual(expect.objectContaining({ type: "battle_finished", payload: { outcome: "lost" } }));
+    expect(maxRound.events.some((event) => event.type === "turn_advanced")).toBe(false);
+  });
+
+  it("captures a validator-confirmed cell target before moving its actor", () => {
+    const base = createFixtureState();
+    const state: BattleState = {
+      ...base,
+      units: base.units.map((unit) => unit.id === "scout"
+        ? {
+            ...unit,
+            hp: 5,
+            skills: unit.skills.map((skill) => skill.id === "mend" ? { ...skill, target: "cell" as const } : skill),
+          }
+        : unit),
+    };
+    const result = resolveTurn(state, {
+      actorId: "scout",
+      expectedRevision: 0,
+      movePath: [{ x: 1, y: 0 }],
+      action: { type: "cast", skillId: "mend", targetCell: { x: 0, y: 0 } },
+    });
+
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) throw new Error("The legal moved cell heal was rejected");
+    expect(findUnit(result.state, "scout")).toMatchObject({ cell: { x: 1, y: 0 }, hp: 8 });
+    expect(result.events.slice(0, 2)).toMatchObject([
+      { type: "moved", payload: { actorId: "scout", from: { x: 0, y: 0 }, to: { x: 1, y: 0 } } },
+      { type: "healed", payload: { sourceId: "scout", targetId: "scout", amount: 3, hpAfter: 8 } },
+    ]);
   });
 });

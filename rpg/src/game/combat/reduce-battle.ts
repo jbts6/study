@@ -25,6 +25,7 @@ type Draft = {
 export function reduceBattle(state: Readonly<BattleState>, command: TurnCommand): ReducedBattle {
   const stateRevision = state.revision + 1;
   const events: BattleEvent[] = [];
+  const cellTargetId = captureCellTargetId(state, command);
   let draft: Draft = { units: state.units, objectives: state.objectives, rngState: state.rngState, disabledIds: [] };
   draft = expireStatuses(draft, command.actorId, events, stateRevision);
 
@@ -35,22 +36,26 @@ export function reduceBattle(state: Readonly<BattleState>, command: TurnCommand)
     emit(events, stateRevision, "moved", { actorId: command.actorId, from: copyCell(beforeMove.cell), to: copyCell(destination) });
   }
 
-  const actionResult = reduceAction(draft, command.actorId, command.action, state.board, events, stateRevision);
+  const actionResult = reduceAction(draft, command.actorId, command.action, cellTargetId, state.board, events, stateRevision);
   draft = applyHazard(actionResult.draft, command.actorId, state, events, stateRevision);
   draft = advanceCooldowns(draft, command.actorId, actionResult.castSkillId, events, stateRevision);
   emitDisabled(events, stateRevision, draft.disabledIds);
 
-  const next = nextTurn(state);
-  const phase = determinePhase(draft, state, next.round);
+  const next = nextTurn(state, draft.units);
+  const nextRound = next?.round ?? state.round;
+  const phase = determinePhase(draft, state, nextRound);
   if (phase !== "in_progress") emit(events, stateRevision, "battle_finished", { outcome: phase });
-  emit(events, stateRevision, "turn_advanced", { round: next.round, turnIndex: next.turnIndex, activeUnitId: next.activeUnitId });
+  if (phase === "in_progress") {
+    if (next === undefined) throw new Error("In-progress battle has no enabled turn participant");
+    emit(events, stateRevision, "turn_advanced", { round: next.round, turnIndex: next.turnIndex, activeUnitId: next.activeUnitId });
+  }
 
   return {
     state: {
       ...state,
       revision: stateRevision,
-      round: next.round,
-      turnIndex: next.turnIndex,
+      round: nextRound,
+      turnIndex: next?.turnIndex ?? state.turnIndex,
       phase,
       units: draft.units,
       objectives: draft.objectives,
@@ -64,6 +69,7 @@ function reduceAction(
   draft: Draft,
   actorId: string,
   action: MainAction,
+  cellTargetId: string | undefined,
   board: BattleState["board"],
   events: BattleEvent[],
   stateRevision: number,
@@ -73,7 +79,7 @@ function reduceAction(
     case "attack":
       return { draft: damage(draft, actor, requireUnit(draft.units, action.targetId), 0, board, events, stateRevision) };
     case "cast":
-      return reduceCast(draft, actor, action, board, events, stateRevision);
+      return reduceCast(draft, actor, action, cellTargetId, board, events, stateRevision);
     case "interact":
       return { draft: interact(draft, actor, action.targetId, events, stateRevision) };
     case "guard":
@@ -87,14 +93,15 @@ function reduceCast(
   draft: Draft,
   actor: BattleUnit,
   action: Extract<MainAction, { type: "cast" }>,
+  cellTargetId: string | undefined,
   board: BattleState["board"],
   events: BattleEvent[],
   stateRevision: number,
 ): Readonly<{ draft: Draft; castSkillId: string }> {
   const skill = requireSkill(actor, action.skillId);
-  const target = action.targetId === undefined
-    ? requireCellOccupant(draft.units, action.targetCell as Cell)
-    : requireUnit(draft.units, action.targetId);
+  const targetId = action.targetId ?? cellTargetId;
+  if (targetId === undefined) throw new Error("Validated cell target was not captured");
+  const target = requireUnit(draft.units, targetId);
   let next = skill.kind === "damage"
     ? damage(draft, actor, target, skill.power, board, events, stateRevision)
     : heal(draft, actor, target, skill.power, events, stateRevision);
@@ -210,10 +217,17 @@ function determinePhase(draft: Draft, state: BattleState, nextRound: number): Ba
   return !hasAlly || keyDestroyed || nextRound > state.maxRounds ? "lost" : "in_progress";
 }
 
-function nextTurn(state: BattleState): Readonly<{ round: number; turnIndex: number; activeUnitId: string }> {
-  const turnIndex = (state.turnIndex + 1) % state.turnOrder.length;
-  const round = state.round + (turnIndex === 0 ? 1 : 0);
-  return { round, turnIndex, activeUnitId: state.turnOrder[turnIndex] as string };
+function nextTurn(state: BattleState, units: readonly BattleUnit[]): Readonly<{ round: number; turnIndex: number; activeUnitId: string }> | undefined {
+  for (let offset = 1; offset <= state.turnOrder.length; offset += 1) {
+    const turnIndex = (state.turnIndex + offset) % state.turnOrder.length;
+    const activeUnitId = state.turnOrder[turnIndex] as string;
+    const candidate = units.find((unit) => unit.id === activeUnitId);
+    if (candidate !== undefined && !candidate.disabled) {
+      const round = state.round + (state.turnIndex + offset >= state.turnOrder.length ? 1 : 0);
+      return { round, turnIndex, activeUnitId };
+    }
+  }
+  return undefined;
 }
 
 function emit(events: BattleEvent[], stateRevision: number, type: BattleEvent["type"], payload: BattleEventPayload): void {
@@ -234,6 +248,11 @@ function requireCellOccupant(units: readonly BattleUnit[], cell: Cell): BattleUn
   const unit = units.find((candidate) => sameCell(candidate.cell, cell));
   if (unit === undefined) throw new Error("Validated cell target has no occupant");
   return unit;
+}
+
+function captureCellTargetId(state: BattleState, command: TurnCommand): string | undefined {
+  if (command.action.type !== "cast" || command.action.targetCell === undefined) return undefined;
+  return requireCellOccupant(state.units, command.action.targetCell).id;
 }
 
 function requireSkill(actor: BattleUnit, id: string): Skill {
