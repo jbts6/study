@@ -6,11 +6,11 @@
 
 **Architecture:** 先用独立浏览器证明页验证固定 Pyodide 及 `pyodide-worker-runner` 的公开 API；该证明失败即停止，保留证据，由新的计划把适配器改为官方 Pyodide Worker API。证明通过后，`runners/protocol` 负责语言无关的运行时校验，`PythonRunnerAdapter` 负责生命周期和硬超时重建，Worker 只运行 Python 辅助脚本并通过 Comlink 传递结构化克隆数据。Python 辅助脚本创建每次运行独有的工作目录和模块命名空间，执行器只返回 JSON 值；`WorldView` 与 `TurnCommand` 的游戏语义始终由战斗内核承担。
 
-**Tech Stack:** TypeScript 5.7、Vite 6、Vitest 2、Playwright 1.62、`pyodide@314.0.3`、`pyodide-worker-runner@1.4.0`、`comsync@0.0.9`、`comlink@4.4.2`、浏览器 Worker、Pyodide Python。
+**Tech Stack:** Node.js 24.15.0（由 fnm 和仓库根 `.node-version` 固定）、TypeScript 7.0.2、Vite 8.2.1、Vitest 4.1.10、jsdom 30.0.1、Playwright 1.62.1、`pyodide@314.0.3`、`pyodide-worker-runner@1.4.0`、`comsync@0.0.9`、`comlink@4.4.2`、浏览器 Worker、Pyodide Python。
 
 ## Global Constraints
 
-- `rpg/package.json`、`rpg/vite.config.ts`、`rpg/playwright.config.ts` 已由战斗计划创建；本计划只修改它们合并依赖、脚本和隔离响应头，使用 `npm --prefix rpg install` 增量更新既有锁文件，不得删除或重建锁文件。
+- `rpg/package.json`、`rpg/tsconfig.json` 与 `rpg/vite.config.ts` 已由战斗计划创建；`rpg/playwright.config.ts` 由 Task 1 新建。本计划只增量合并依赖、脚本、TypeScript 输入范围和隔离响应头，使用 `npm --prefix rpg install` 更新既有锁文件，不得删除或重建锁文件，不得降级阶段 1 已固定的 TypeScript/Vite/Vitest/jsdom/Playwright。
 - 直接依赖必须精确固定为 `pyodide@314.0.3`、`pyodide-worker-runner@1.4.0`、`comsync@0.0.9`、`comlink@4.4.2`；不得为了辅助库兼容性降级 Pyodide。
 - 首个证明点必须在真实浏览器覆盖加载、执行、`SharedArrayBuffer` 中断、硬超时 Worker 重建、多文件导入、连续运行隔离；Task 1 失败时停止本计划全部后续任务。
 - 若 Task 1 证伪兼容性，只记录版本、命令、浏览器、最小复现和脱敏错误输出；新计划改用官方 Pyodide Worker API。不得修补依赖私有实现、猴子补丁或回退 Pyodide。
@@ -40,17 +40,36 @@
 ## 依赖顺序
 
 1. Task 1 的兼容性证明必须通过并提交，才可开始 Task 2--7。
-2. Task 2 依赖战斗计划已导出 `WorldView`、`TurnCommand`；它不修改 `rpg/src/game/combat/types.ts`。
+2. Task 2 依赖战斗计划已导出 `WorldView`、`TurnCommand`；它不修改 `rpg/src/game/combat/types.ts`，并接受 `WorldView.activeUnitId` 为 `string | null`。
 3. Task 3--6 都依赖 Task 2；Task 6 依赖 Task 3--5。
 4. Task 7 只在 Task 1--6 的单元测试全部通过后执行。
+
+## 预检修正规则
+
+以下规则基于阶段 1 基线 `master@8ef1f97` 的实际文件与接口得出，优先于后文示例草稿；实现和审查必须按本节收敛，不得机械复制相冲突的片段。
+
+- 工具链固定为 fnm 管理的 Node `24.15.0`、TypeScript `7.0.2`、Vite `8.2.1`、Vitest `4.1.10`、jsdom `30.0.1` 和 Playwright `1.62.1`。仓库根目录跟踪 `.node-version`，`rpg/package.json` 声明 `engines.node` 为 `24.15.0`；不得降级阶段 1 的精确依赖。
+- `rpg/playwright.config.ts` 在基线中不存在，Task 1 必须新建完整配置，并同时定义 `testDir`、`use.baseURL` 与 `webServer`。测试继续使用相对 `page.goto()`，不得依赖调用者碰巧设置 URL。
+- `rpg/tsconfig.json` 必须保留既有严格选项和 `skipLibCheck`，并显式覆盖 `src`、`tools`、`e2e`、`vite.config.ts`、`playwright.config.ts` 以及 `vite/client` 类型；所有 proof 源码必须通过 `noUnusedLocals`。
+- `RunnerProof` 只在 `tools/runner-proof/types.ts` 定义一次，页面与 Playwright 测试共同导入该类型；不得分别扩展不一致的 `Window.runnerProof`，不得保留未使用的通用 `call()` 包装器。
+- Task 1 的硬超时依赖 Worker 工厂保留的原生 `Worker` 引用并调用 `worker.terminate()`；不假定 `PyodideClient` 存在未验证的 `terminate()` API。门禁必须证明终止后由新 Worker 恢复。
+- Task 1 的隔离断言必须连续运行两组同名 `helper.py` 且值不同，并证明第二次不读取第一次遗留的 `sys.modules` 项；仅检查入口脚本全局变量不算隔离证明。
+- Task 2 的请求快照若要承诺不可变，必须递归冻结或使用只读值对象；单独 `structuredClone()` 只能证明与调用方断开别名，文档不得把它描述成不可变。
+- Task 3 在首次 `ensureClient()` 的第一个异步边界前就必须登记同一个初始化 Promise，保证并发调用只创建一次客户端；`dispose()`、初始化失败和重建失败都必须让全部等待者以稳定诊断结束，不能留下悬挂 Promise。Task 3 只注入 Worker 工厂，默认浏览器 Worker 工厂由 Task 6 增加。
+- Task 4 的测试 fixture revision 必须使用实际值 `0`；安全内建函数包含受控 `print`，所有 Python 异常都转换为协议诊断。根目录 `helper.py` 的允许模块名是 `helper`，路径归一化后再判断白名单。
+- Task 5 的深层序列化测试把深对象保存在局部变量并只追踪预算允许的值；玩家文件通过绝对路径到相对路径的映射识别，不能只用 basename，否则子目录同名文件会碰撞。
+- Task 6 不重复实现 Task 3 已注入的工厂；Task 7 把新增断言合并到现有测试文件，避免重复 import、重复 fixture 和作用域外变量。重建失败结果由仍持有活动请求的调用层构造。
 
 ### Task 1: 建立真实浏览器兼容性证明硬门
 
 **Files:**
+- Create: `.node-version`
 - Modify: `rpg/package.json`
+- Modify: `rpg/tsconfig.json`
 - Modify: `rpg/vite.config.ts`
-- Modify: `rpg/playwright.config.ts`
+- Create: `rpg/playwright.config.ts`
 - Create: `rpg/tools/runner-proof/index.html`
+- Create: `rpg/tools/runner-proof/types.ts`
 - Create: `rpg/tools/runner-proof/main.ts`
 - Create: `rpg/tools/runner-proof/proof.worker.ts`
 - Create: `rpg/e2e/runner-proof.spec.ts`
@@ -67,6 +86,7 @@
 
 ```json
 {
+  "engines": { "node": "24.15.0" },
   "scripts": { "e2e": "playwright test" },
   "dependencies": {
     "comlink": "4.4.2",
@@ -77,9 +97,9 @@
 }
 ```
 
-不修改 `rpg/tsconfig.json`；它由战斗计划统一维护，必须已经包含 `src`、`tools`、`e2e` 和 `vite/client` 类型。
+增量修改 `rpg/tsconfig.json`：保留阶段 1 的严格选项与 `skipLibCheck`，将 `types` 设为 `["vite/client","vitest/globals"]`，将 `include` 扩展为 `["src","tools","e2e","vite.config.ts","playwright.config.ts"]`。
 
-在既有 `rpg/vite.config.ts` 的 `server` 对象合并，在既有 `rpg/playwright.config.ts` 的 `webServer` 对象替换为：
+在既有 `rpg/vite.config.ts` 的 `server` 对象合并，并新建完整的 `rpg/playwright.config.ts`：
 
 ```ts
 import { defineConfig } from "vitest/config";
@@ -95,15 +115,21 @@ server: {
 ```ts
 import { defineConfig } from "@playwright/test";
 
-webServer: {
-  command: "npm --prefix rpg run dev -- --port 5173",
-  url: "http://127.0.0.1:5173",
-  reuseExistingServer: true,
-  timeout: 120_000,
-},
+export default defineConfig({
+  testDir: "./e2e",
+  use: { baseURL: "http://127.0.0.1:5173" },
+  webServer: {
+    command: "npm run dev -- --host 127.0.0.1 --port 5173",
+    url: "http://127.0.0.1:5173",
+    reuseExistingServer: false,
+    timeout: 120_000,
+  },
+});
 ```
 
 运行：`npm --prefix rpg install pyodide@314.0.3 pyodide-worker-runner@1.4.0 comsync@0.0.9 comlink@4.4.2`
+
+运行：`npm --prefix rpg exec -- playwright install chromium`
 
 运行：`npm --prefix rpg ls pyodide pyodide-worker-runner comsync comlink`
 
