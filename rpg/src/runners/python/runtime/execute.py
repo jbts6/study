@@ -23,6 +23,8 @@ ORIGINAL_IMPORT = __import__
 TRACE_IS_FINITE = math.isfinite
 TRACE_TYPE = type
 TRACE_LEN = len
+TRACE_LIST = list
+TRACE_EXCEPTION_INIT = Exception.__init__
 TRACE_ID = id
 TRACE_MIN = min
 TRACE_RANGE = range
@@ -47,8 +49,8 @@ class ReturnNotSerializable(Exception):
 
 class TraceLimitReached(Exception):
     def __init__(self, trace):
-        super().__init__("TRACE_LIMIT_REACHED")
-        self.trace = list(trace)
+        TRACE_EXCEPTION_INIT(self, "TRACE_LIMIT_REACHED")
+        self.trace = TRACE_LIST(trace)
 
 
 def guarded_import(allowed_modules: set[str], player_module_roots: set[str]):
@@ -159,7 +161,7 @@ def error_result(request: dict[str, object], status: str, code: str, message: st
     if location is not None:
         diagnostic["location"] = location
     events = [] if trace is None else trace
-    return {"protocolVersion": 1, "runId": request["runId"], "attemptId": request["attemptId"], "executionStatus": status, "returnValue": None, "trace": events, "diagnostics": [diagnostic], "streams": {"stdout": "", "stderr": "", "truncated": False}, "metrics": {"durationMs": int((time.perf_counter() - started) * 1000), "traceEvents": len(events)}}
+    return {"protocolVersion": 1, "runId": request["runId"], "attemptId": request["attemptId"], "executionStatus": status, "returnValue": None, "trace": events, "diagnostics": [diagnostic], "streams": {"stdout": "", "stderr": "", "truncated": False}, "metrics": {"durationMs": int((time.perf_counter() - started) * 1000), "traceEvents": TRACE_LEN(events)}}
 
 
 def syntax_error_result(request: dict[str, object], error: SyntaxError, started: float) -> dict[str, object]:

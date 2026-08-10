@@ -16,6 +16,27 @@ async function run(request: object, slot = "__test_request__") {
   return JSON.parse(String(raw)) as Record<string, any>;
 }
 
+async function runWithRuntimeGlobalsPoisoned(request: object, slot = "__test_poison_request__") {
+  pyodide.globals.set(slot, pyodide.toPy(request));
+  const raw = await pyodide.runPythonAsync(`
+import json as __json
+__runtime_globals = execute_request.__globals__
+__missing = object()
+__names = ("list", "len", "super")
+__originals = {__name: __runtime_globals.get(__name, __missing) for __name in __names}
+try:
+    __result = execute_request(${slot})
+finally:
+    for __name, __original in __originals.items():
+        if __original is __missing:
+            __runtime_globals.pop(__name, None)
+        else:
+            __runtime_globals[__name] = __original
+__json.dumps(__result)
+`);
+  return JSON.parse(String(raw)) as Record<string, any>;
+}
+
 const baseRequest = {
   protocolVersion: 1,
   runId: "run-runtime-01",
@@ -305,5 +326,24 @@ describe("python execution isolation and policy", () => {
     expect(result.executionStatus).toBe("completed");
     expect(entryReturn).toBeDefined();
     expect(result.returnValueTraceSeq).toBe(entryReturn?.seq);
+  });
+
+  it("轨迹预算不调用玩家替换的共享内建", async () => {
+    const result = await runWithRuntimeGlobalsPoisoned({
+      ...baseRequest,
+      allowedModules: ["sys"],
+      limits: { ...baseRequest.limits, maxTraceEvents: 8 },
+      files: {
+        "main.py": "import sys\ndef poison(*args, **kwargs): raise AssertionError('runtime global invoked')\ndef choose_turn(world):\n runtime_globals = sys._getframe().f_back.f_globals\n runtime_globals['list'] = poison\n runtime_globals['len'] = poison\n runtime_globals['super'] = poison\n marker = 'armed'\n while True:\n  marker = 'loop'",
+      },
+    });
+    expect(result).toMatchObject({
+      executionStatus: "runtime_error",
+      diagnostics: [{ code: "TRACE_LIMIT_REACHED" }],
+      metrics: { traceEvents: 8 },
+    });
+    expect(result.trace).toHaveLength(8);
+    expect(result.trace.map((event: { seq: number }) => event.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(result.trace.every((event: { file: string }) => event.file === "main.py")).toBe(true);
   });
 });
