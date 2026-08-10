@@ -53,11 +53,13 @@ export async function createReplay(
   metadata: ReplayMetadata,
   initialState: BattleState,
 ): Promise<Replay> {
-  const initialStateHash = await canonicalSha256(initialState);
+  const metadataSnapshot = structuredClone(metadata);
+  const initialStateSnapshot = structuredClone(initialState);
+  const initialStateHash = await canonicalSha256(initialStateSnapshot);
   return {
     replayVersion: 1,
-    metadata,
-    initialState,
+    metadata: metadataSnapshot,
+    initialState: initialStateSnapshot,
     initialStateHash,
     steps: [],
     outcome: initialState.phase,
@@ -71,24 +73,27 @@ export async function recordAcceptedTurn(
   before: BattleState,
   resolution: Extract<CommandResolution, { accepted: true }>,
 ): Promise<Replay> {
-  const stateHash = await canonicalSha256(resolution.state);
+  const replaySnapshot = structuredClone(replay);
+  const beforeSnapshot = structuredClone(before);
+  const resolutionSnapshot = structuredClone(resolution);
+  const stateHash = await canonicalSha256(resolutionSnapshot.state);
   const step: ReplayStep = {
-    seq: replay.steps.length + 1,
-    round: before.round,
-    turnIndex: before.turnIndex,
-    stateRevision: before.revision,
-    actorId: resolution.command.actorId,
-    command: resolution.command,
-    rngBefore: before.rngState,
-    rngAfter: resolution.state.rngState,
-    events: resolution.events,
-    eventsHash: await canonicalSha256(resolution.events),
+    seq: replaySnapshot.steps.length + 1,
+    round: beforeSnapshot.round,
+    turnIndex: beforeSnapshot.turnIndex,
+    stateRevision: beforeSnapshot.revision,
+    actorId: resolutionSnapshot.command.actorId,
+    command: resolutionSnapshot.command,
+    rngBefore: beforeSnapshot.rngState,
+    rngAfter: resolutionSnapshot.state.rngState,
+    events: resolutionSnapshot.events,
+    eventsHash: await canonicalSha256(resolutionSnapshot.events),
     stateHash,
   };
   return {
-    ...replay,
-    steps: [...replay.steps, step],
-    outcome: resolution.state.phase,
+    ...replaySnapshot,
+    steps: [...replaySnapshot.steps, step],
+    outcome: resolutionSnapshot.state.phase,
     finalStateHash: stateHash,
   };
 }
@@ -112,9 +117,10 @@ export async function verifyReplay(replay: Replay): Promise<ReplayVerification> 
   }
 
   let state = replay.initialState;
-  for (const step of replay.steps) {
+  for (const [index, step] of replay.steps.entries()) {
+    const stepNumber = index + 1;
     const result = resolveTurn(state, step.command);
-    if (!result.accepted) return mismatch(step.seq, "command", "accepted", "rejected", replay);
+    if (!result.accepted) return mismatch(stepNumber, "command", "accepted", "rejected", replay);
 
     const checks: readonly [ReplayMismatch["field"], string | number, string | number][] = [
       ["rngBefore", step.rngBefore, state.rngState],
@@ -123,7 +129,7 @@ export async function verifyReplay(replay: Replay): Promise<ReplayVerification> 
       ["stateHash", step.stateHash, await canonicalSha256(result.state)],
     ];
     for (const [field, expected, actual] of checks) {
-      if (expected !== actual) return mismatch(step.seq, field, expected, actual, replay);
+      if (expected !== actual) return mismatch(stepNumber, field, expected, actual, replay);
     }
     state = result.state;
   }
