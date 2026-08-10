@@ -70,6 +70,13 @@ describe("validateRunRequest", () => {
 
   it("rejects an unsupported protocol version before other fields", () => {
     expect(diagnosticCode({ ...validRequest(), protocolVersion: 2 })).toBe("UNSUPPORTED_PROTOCOL_VERSION");
+    expect(
+      diagnosticCode({
+        ...validRequest(),
+        protocolVersion: 2,
+        files: () => undefined,
+      }),
+    ).toBe("UNSUPPORTED_PROTOCOL_VERSION");
   });
 
   it("rejects unknown top-level fields with a stable diagnostic", () => {
@@ -194,6 +201,22 @@ describe("validateRunRequest", () => {
         worldView: { ...worldViewFixture, mutable: new Map([["key", "value"]]) },
       }),
     ).toBe("INVALID_WORLD_VIEW");
+  });
+
+  it("accepts an acyclic worldView graph with shared object references", () => {
+    const sharedCell = { x: 0, y: 0 };
+    const clonedWorldView = structuredClone(worldViewFixture);
+    const worldView = {
+      ...clonedWorldView,
+      units: [
+        { ...clonedWorldView.units[0]!, cell: sharedCell },
+        { ...clonedWorldView.units[1]!, cell: sharedCell },
+      ],
+    };
+
+    const result = validateRunRequest({ ...validRequest(), worldView });
+
+    expect(result.ok).toBe(true);
   });
 
   it("converts throwing accessors and proxies into one stable diagnostic", () => {

@@ -94,16 +94,21 @@ function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
   return value;
 }
 
-function isJsonData(value: unknown, seen = new WeakSet<object>()): boolean {
+function isJsonData(value: unknown, path = new WeakSet<object>()): boolean {
   if (value === null || typeof value === "string" || typeof value === "boolean") return true;
   if (typeof value === "number") return Number.isFinite(value);
   if (typeof value !== "object") return false;
-  if (seen.has(value)) return false;
-  seen.add(value);
+  if (path.has(value)) return false;
+  path.add(value);
 
-  if (Array.isArray(value)) return value.every((nestedValue) => isJsonData(nestedValue, seen));
-  if (!isPlainObject(value)) return false;
-  return Object.values(value).every((nestedValue) => isJsonData(nestedValue, seen));
+  let valid = false;
+  if (Array.isArray(value)) {
+    valid = value.every((nestedValue) => isJsonData(nestedValue, path));
+  } else if (isPlainObject(value)) {
+    valid = Object.values(value).every((nestedValue) => isJsonData(nestedValue, path));
+  }
+  path.delete(value);
+  return valid;
 }
 
 export function validateRunRequest(input: unknown): RequestValidationResult {
@@ -112,12 +117,15 @@ export function validateRunRequest(input: unknown): RequestValidationResult {
     const rawUnknownField = Reflect.ownKeys(input).find(
       (key) => typeof key !== "string" || !REQUEST_FIELDS.has(key),
     );
+    if (input.protocolVersion !== 1) return invalid("UNSUPPORTED_PROTOCOL_VERSION", "不支持的运行协议版本");
+    if (rawUnknownField !== undefined) {
+      return invalid("UNKNOWN_REQUEST_FIELD", `未知运行请求字段: ${String(rawUnknownField)}`);
+    }
     const snapshot = structuredClone(input) as unknown;
     if (!isPlainObject(snapshot)) return invalid("INVALID_REQUEST", "运行请求必须是普通对象");
     if (snapshot.protocolVersion !== 1) return invalid("UNSUPPORTED_PROTOCOL_VERSION", "不支持的运行协议版本");
 
-    const unknownField =
-      rawUnknownField ?? Object.keys(snapshot).find((key) => !REQUEST_FIELDS.has(key));
+    const unknownField = Object.keys(snapshot).find((key) => !REQUEST_FIELDS.has(key));
     if (unknownField !== undefined) return invalid("UNKNOWN_REQUEST_FIELD", `未知运行请求字段: ${String(unknownField)}`);
 
     for (const field of ["runId", "attemptId", "questId"] as const) {
