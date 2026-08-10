@@ -152,7 +152,7 @@ export class PythonRunnerAdapter {
     this.setState("running");
     try {
       const result = await client.call(client.workerProxy.run, active.request);
-      if (this.acceptsWorkerOutcome(active)) this.settle(active, result);
+      if (this.acceptsWorkerOutcome(active)) this.settle(active, result, "ready");
     } catch {
       if (this.acceptsWorkerOutcome(active)) this.rebuild(active, "runner_error", "WORKER_FATAL", "Python 运行器发生致命错误");
     }
@@ -227,7 +227,7 @@ export class PythonRunnerAdapter {
       this.settle(active, localResult(active.request, "runner_error", "RUNNER_REBUILD_FAILED", "运行器不可用", durationMs), undefined);
       return;
     }
-    this.settle(active, localResult(active.request, status, code, message, durationMs));
+    this.settle(active, localResult(active.request, status, code, message, durationMs), "ready");
   }
 
   private onHardTimeout(token: number): void {
@@ -254,7 +254,7 @@ export class PythonRunnerAdapter {
     return !this.disposed && this.client === client && this.generation === generation;
   }
 
-  private settle(active: ActiveRun, result: RunResult, state: RunnerState | undefined = "ready"): void {
+  private settle(active: ActiveRun, result: RunResult, state?: RunnerState): void {
     if (this.active !== active) return;
     this.clearTimers(active);
     this.active = undefined;

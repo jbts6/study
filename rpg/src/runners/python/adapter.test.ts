@@ -107,6 +107,20 @@ async function flush(): Promise<void> {
   for (let index = 0; index < 8; index += 1) await Promise.resolve();
 }
 
+function timerHarness() {
+  let nextHandle = 0;
+  const callbacks = new Map<number, () => void>();
+  const setTimeoutFn = vi.fn((callback: () => void, _delayMs: number) => {
+    const handle = ++nextHandle;
+    callbacks.set(handle, callback);
+    return handle;
+  });
+  const clearTimeoutFn = vi.fn((handle: number) => {
+    callbacks.delete(handle);
+  });
+  return { callbacks, setTimeoutFn, clearTimeoutFn };
+}
+
 function diagnosticCode(result: RunResult): string | undefined {
   return result.diagnostics[0]?.code;
 }
@@ -245,7 +259,10 @@ describe("PythonRunnerAdapter", () => {
 
     const timedOut = adapter.run(input);
     await vi.advanceTimersByTimeAsync(input.limits.timeoutMs);
-    await expect(timedOut).resolves.toMatchObject({ executionStatus: "timeout" });
+    await expect(timedOut).resolves.toMatchObject({
+      executionStatus: "timeout",
+      metrics: { durationMs: input.limits.timeoutMs, traceEvents: 0 },
+    });
     delayedInitialization.resolve({ state: "ready" });
     await flush();
     expect(oldClient.terminate).toHaveBeenCalledTimes(1);
@@ -289,36 +306,63 @@ describe("PythonRunnerAdapter", () => {
 
   it("uses stable unavailable diagnostics for initialization and rebuild failures", async () => {
     const initialClient = fakeClient({ initialize: async () => Promise.reject(new Error("C:\\private\\stack")) });
+    const initialStates: RunnerState[] = [];
     const initial = makeAdapter(initialClient).adapter;
+    initial.subscribe((state) => initialStates.push(state));
     const initialFailure = await initial.run(request());
     expect(initialFailure).toMatchObject({ executionStatus: "runner_error", diagnostics: [expect.objectContaining({ code: "RUNNER_UNAVAILABLE" })] });
     expect(initialFailure.diagnostics[0]?.message).not.toContain("private");
+    expect(initialStates.at(-1)).toBe("unavailable");
 
     const fatal = fakeClient({ run: async () => Promise.reject(new Error("worker secret")) });
     const brokenReplacement = fakeClient({ initialize: async () => ({ state: "unavailable" as const }) });
+    const rebuildStates: RunnerState[] = [];
     const rebuilding = makeAdapter(fatal, brokenReplacement).adapter;
+    rebuilding.subscribe((state) => rebuildStates.push(state));
     const rebuildFailure = await rebuilding.run(request());
     expect(rebuildFailure).toMatchObject({ executionStatus: "runner_error", diagnostics: [expect.objectContaining({ code: "RUNNER_REBUILD_FAILED" })] });
     expect(rebuildFailure.diagnostics[0]?.message).toContain("运行器不可用");
+    expect(rebuildStates.at(-1)).toBe("unavailable");
   });
 
   it("settles running and initializing promises on dispose, terminates once, and rejects later runs", async () => {
     const runningInput = request();
     const runningClient = fakeClient({ run: () => deferred<RunResult>().promise });
-    const running = makeAdapter(runningClient).adapter;
+    const runningTimers = timerHarness();
+    const runningSetup = makeAdapter(runningClient);
+    const running = new PythonRunnerAdapter({
+      createWorker: runningSetup.createWorker,
+      createClient: runningSetup.createClient,
+      setTimeoutFn: runningTimers.setTimeoutFn,
+      clearTimeoutFn: runningTimers.clearTimeoutFn,
+    });
     const pendingRun = running.run(runningInput);
     await flush();
+    await running.interrupt(runningInput.runId);
+    expect(runningTimers.setTimeoutFn).toHaveBeenCalledTimes(2);
     running.dispose();
     running.dispose();
+    expect(runningTimers.clearTimeoutFn).toHaveBeenCalledTimes(2);
+    expect(runningTimers.callbacks).toHaveLength(0);
     await expect(pendingRun).resolves.toMatchObject({ executionStatus: "interrupted", diagnostics: [expect.objectContaining({ code: "RUNNER_DISPOSED" })] });
     expect(runningClient.terminate).toHaveBeenCalledTimes(1);
     await expect(running.run(runningInput)).resolves.toMatchObject({ executionStatus: "runner_error", diagnostics: [expect.objectContaining({ code: "RUNNER_DISPOSED" })] });
 
     const delayedInitialization = deferred<{ state: "ready" | "unavailable" }>();
     const initializingClient = fakeClient({ initialize: () => delayedInitialization.promise });
-    const initializing = makeAdapter(initializingClient).adapter;
+    const initializingTimers = timerHarness();
+    const initializingSetup = makeAdapter(initializingClient);
+    const initializing = new PythonRunnerAdapter({
+      createWorker: initializingSetup.createWorker,
+      createClient: initializingSetup.createClient,
+      setTimeoutFn: initializingTimers.setTimeoutFn,
+      clearTimeoutFn: initializingTimers.clearTimeoutFn,
+    });
     const pendingInitialization = initializing.run(request());
+    expect(initializingTimers.setTimeoutFn).toHaveBeenCalledTimes(1);
     initializing.dispose();
+    expect(initializingTimers.clearTimeoutFn).toHaveBeenCalledTimes(1);
+    expect(initializingTimers.callbacks).toHaveLength(0);
     delayedInitialization.resolve({ state: "ready" });
     await expect(pendingInitialization).resolves.toMatchObject({ executionStatus: "interrupted", diagnostics: [expect.objectContaining({ code: "RUNNER_DISPOSED" })] });
     expect(initializingClient.terminate).toHaveBeenCalledTimes(1);
@@ -331,12 +375,17 @@ describe("PythonRunnerAdapter", () => {
     const { adapter } = makeAdapter(client);
     const states: RunnerState[] = [];
     const unsubscribe = adapter.subscribe((state) => states.push(state));
-    unsubscribe();
+    const removedStates: RunnerState[] = [];
+    const removeSecondListener = adapter.subscribe((state) => removedStates.push(state));
+    removeSecondListener();
 
     const result = adapter.run(input);
     await flush();
     pendingRun.resolve(completed(input));
     await result;
-    expect(states).toEqual(["loading"]);
+    expect(states).toEqual(["loading", "ready", "running", "ready"]);
+    expect(states.every((state, index) => index === 0 || state !== states[index - 1])).toBe(true);
+    expect(removedStates).toEqual(["loading"]);
+    unsubscribe();
   });
 });
