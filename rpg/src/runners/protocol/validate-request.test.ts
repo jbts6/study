@@ -140,6 +140,7 @@ describe("validateRunRequest", () => {
     expect(diagnosticCode({ ...validRequest(), limits: { ...limits, timeoutMs: Number.MAX_SAFE_INTEGER + 1 } })).toBe("INVALID_LIMIT");
     expect(diagnosticCode({ ...validRequest(), limits: { ...limits, extra: 1 } })).toBe("INVALID_LIMIT");
     expect(diagnosticCode({ ...validRequest(), limits: { ...limits, maxValueDepth: undefined } })).toBe("INVALID_LIMIT");
+    expect(diagnosticCode({ ...validRequest(), limits: { ...limits, maxValueDepth: 0 } })).toBe("INVALID_LIMIT");
     expect(diagnosticCode({ ...validRequest(), limits: null })).toBe("INVALID_LIMIT");
   });
 

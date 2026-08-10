@@ -101,7 +101,7 @@ test.describe("Pyodide Worker compatibility", () => {
     await expect(page.evaluate(() => window.runnerProof.execute("40 + 2"))).resolves.toEqual(42);
   });
 
-  test("硬超时终止旧 Worker 并以新 Worker 恢复", async () => {
+  test("真实浏览器硬超时重建后继续执行", async () => {
     await expect(
       page.evaluate(() => window.runnerProof.hardTimeout("while True: pass", 200)),
     ).resolves.toEqual({ status: "timeout", rebuilt: true });

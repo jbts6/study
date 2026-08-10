@@ -81,6 +81,15 @@ describe("python execution isolation and policy", () => {
     expect(result).toMatchObject({ executionStatus: "completed", returnValue: { action: { type: "wait" }, revision: worldViewFixture.revision }, streams: { stdout: "ready\n", stderr: "", truncated: false } });
   });
 
+  it("returns empty streams for a completed program that does not write output", async () => {
+    const result = await run({ ...baseRequest, files: { "main.py": "def choose_turn(world):\n    return {'action': {'type': 'wait'}}\n" } });
+
+    expect(result).toMatchObject({
+      executionStatus: "completed",
+      streams: { stdout: "", stderr: "", truncated: false },
+    });
+  });
+
   it("does not retain entry-module globals across runs", async () => {
     const first = await run({ ...baseRequest, files: { "main.py": "leaked = 41\ndef choose_turn(world): return leaked\n" } });
     expect(first).toMatchObject({ executionStatus: "completed", returnValue: 41 });

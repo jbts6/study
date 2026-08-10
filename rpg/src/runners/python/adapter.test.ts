@@ -182,6 +182,7 @@ describe("PythonRunnerAdapter", () => {
     const firstResult = adapter.run(first);
     const secondResult = await adapter.run(second);
     expect(secondResult.executionStatus).toBe("invalid_request");
+    expect(secondResult.runId).toBe(second.runId);
     expect(diagnosticCode(secondResult)).toBe("RUN_IN_PROGRESS");
     expect(createClient).toHaveBeenCalledTimes(1);
 
@@ -236,6 +237,7 @@ describe("PythonRunnerAdapter", () => {
     await flush();
     await vi.advanceTimersByTimeAsync(input.limits.timeoutMs);
     await expect(timedOut).resolves.toMatchObject({
+      runId: input.runId,
       executionStatus: "timeout",
       diagnostics: [expect.objectContaining({ code: "HARD_TIMEOUT" })],
       metrics: { durationMs: input.limits.timeoutMs, traceEvents: 0 },
