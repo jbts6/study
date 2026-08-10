@@ -115,8 +115,9 @@ Expected: FAIL，类型和 fixture 模块不存在。
 {"name":"python-rpg","private":true,"version":"0.1.0","type":"module","scripts":{"dev":"vite","build":"tsc --noEmit && vite build","test":"vitest run"},"dependencies":{"canonicalize":"3.0.0"},"devDependencies":{"@playwright/test":"1.62.1","jsdom":"30.0.1","typescript":"7.0.2","vite":"8.2.1","vitest":"4.1.10"}}
 \`\`\`
 \`\`\`json
-{"compilerOptions":{"target":"ES2022","module":"ESNext","moduleResolution":"Bundler","strict":true,"noUnusedLocals":true,"noUnusedParameters":true,"noFallthroughCasesInSwitch":true,"noEmit":true,"lib":["ES2022","DOM","DOM.Iterable"],"types":["vitest/globals"]},"include":["src","vite.config.ts"]}
+{"compilerOptions":{"target":"ES2022","module":"ESNext","moduleResolution":"Bundler","strict":true,"noUnusedLocals":true,"noUnusedParameters":true,"noFallthroughCasesInSwitch":true,"noEmit":true,"skipLibCheck":true,"lib":["ES2022","DOM","DOM.Iterable"],"types":["vitest/globals"]},"include":["src","vite.config.ts"]}
 \`\`\`
+`skipLibCheck` 是 TypeScript 7.0.2 与固定 Vite/Vitest 声明的兼容要求；它仅跳过第三方 `.d.ts` 检查，项目源码仍由 `strict`、`noUnusedLocals`、`noUnusedParameters` 等选项检查。
 \`\`\`ts
 import { defineConfig } from "vitest/config";
 export default defineConfig({server:{host:"127.0.0.1",port:5174},test:{environment:"jsdom",exclude:["e2e/**","node_modules/**"],globals:true}});
