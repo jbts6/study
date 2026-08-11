@@ -73,7 +73,9 @@ function createAdapter(opts: { failReady?: boolean } = {}): { adapter: PythonRun
   const adapter = new PythonRunnerAdapter({
     createChannel: () => {
       const ch = new MockChannel(channels.length);
-      if (opts.failReady) ch.waitReady.mockRejectedValueOnce(new Error("startup fail"));
+      if (opts.failReady && channels.length === 0) {
+        ch.waitReady.mockRejectedValueOnce(new Error("startup fail"));
+      }
       channels.push(ch);
       return ch;
     },
@@ -159,13 +161,20 @@ describe("python runner adapter", () => {
   it("maps channel ready failure to RUNNER_START_FAILED", async () => {
     resetTimers();
     const { adapter, channels } = createAdapter({ failReady: true });
-    const promise = adapter.run(makeRequest("r1"));
+    const first = adapter.run(makeRequest("r1"));
     await waitForKill(channels[0]);
+    const retry = adapter.run(makeRequest("r2"));
+    expect(channels).toHaveLength(1);
+
     channels[0].emitExit(null, "SIGKILL");
-    const result = await promise;
+    const result = await first;
     expect(result.executionStatus).toBe("runner_error");
     expect(result.diagnostics[0].code).toBe("RUNNER_START_FAILED");
     expect(channels[0].kill).toHaveBeenCalledTimes(1);
+
+    await waitForSend(channels, 1);
+    channels[1].emitMessage(makeCompleted("r2"));
+    expect((await retry).executionStatus).toBe("completed");
   });
 
   it("restarts the channel after RUNNER_SEND_FAILED", async () => {

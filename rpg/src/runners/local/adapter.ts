@@ -171,7 +171,7 @@ export class PythonRunnerAdapter {
     try {
       await lease.channel.waitReady();
     } catch {
-      await this.dropLease(lease);
+      this.beginRestart(lease);
       return localResult(validated, "runner_error", "RUNNER_START_FAILED", "Python 子进程启动失败。");
     }
     if (this.disposed) {
@@ -193,15 +193,6 @@ export class PythonRunnerAdapter {
         resolve(localResult(validated, "runner_error", "RUNNER_SEND_FAILED", "Python 子进程写入失败。"));
       });
     });
-  }
-
-  private async dropLease(lease: ChannelLease): Promise<void> {
-    if (this.channel === lease.channel) this.channel = undefined;
-    try {
-      await lease.channel.kill();
-    } catch {
-      /* ignore cleanup errors */
-    }
   }
 
   private beginRestart(lease: ChannelLease): void {
