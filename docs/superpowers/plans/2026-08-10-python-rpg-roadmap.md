@@ -61,7 +61,7 @@
 
 ## 阶段 4：六关战役、内容校验与素材账本
 
-详细计划：[2026-08-10-python-rpg-campaign.md](./2026-08-10-python-rpg-campaign.md)
+详细计划：待按本地 CPython Runner 方向重写（原 campaign plan 已删除，属阶段 2 危险项下游）
 
 - [ ] 依次完成 6 个任务：共享严格 decoder/双加载器与 BattleState 装配、严格 JSON/奖励与全引用检查器、六关 Python 与 gate/combat/replay 验收、AppContentPort 完整适配、AppController lifecycle 与恢复动作、真实资产与多回合 Playwright 验收。
 - [ ] 保持六个关卡 ID 与顺序固定：`python-marsh-01` 至 `python-marsh-06`；内容加载同时支持浏览器 `fetch` 与 Node 检查器，二者共享同一运行时 decoder。
