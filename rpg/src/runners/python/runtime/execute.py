@@ -80,8 +80,8 @@ def _evict_allowed_modules(allowed_modules: set[str]) -> None:
 
 
 def _reject_preloaded_module_collisions(player_module_roots: set[str]) -> None:
-    preloaded_roots = {name.split(".", 1)[0] for name in sys.modules}
-    collisions = player_module_roots & preloaded_roots
+    preloaded_roots = {name.split(".", 1)[0].casefold() for name in sys.modules}
+    collisions = {root for root in player_module_roots if root.casefold() in preloaded_roots}
     if collisions:
         raise RuntimeError("MODULE_NOT_ALLOWED:" + sorted(collisions)[0])
 

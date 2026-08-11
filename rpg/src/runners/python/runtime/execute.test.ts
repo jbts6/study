@@ -200,16 +200,18 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     expect(result.diagnostics[0].code).toBe("MODULE_NOT_ALLOWED");
   });
 
-  it("blocks preloaded module access through a colliding player filename", async () => {
+  it.each(["importlib.py", "ImportLib.py"])(
+    "blocks preloaded module access through colliding player filename %s",
+    async (collidingFilename) => {
     const result = await withPythonBridge(async (bridge) =>
       sendAndWait(
         bridge,
         baseRequest({
-          runId: "exec-preloaded-collision",
+          runId: `exec-preloaded-collision-${collidingFilename}`,
           files: {
             "main.py":
               "def choose_turn(world):\n    import importlib\n    imported = importlib.import_module('socket')\n    return {'module': imported.__name__}\n",
-            "importlib.py": "",
+            [collidingFilename]: "",
           },
           entrypoint: { file: "main.py", callable: "choose_turn" },
         }),
@@ -217,19 +219,22 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     );
     expect(result.executionStatus).toBe("runtime_error");
     expect(result.diagnostics[0].code).toBe("MODULE_NOT_ALLOWED");
-  });
+    },
+  );
 
-  it("does not let a player file replace an allowed standard-library module", async () => {
+  it.each(["math.py", "Math.py"])(
+    "does not let player file %s replace an allowed standard-library module",
+    async (collidingFilename) => {
     const result = await withPythonBridge(async (bridge) =>
       sendAndWait(
         bridge,
         baseRequest({
-          runId: "exec-allowed-module-collision",
+          runId: `exec-allowed-module-collision-${collidingFilename}`,
           allowedModules: ["math"],
           files: {
             "main.py":
               "def choose_turn(world):\n    import math\n    return {'value': math.VALUE}\n",
-            "math.py": "VALUE = 99\n",
+            [collidingFilename]: "VALUE = 99\n",
           },
           entrypoint: { file: "main.py", callable: "choose_turn" },
         }),
@@ -237,7 +242,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     );
     expect(result.executionStatus).toBe("runtime_error");
     expect(result.diagnostics[0].code).toBe("MODULE_NOT_ALLOWED");
-  });
+    },
+  );
 
   it("applies SAFE_BUILTINS to entry and player modules", async () => {
     const entry = await withPythonBridge(async (bridge) =>
