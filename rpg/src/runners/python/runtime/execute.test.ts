@@ -93,7 +93,7 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     });
   });
 
-  it("restores daemon sys.modules, sys.path, sys.meta_path and cwd after each request", async () => {
+  it("starts each request with fresh Python interpreter state", async () => {
     await withDetectedPython(async () => {
       // Player code cannot reach sys/os: they are outside the allowed set and
       // not in SAFE_BUILTINS, so the guarded import rejects them. This keeps
