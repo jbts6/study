@@ -168,7 +168,7 @@ describe("python runner adapter", () => {
     expect(channels[0].kill).toHaveBeenCalledTimes(1);
   });
 
-  it("maps channel send failure to RUNNER_SEND_FAILED", async () => {
+  it("restarts the channel after RUNNER_SEND_FAILED", async () => {
     resetTimers();
     const { adapter, channels } = createAdapter();
     const promise = adapter.run(makeRequest("r1"));
@@ -176,6 +176,14 @@ describe("python runner adapter", () => {
     const result = await promise;
     expect(result.executionStatus).toBe("runner_error");
     expect(result.diagnostics[0].code).toBe("RUNNER_SEND_FAILED");
+    await waitForKill(channels[0]);
+
+    const retry = adapter.run(makeRequest("r2"));
+    expect(channels).toHaveLength(1);
+    channels[0].emitExit(null, "SIGKILL");
+    await waitForSend(channels, 1);
+    channels[1].emitMessage(makeCompleted("r2"));
+    expect((await retry).executionStatus).toBe("completed");
   });
 
   it("dispose is idempotent and awaits channel kill", async () => {
@@ -192,6 +200,24 @@ describe("python runner adapter", () => {
     expect(channels[0].kill).toHaveBeenCalledTimes(1);
     const result = await promise;
     expect(result.diagnostics[0].code).toBe("RUNNER_DISPOSED");
+  });
+
+  it("dispose waits for an in-flight restart barrier", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const run = adapter.run(makeRequest("r1", 100));
+    await waitForSend(channels, 0);
+    triggerAllTimers();
+    await run;
+
+    let disposed = false;
+    const disposePromise = adapter.dispose().then(() => { disposed = true; });
+    await Promise.resolve();
+    expect(disposed).toBe(false);
+
+    channels[0].emitExit(null, "SIGKILL");
+    await disposePromise;
+    expect(disposed).toBe(true);
   });
 
   it("ignores messages with wrong runId", async () => {
@@ -236,6 +262,28 @@ describe("python runner adapter", () => {
     expect(r2.runId).toBe("r2");
   });
 
+  it("keeps concurrent retries behind the same restart barrier", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const p1 = adapter.run(makeRequest("r1", 100));
+    await waitForSend(channels, 0);
+    triggerAllTimers();
+    await p1;
+
+    const p2 = adapter.run(makeRequest("r2", 100));
+    const p3 = adapter.run(makeRequest("r3", 100));
+    expect(channels).toHaveLength(1);
+
+    channels[0].emitExit(null, "SIGKILL");
+    await waitForSend(channels, 1);
+    channels[1].emitMessage(makeCompleted("r2"));
+
+    const [r2, r3] = await Promise.all([p2, p3]);
+    expect(r2.executionStatus).toBe("completed");
+    expect(r3.executionStatus).toBe("invalid_request");
+    expect(r3.diagnostics[0].code).toBe("RUN_IN_PROGRESS");
+  });
+
   it("ignores messages from a previous generation channel", async () => {
     resetTimers();
     const { adapter, channels } = createAdapter();
@@ -275,6 +323,37 @@ describe("python runner adapter", () => {
     const result = await promise;
     expect(result.executionStatus).toBe("interrupted");
     expect(result.diagnostics[0].code).toBe("INTERRUPTED");
+  });
+
+  it("reports a non-SIGINT exit during interrupt as a runner failure", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const promise = adapter.run(makeRequest("r1", 5000));
+    await waitForSend(channels, 0);
+    await adapter.interrupt("r1");
+    channels[0].emitExit(1, "SIGTERM");
+    const result = await promise;
+    expect(result.executionStatus).toBe("runner_error");
+    expect(result.diagnostics[0].code).toBe("RUNNER_PROCESS_EXITED");
+  });
+
+  it("records interrupt intent before signaling the channel", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const first = adapter.run(makeRequest("r1", 5000));
+    await waitForSend(channels, 0);
+    channels[0].interrupt.mockImplementationOnce(() => {
+      channels[0].emitExit(null, "SIGINT");
+    });
+
+    await adapter.interrupt("r1");
+    const interrupted = await first;
+    expect(interrupted.executionStatus).toBe("interrupted");
+
+    const second = adapter.run(makeRequest("r2", 100));
+    await waitForSend(channels, 1);
+    channels[1].emitMessage(makeCompleted("r2"));
+    expect((await second).executionStatus).toBe("completed");
   });
 
   it("upgrades to RUNNER_INTERRUPT_TIMEOUT after grace", async () => {

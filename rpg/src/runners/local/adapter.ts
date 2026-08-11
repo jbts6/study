@@ -128,7 +128,7 @@ export class PythonRunnerAdapter {
     if (active && active.lease === lease) {
       this.clearActiveTimers(active);
       this.active = undefined;
-      if (active.interrupting) {
+      if (active.interrupting && signal === "SIGINT") {
         active.resolve(interruptedResult(active.request));
       } else {
         active.resolve(
@@ -158,8 +158,8 @@ export class PythonRunnerAdapter {
   private async executeRun(validated: RunRequest): Promise<RunResult> {
     if (this.pendingRestart) {
       const pending = this.pendingRestart;
-      this.pendingRestart = undefined;
       await pending;
+      if (this.pendingRestart === pending) this.pendingRestart = undefined;
     }
     if (this.disposed) {
       return localResult(validated, "runner_error", "RUNNER_DISPOSED", "运行器已释放。");
@@ -189,7 +189,7 @@ export class PythonRunnerAdapter {
         if (!active || active.lease !== lease) return;
         this.clearActiveTimers(active);
         this.active = undefined;
-        if (this._state !== "restarting") this.setState("ready");
+        this.beginRestart(lease);
         resolve(localResult(validated, "runner_error", "RUNNER_SEND_FAILED", "Python 子进程写入失败。"));
       });
     });
@@ -204,15 +204,19 @@ export class PythonRunnerAdapter {
     }
   }
 
+  private beginRestart(lease: ChannelLease): void {
+    this.setState("restarting");
+    if (this.channel === lease.channel) this.channel = undefined;
+    this.pendingRestart = lease.channel.kill().catch(() => { /* ignore */ });
+  }
+
   private handleHardTimeout(): void {
     const active = this.active;
     if (!active) return;
     this.clearActiveTimers(active);
     this.active = undefined;
-    this.setState("restarting");
     const lease = active.lease;
-    this.channel = undefined;
-    this.pendingRestart = lease.channel.kill().catch(() => { /* ignore */ });
+    this.beginRestart(lease);
     active.resolve(
       localResult(active.request, "timeout", "RUNNER_TIMEOUT", "Python 运行超时，子进程已终止并重建。"),
     );
@@ -223,21 +227,22 @@ export class PythonRunnerAdapter {
     if (!active || active.request.runId !== runId) return Promise.resolve();
     this.setState("interrupting");
     this.clearTimeoutFn(active.hardTimer);
+    const interrupting = { ...active, interrupting: true };
+    this.active = interrupting;
     active.lease.channel.interrupt();
+    if (this.active !== interrupting) return Promise.resolve();
     const graceTimer = this.setTimeoutFn(() => {
       const stillActive = this.active;
       if (!stillActive || stillActive.request.runId !== runId) return;
       this.clearActiveTimers(stillActive);
       this.active = undefined;
-      this.setState("restarting");
       const lease = stillActive.lease;
-      this.channel = undefined;
-      this.pendingRestart = lease.channel.kill().catch(() => { /* ignore */ });
+      this.beginRestart(lease);
       stillActive.resolve(
         localResult(stillActive.request, "timeout", "RUNNER_INTERRUPT_TIMEOUT", "中断等待超时，子进程已终止并重建。"),
       );
     }, active.request.limits.interruptGraceMs);
-    this.active = { ...active, graceTimer, interrupting: true };
+    this.active = { ...interrupting, graceTimer };
     return Promise.resolve();
   }
 
@@ -256,8 +261,13 @@ export class PythonRunnerAdapter {
       active.resolve(localResult(active.request, "runner_error", "RUNNER_DISPOSED", "运行器已释放。"));
     }
     const channel = this.channel;
+    const pendingRestart = this.pendingRestart;
     this.channel = undefined;
     this.setState("unavailable");
+    if (pendingRestart) {
+      await pendingRestart;
+      if (this.pendingRestart === pendingRestart) this.pendingRestart = undefined;
+    }
     if (channel) {
       try {
         await channel.kill();
