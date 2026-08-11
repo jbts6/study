@@ -29,7 +29,7 @@ async function main(): Promise<void> {
     }
   }
   const server = await startRunnerServer(port);
-  process.stdout.write(JSON.stringify({ type: "runner_ready", port: server.port }) + "\n");
+  process.stdout.write(JSON.stringify({ type: "runner_ready", port: server.port, pid: process.pid }) + "\n");
   let closed = false;
   const shutdown = async (): Promise<void> => {
     if (closed) return;
