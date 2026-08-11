@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 import { isLoopbackOrigin, startRunnerServer } from "./node-server";
+import { PythonRunnerAdapter } from "./adapter";
 import { loadPythonDetection } from "./test-support";
 import { worldViewFixture } from "../../game/testing/fixture";
 import type { RunRequest } from "../protocol/types";
@@ -107,6 +108,38 @@ describe.skipIf(!python)("node runner server (CPython 3.12+)", () => {
     const d2 = server.close();
     expect(d1).toBe(d2);
     await d1;
+  });
+
+  it("waits for disposal already started by an abnormal socket close", async () => {
+    let releaseDisposal!: () => void;
+    const disposal = new Promise<void>((resolve) => { releaseDisposal = resolve; });
+    const disposeSpy = vi.spyOn(PythonRunnerAdapter.prototype, "dispose")
+      .mockImplementation(() => disposal);
+    const server = await startRunnerServer(0);
+    const ws = new WebSocket(`ws://127.0.0.1:${server.port}`);
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("open timeout")), 5_000);
+        ws.on("open", () => { clearTimeout(timer); resolve(); });
+      });
+      const socketClosed = new Promise<void>((resolve) => ws.on("close", () => resolve()));
+      ws.terminate();
+      await socketClosed;
+      await vi.waitFor(() => { expect(disposeSpy).toHaveBeenCalled(); });
+
+      let serverClosed = false;
+      const closing = server.close().then(() => { serverClosed = true; });
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      expect(serverClosed).toBe(false);
+
+      releaseDisposal();
+      await closing;
+    } finally {
+      releaseDisposal();
+      await server.close();
+      disposeSpy.mockRestore();
+    }
   });
 
   it("dispose message releases adapter and closes socket with 1001", async () => {

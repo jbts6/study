@@ -147,8 +147,9 @@ export function startRunnerServerWithDetection(
       });
 
       const cleanup = (): void => {
-        adapters.delete(ws);
-        void adapter.dispose();
+        void disposeSocket(ws, adapter).then(() => {
+          if (adapters.get(ws) === adapter) adapters.delete(ws);
+        });
       };
       ws.on("close", cleanup);
       ws.on("error", cleanup);
