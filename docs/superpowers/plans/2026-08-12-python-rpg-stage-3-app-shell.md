@@ -41,7 +41,10 @@
 - `rpg/src/app/app-controller.test.ts`：成功、失败和文本重置关键行为。
 - `rpg/src/app/code-editor.ts`：CodeMirror 创建、值同步和只读切换。
 - `rpg/src/app/app-view.ts`：桌面 DOM、战场渲染、控件绑定、反馈与重置确认。
-- `rpg/src/styles.css`：奥术工业控制台 token、桌面三层布局、状态和动效。
+- `rpg/src/styles.css`：只聚合本地样式模块。
+- `rpg/src/styles/tokens.css`：奥术工业 token、基础排版、焦点和减弱动效。
+- `rpg/src/styles/layout.css`：桌面三层布局、双主区和内部滚动边界。
+- `rpg/src/styles/game.css`：战场、编辑器、控件、反馈、对话框和恢复页状态。
 - `rpg/playwright.config.ts`：同时启动 Vite 与本地 Runner 的唯一 E2E 配置。
 - `rpg/e2e/app-shell.spec.ts`：编辑、运行、刷新恢复和完成遭遇的主流程。
 - `rpg/README.md`：本地启动、CPython 要求、保存位置和重置方式。
@@ -814,6 +817,9 @@ git commit -m "feat: orchestrate playable turns"
 - Create: `rpg/src/app/code-editor.ts`
 - Create: `rpg/src/app/app-view.ts`
 - Create: `rpg/src/styles.css`
+- Create: `rpg/src/styles/tokens.css`
+- Create: `rpg/src/styles/layout.css`
+- Create: `rpg/src/styles/game.css`
 - Create: `rpg/playwright.config.ts`
 - Create: `rpg/e2e/app-shell.spec.ts`
 - Modify: `rpg/src/main.ts`
@@ -1046,7 +1052,15 @@ Battle grid layout must derive columns from `battleState.board.width`; do not ha
 
 - [ ] **Step 6: Implement the desktop visual contract**
 
-Create `rpg/src/styles.css`. Define at minimum these tokens:
+Create `rpg/src/styles.css` as an import-only aggregator in this order:
+
+```css
+@import "./styles/tokens.css";
+@import "./styles/layout.css";
+@import "./styles/game.css";
+```
+
+Define at minimum these tokens in `rpg/src/styles/tokens.css`:
 
 ```css
 :root {
@@ -1067,7 +1081,7 @@ Create `rpg/src/styles.css`. Define at minimum these tokens:
 }
 ```
 
-Required layout and interaction CSS:
+Distribute the remaining CSS by responsibility: viewport and three-layer geometry in `layout.css`; battlefield, editor, feedback, controls, dialog, recovery, and state visuals in `game.css`. Keep every stylesheet below 300 lines. Required layout and interaction CSS:
 
 - `html`, `body`, and `#app` use `height: 100%`; `body` has `min-width: 1180px`, `overflow: hidden`, no mobile media query, and blueprint-grid depth using local CSS gradients.
 - `.app-shell` uses `height: 100dvh`, `min-height: 0`, `overflow: hidden`, and rows `auto minmax(0, 1fr) auto`.
@@ -1140,6 +1154,9 @@ git add rpg/e2e/app-shell.spec.ts
 git add rpg/src/app/code-editor.ts
 git add rpg/src/app/app-view.ts
 git add rpg/src/styles.css
+git add rpg/src/styles/tokens.css
+git add rpg/src/styles/layout.css
+git add rpg/src/styles/game.css
 git add rpg/src/main.ts
 git commit -m "feat: build playable desktop shell"
 ```
