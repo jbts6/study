@@ -6,12 +6,33 @@ import type { RunRequest } from "../protocol/types.ts";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const daemonScript = path.join(__dirname, "../python/runtime/daemon.py");
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+const daemonScript = path.join(moduleDir, "../python/runtime/daemon.py");
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const CLOSE_GRACE_MS = 500;
 
 export interface ServerHandle {
   readonly port: number;
   close(): Promise<void>;
+}
+
+export function isLoopbackOrigin(origin: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  const host = url.hostname;
+  const normalized = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+  return LOOPBACK_HOSTS.has(normalized);
+}
+
+function originAllowed(origin: string | undefined): boolean {
+  if (origin === undefined) return true;
+  if (origin === "null") return false;
+  return isLoopbackOrigin(origin);
 }
 
 export async function startRunnerServer(port: number): Promise<ServerHandle> {
@@ -28,6 +49,41 @@ export function startRunnerServerWithDetection(
 ): Promise<ServerHandle> {
   return new Promise((resolve, reject) => {
     const wss = new WebSocketServer({ host: "127.0.0.1", port });
+    const adapters = new Map<WebSocket, PythonRunnerAdapter>();
+    let closePromise: Promise<void> | undefined;
+
+    const disposeSocket = async (ws: WebSocket, adapter: PythonRunnerAdapter): Promise<void> => {
+      try {
+        await adapter.dispose();
+      } catch {
+        /* ignore */
+      }
+      if (ws.readyState === WebSocket.OPEN) {
+        await new Promise<void>((res) => {
+          const timer = setTimeout(() => { ws.terminate(); res(); }, CLOSE_GRACE_MS);
+          ws.close(1001);
+          ws.on("close", () => { clearTimeout(timer); res(); });
+        });
+      }
+    };
+
+    const close = (): Promise<void> => {
+      if (closePromise) return closePromise;
+      closePromise = (async () => {
+        wss.removeAllListeners("connection");
+        wss.removeAllListeners("error");
+        const sockets = [...adapters.keys()];
+        await Promise.all(
+          sockets.map((ws) => {
+            const adapter = adapters.get(ws);
+            return adapter ? disposeSocket(ws, adapter) : Promise.resolve();
+          }),
+        );
+        await new Promise<void>((res) => wss.close(() => res()));
+      })();
+      return closePromise;
+    };
+
     wss.on("error", reject);
     wss.on("listening", () => {
       const addr = wss.address();
@@ -36,23 +92,20 @@ export function startRunnerServerWithDetection(
         get port() {
           return actualPort;
         },
-        close: () =>
-          new Promise<void>((res) => {
-            wss.close(() => res());
-          }),
+        close,
       });
     });
 
     wss.on("connection", (ws, req) => {
       const origin = req.headers.origin;
-      if (origin && !origin.includes("127.0.0.1") && !origin.includes("localhost")) {
+      if (!originAllowed(origin)) {
         ws.close(1008, "Forbidden origin");
         return;
       }
-
       const adapter = new PythonRunnerAdapter({
         createChannel: () => new PythonBridge({ pythonPath: detection.path, daemonScript }),
       });
+      adapters.set(ws, adapter);
 
       adapter.onStateChange((state) => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -78,15 +131,27 @@ export function startRunnerServerWithDetection(
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ type: "state", state: adapter.state }));
             }
+          } else if (msg.type === "dispose") {
+            await disposeSocket(ws, adapter);
+            adapters.delete(ws);
+          } else {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: "protocol_error", error: "unknown message type" }));
+            }
           }
-        } catch {
-          /* ignore malformed messages */
+        } catch (err) {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "protocol_error", error: err instanceof Error ? err.message : "unknown" }));
+          }
         }
       });
 
-      ws.on("close", () => {
-        adapter.dispose();
-      });
+      const cleanup = (): void => {
+        adapters.delete(ws);
+        void adapter.dispose();
+      };
+      ws.on("close", cleanup);
+      ws.on("error", cleanup);
     });
   });
 }
