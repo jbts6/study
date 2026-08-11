@@ -1,3 +1,4 @@
+import builtins
 import contextlib
 import io
 import math
@@ -15,7 +16,7 @@ import importlib.util
 
 BLOCKED_MODULES = frozenset({"js", "pyodide", "micropip", "socket", "ssl", "http", "urllib", "requests", "subprocess", "multiprocessing", "ctypes", "webbrowser"})
 SAFE_ALLOWED_MODULES = frozenset({"math"})
-SAFE_BUILTINS = {"__build_class__": __build_class__, "abs": abs, "all": all, "any": any, "AssertionError": AssertionError, "bool": bool, "dict": dict, "enumerate": enumerate, "Exception": Exception, "filter": filter, "float": float, "int": int, "len": len, "list": list, "map": map, "max": max, "min": min, "object": object, "print": print, "range": range, "reversed": reversed, "round": round, "set": set, "sorted": sorted, "str": str, "sum": sum, "tuple": tuple, "ValueError": ValueError, "zip": zip}
+STANDARD_BUILTINS = dict(vars(builtins))
 TRACE_STRING_LIMIT = 200
 TRACE_COLLECTION_LIMIT = 20
 TRACE_DEPTH_LIMIT = 3
@@ -89,7 +90,7 @@ def _reject_preloaded_module_collisions(player_module_roots: set[str]) -> None:
 class RestrictedPlayerLoader(importlib.abc.MetaPathFinder, importlib.abc.Loader):
     def __init__(self, root: Path, guarded):
         self.root, self.guarded = root, guarded
-        self.builtins = {**SAFE_BUILTINS, "__import__": guarded}
+        self.builtins = {**STANDARD_BUILTINS, "__import__": guarded}
 
     def find_spec(self, fullname, path=None, target=None):
         relative = Path(*fullname.split("."))
@@ -189,7 +190,7 @@ def error_result(request: dict[str, object], status: str, code: str, message: st
 
 def syntax_error_result(request: dict[str, object], error: SyntaxError, started: float) -> dict[str, object]:
     filename = Path(error.filename).name if error.filename else request["entrypoint"]["file"]
-    return error_result(request, "syntax_error", "PYTHON_SYNTAX_ERROR", "Python 语法错误。", started, {"file": filename, "line": error.lineno or 1, "column": error.offset or 1})
+    return error_result(request, "syntax_error", "PYTHON_SYNTAX_ERROR", error.msg, started, {"file": filename, "line": error.lineno or 1, "column": error.offset or 1})
 
 
 def trace_limit_result(request: dict[str, object], started: float, trace: list[dict[str, object]]) -> dict[str, object]:
@@ -198,6 +199,26 @@ def trace_limit_result(request: dict[str, object], started: float, trace: list[d
 
 def runtime_error_result(request: dict[str, object], code: str, message: str, started: float) -> dict[str, object]:
     return error_result(request, "runtime_error", code, message, started)
+
+
+def exception_location(error: BaseException):
+    trace = error.__traceback__
+    if trace is None:
+        return None
+    while trace.tb_next is not None:
+        trace = trace.tb_next
+    return {"file": Path(trace.tb_frame.f_code.co_filename).name, "line": trace.tb_lineno}
+
+
+def exception_result(request: dict[str, object], error: BaseException, started: float) -> dict[str, object]:
+    return error_result(
+        request,
+        "runtime_error",
+        "PYTHON_RUNTIME_ERROR",
+        f"{type(error).__name__}: {error}",
+        started,
+        exception_location(error),
+    )
 
 
 def _restore_modules(snapshot, original=None):
@@ -379,10 +400,12 @@ def execute_request(request: dict[str, object]) -> dict[str, object]:
     except ReturnNotSerializable:
         return runtime_error_result(request, "RETURN_NOT_SERIALIZABLE", "入口函数必须返回 JSON 值。", started)
     except RuntimeError as error:
-        code = "MODULE_NOT_ALLOWED" if str(error).startswith("MODULE_NOT_ALLOWED:") else "PYTHON_RUNTIME_ERROR"
-        return runtime_error_result(request, code, "Python 运行失败。", started)
-    except BaseException:
-        return runtime_error_result(request, "PYTHON_RUNTIME_ERROR", "Python 运行失败。", started)
+        if str(error).startswith("MODULE_NOT_ALLOWED:"):
+            module_name = str(error).split(":", 1)[1]
+            return runtime_error_result(request, "MODULE_NOT_ALLOWED", f"不允许导入模块：{module_name}", started)
+        return exception_result(request, error, started)
+    except BaseException as error:
+        return exception_result(request, error, started)
     finally:
         sys.settrace(previous_trace)
         os.chdir(previous_cwd)

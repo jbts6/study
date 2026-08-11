@@ -245,40 +245,25 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     },
   );
 
-  it("applies SAFE_BUILTINS to entry and player modules", async () => {
-    const entry = await withPythonBridge(async (bridge) =>
+  it("provides standard Python builtins to player code", async () => {
+    const result = await withPythonBridge(async (bridge) =>
       sendAndWait(
         bridge,
         baseRequest({
-          runId: "exec-builtin-entry",
+          runId: "exec-standard-builtins",
           files: {
             "main.py":
-              "def choose_turn(world):\n    open('x')\n    return {'action': {'type': 'wait'}}\n",
+              "def choose_turn(world):\n    values = [3, 4]\n    return {'is_list': isinstance(values, list), 'first': next(iter(values)), 'kind': type(values).__name__}\n",
           },
           entrypoint: { file: "main.py", callable: "choose_turn" },
         }),
       ),
     );
-    expect(entry.executionStatus).toBe("runtime_error");
-
-    const helper = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
-        baseRequest({
-          runId: "exec-builtin-helper",
-          files: {
-            "main.py":
-              "def choose_turn(world):\n    import helper\n    return helper.run()\n",
-            "helper.py": "def run():\n    return eval('1')\n",
-          },
-          entrypoint: { file: "main.py", callable: "choose_turn" },
-        }),
-      ),
-    );
-    expect(helper.executionStatus).toBe("runtime_error");
+    expect(result.executionStatus).toBe("completed");
+    expect(result.returnValue).toEqual({ is_list: true, first: 3, kind: "list" });
   });
 
-  it("hides private exception text for syntax and runtime errors", async () => {
+  it("reports useful syntax and runtime error details", async () => {
     const syntax = await withPythonBridge(async (bridge) =>
       sendAndWait(
         bridge,
@@ -293,7 +278,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     );
     expect(syntax.executionStatus).toBe("syntax_error");
     expect(syntax.diagnostics[0].code).toBe("PYTHON_SYNTAX_ERROR");
-    expect(syntax.diagnostics[0].location).toMatchObject({ file: "main.py" });
+    expect(syntax.diagnostics[0].message).toContain("expected ':'");
+    expect(syntax.diagnostics[0].location).toMatchObject({ file: "main.py", line: 1 });
 
     const runtime = await withPythonBridge(async (bridge) =>
       sendAndWait(
@@ -302,7 +288,7 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
           runId: "exec-runtime",
           files: {
             "main.py":
-              "def choose_turn(world):\n    raise ValueError('secret-traceback-text')\n",
+              "def choose_turn(world):\n    raise ValueError('turn selection failed')\n",
           },
           entrypoint: { file: "main.py", callable: "choose_turn" },
         }),
@@ -310,7 +296,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     );
     expect(runtime.executionStatus).toBe("runtime_error");
     expect(runtime.diagnostics[0].code).toBe("PYTHON_RUNTIME_ERROR");
-    expect(JSON.stringify(runtime)).not.toContain("secret-traceback-text");
+    expect(runtime.diagnostics[0].message).toBe("ValueError: turn selection failed");
+    expect(runtime.diagnostics[0].location).toMatchObject({ file: "main.py", line: 2 });
   });
 
   it("truncates stdout by utf-8 bytes without splitting multibyte sequences", async () => {
