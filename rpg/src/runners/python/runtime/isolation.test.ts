@@ -48,4 +48,46 @@ describe.skipIf(!python)("resident process isolation (CPython 3.12+)", () => {
       expect((second.returnValue as Record<string, unknown>)?.value).toBe("second");
     });
   });
+
+  it("does not retain allowed-module attributes across requests", async () => {
+    await withPythonBridge(async (bridge) => {
+      const mutate: RunRequest = {
+        protocolVersion: 1 as const,
+        runId: "iso-leak-1",
+        attemptId: "iso-a1",
+        questId: "q",
+        language: "python",
+        files: {
+          "main.py":
+            "def choose_turn(world):\n    import math\n    math.LEAKED = 'present'\n    return {'action': {'type': 'wait'}}\n",
+        },
+        entrypoint: { file: "main.py", callable: "choose_turn" },
+        worldView: worldViewFixture,
+        allowedModules: ["math"],
+        limits: {
+          timeoutMs: 5_000,
+          interruptGraceMs: 500,
+          maxFiles: 10,
+          maxFileBytes: 65_536,
+          maxSourceBytes: 65_536,
+          maxOutputBytes: 16_384,
+          maxTraceEvents: 1_000,
+          maxValueDepth: 3,
+        },
+      };
+      const observe: RunRequest = {
+        ...mutate,
+        runId: "iso-leak-2",
+        files: {
+          "main.py":
+            "def choose_turn(world):\n    import math\n    try:\n        leaked = math.LEAKED\n    except Exception:\n        leaked = None\n    return {'action': {'type': 'wait'}, 'leaked': leaked}\n",
+        },
+      };
+      const first = await sendAndWait(bridge, mutate);
+      expect(first.executionStatus).toBe("completed");
+      const second = await sendAndWait(bridge, observe);
+      expect(second.executionStatus).toBe("completed");
+      expect((second.returnValue as Record<string, unknown>)?.leaked).toBeNull();
+    });
+  });
 });

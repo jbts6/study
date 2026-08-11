@@ -181,6 +181,25 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     expect((allowed.returnValue as Record<string, unknown>)?.value).toBe(3);
   });
 
+  it("blocks dynamic loading of a prohibited root", async () => {
+    const result = await withPythonBridge(async (bridge) =>
+      sendAndWait(
+        bridge,
+        baseRequest({
+          runId: "exec-dynamic-block",
+          allowedModules: ["math"],
+          files: {
+            "main.py":
+              "def choose_turn(world):\n    __import__('socket')\n    return {'action': {'type': 'wait'}}\n",
+          },
+          entrypoint: { file: "main.py", callable: "choose_turn" },
+        }),
+      ),
+    );
+    expect(result.executionStatus).toBe("runtime_error");
+    expect(result.diagnostics[0].code).toBe("MODULE_NOT_ALLOWED");
+  });
+
   it("applies SAFE_BUILTINS to entry and player modules", async () => {
     const entry = await withPythonBridge(async (bridge) =>
       sendAndWait(

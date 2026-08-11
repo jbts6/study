@@ -134,6 +134,11 @@ describe("validateRunRequest", () => {
     expect(diagnosticCode({ ...validRequest(), allowedModules: [1] })).toBe("INVALID_ALLOWED_MODULE");
   });
 
+  it("rejects unsupported allowed module names", () => {
+    expect(diagnosticCode({ ...validRequest(), allowedModules: ["importlib"] })).toBe("UNSUPPORTED_ALLOWED_MODULE");
+    expect(diagnosticCode({ ...validRequest(), allowedModules: ["math", "os"] })).toBe("UNSUPPORTED_ALLOWED_MODULE");
+  });
+
   it("requires exactly eight positive safe integer limits", () => {
     expect(diagnosticCode({ ...validRequest(), limits: { ...limits, timeoutMs: 0 } })).toBe("INVALID_LIMIT");
     expect(diagnosticCode({ ...validRequest(), limits: { ...limits, timeoutMs: 1.5 } })).toBe("INVALID_LIMIT");

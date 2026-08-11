@@ -14,6 +14,7 @@ import importlib.util
 
 
 BLOCKED_MODULES = frozenset({"js", "pyodide", "micropip", "socket", "ssl", "http", "urllib", "requests", "subprocess", "multiprocessing", "ctypes", "webbrowser"})
+SAFE_ALLOWED_MODULES = frozenset({"math"})
 SAFE_BUILTINS = {"__build_class__": __build_class__, "abs": abs, "all": all, "any": any, "AssertionError": AssertionError, "bool": bool, "dict": dict, "enumerate": enumerate, "Exception": Exception, "filter": filter, "float": float, "int": int, "len": len, "list": list, "map": map, "max": max, "min": min, "object": object, "print": print, "range": range, "reversed": reversed, "round": round, "set": set, "sorted": sorted, "str": str, "sum": sum, "tuple": tuple, "ValueError": ValueError, "zip": zip}
 TRACE_STRING_LIMIT = 200
 TRACE_COLLECTION_LIMIT = 20
@@ -61,6 +62,21 @@ def guarded_import(allowed_modules: set[str], player_module_roots: set[str]):
         return ORIGINAL_IMPORT(name, globals, locals, fromlist, level)
 
     return import_module
+
+
+def _validated_allowed_modules(request: dict[str, object]) -> set[str]:
+    requested = set(request.get("allowedModules", []))
+    unsupported = requested - SAFE_ALLOWED_MODULES
+    if unsupported:
+        raise RuntimeError("MODULE_NOT_ALLOWED:" + sorted(unsupported)[0])
+    return requested
+
+
+def _evict_allowed_modules(allowed_modules: set[str]) -> None:
+    for name in tuple(sys.modules):
+        root = name.split(".", 1)[0]
+        if root in allowed_modules:
+            del sys.modules[name]
 
 
 class RestrictedPlayerLoader(importlib.abc.MetaPathFinder, importlib.abc.Loader):
@@ -300,7 +316,8 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
         os.chdir(root)
         files = request.get("files", {})
         player_module_roots, player_file_names = _write_player_files(root, files)
-        allowed = set(request.get("allowedModules", []))
+        allowed = _validated_allowed_modules(request)
+        _evict_allowed_modules(allowed)
         guarded = guarded_import(allowed, player_module_roots)
         loader = RestrictedPlayerLoader(root, guarded)
         sys.path.insert(0, str(root))
