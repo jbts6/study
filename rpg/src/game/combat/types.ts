@@ -24,12 +24,6 @@ export type ReducedBattle = Readonly<{ state: BattleState; events: readonly Batt
 export type CommandResolution = Readonly<{ accepted: true; command: TurnCommand; state: BattleState; events: readonly BattleEvent[] }> | Readonly<{ accepted: false; errors: readonly CommandError[]; state: BattleState }>;
 export type WorldUnit = Readonly<{ id: string; team: Team; cell: Cell; hp: number; maxHp: number; disabled: boolean; statuses: readonly Status[]; move?: number; attack?: number; defense?: number; skills?: readonly Readonly<Pick<Skill, "id" | "range" | "power" | "target" | "kind">>[] }>;
 export type WorldView = Readonly<{ battleId: string; contentVersion: string; revision: number; round: number; activeUnitId: string | null; board: Readonly<Pick<BattleBoard, "width" | "height" | "blockedCells" | "hazardCells" | "coverCells">>; objectives: readonly Readonly<Pick<Objective, "id" | "cell" | "durability" | "completed">>[]; units: readonly WorldUnit[] }>;
-export type ReplayMetadata = Readonly<{ engineVersion: string; contentVersion: string; runnerProtocolVersion: 1; questId: string; battleId: string; seed: string }>;
-export type ReplayStep = Readonly<{ seq: number; round: number; turnIndex: number; stateRevision: number; actorId: string; command: TurnCommand; rngBefore: number; rngAfter: number; events: readonly BattleEvent[]; eventsHash: string; stateHash: string }>;
-export type Replay = Readonly<{ replayVersion: 1; metadata: ReplayMetadata; initialState: BattleState; initialStateHash: string; steps: readonly ReplayStep[]; outcome: BattlePhase; finalStateHash: string }>;
-export type ReplayMismatch = Readonly<{ step: number; field: "replayVersion" | "engineVersion" | "contentVersion" | "runnerProtocolVersion" | "initialStateHash" | "command" | "rngBefore" | "rngAfter" | "eventsHash" | "stateHash" | "outcome" | "finalStateHash"; expected: string | number | BattlePhase; actual: string | number | BattlePhase; engineVersion: string; contentVersion: string; runnerProtocolVersion: number }>;
-export type ReplayVerification = Readonly<{ verified: true; finalStateHash: string }> | Readonly<{ verified: false; mismatch: ReplayMismatch }>;
-
 export function xorshift32(state: number): Readonly<{ value: number; nextState: number }> {
   let value = state >>> 0;
   value ^= value << 13;
