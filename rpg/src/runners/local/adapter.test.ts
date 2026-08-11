@@ -65,6 +65,9 @@ function makeRequest(runId: string, timeoutMs = 2000): RunRequest {
 function makeCompleted(runId: string, attemptId = "a1"): RunResult {
   return { protocolVersion: 1, runId, attemptId, executionStatus: "completed", returnValue: null, returnValueTraceSeq: undefined, trace: [], diagnostics: [], streams: { stdout: "", stderr: "", truncated: false }, metrics: { durationMs: 5, traceEvents: 0 } };
 }
+function makeInterrupted(runId: string): RunResult {
+  return { protocolVersion: 1, runId, attemptId: "a1", executionStatus: "interrupted", returnValue: null, returnValueTraceSeq: undefined, trace: [], diagnostics: [{ code: "INTERRUPTED", severity: "info", message: "Python 运行已中断。", recoveryAction: "修改代码后重新运行" }], streams: { stdout: "", stderr: "", truncated: false }, metrics: { durationMs: 0, traceEvents: 0 } };
+}
 function createAdapter(opts: { failReady?: boolean } = {}): { adapter: PythonRunnerAdapter; channels: MockChannel[] } {
   const channels: MockChannel[] = [];
   const adapter = new PythonRunnerAdapter({
@@ -248,5 +251,58 @@ describe("python runner adapter", () => {
     const r2 = await p2;
     expect(r2.executionStatus).toBe("completed");
     expect(r2.runId).toBe("r2");
+  });
+
+  it("resolves interrupted when a message arrives after interrupt", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const promise = adapter.run(makeRequest("r1", 5000));
+    await waitForSend(channels, 0);
+    await adapter.interrupt("r1");
+    channels[0].emitMessage(makeInterrupted("r1"));
+    const result = await promise;
+    expect(result.executionStatus).toBe("interrupted");
+    expect(result.diagnostics[0].code).toBe("INTERRUPTED");
+  });
+
+  it("resolves interrupted when the process exits during interrupt", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const promise = adapter.run(makeRequest("r1", 5000));
+    await waitForSend(channels, 0);
+    await adapter.interrupt("r1");
+    channels[0].emitExit(null, "SIGINT");
+    const result = await promise;
+    expect(result.executionStatus).toBe("interrupted");
+    expect(result.diagnostics[0].code).toBe("INTERRUPTED");
+  });
+
+  it("upgrades to RUNNER_INTERRUPT_TIMEOUT after grace", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const promise = adapter.run(makeRequest("r1", 5000));
+    await waitForSend(channels, 0);
+    await adapter.interrupt("r1");
+    triggerAllTimers();
+    const result = await promise;
+    expect(result.executionStatus).toBe("timeout");
+    expect(result.diagnostics[0].code).toBe("RUNNER_INTERRUPT_TIMEOUT");
+    expect(channels[0].kill).toHaveBeenCalledTimes(1);
+    channels[0].emitExit(null, "SIGKILL");
+  });
+
+  it("uses a new generation after interrupt-induced exit", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const p1 = adapter.run(makeRequest("r1", 5000));
+    await waitForSend(channels, 0);
+    await adapter.interrupt("r1");
+    channels[0].emitExit(null, "SIGINT");
+    await p1;
+    const p2 = adapter.run(makeRequest("r2", 100));
+    await waitForSend(channels, 1);
+    channels[1].emitMessage(makeCompleted("r2"));
+    const r2 = await p2;
+    expect(r2.executionStatus).toBe("completed");
   });
 });

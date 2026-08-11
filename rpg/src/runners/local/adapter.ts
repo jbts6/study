@@ -23,6 +23,7 @@ interface ActiveRun {
   readonly resolve: (result: RunResult) => void;
   readonly hardTimer: TimerHandle;
   graceTimer?: TimerHandle;
+  interrupting?: boolean;
 }
 
 function localResult(
@@ -41,6 +42,21 @@ function localResult(
     returnValueTraceSeq: undefined,
     trace: [],
     diagnostics: [diagnostic],
+    streams: { stdout: "", stderr: "", truncated: false },
+    metrics: { durationMs: 0, traceEvents: 0 },
+  };
+}
+
+function interruptedResult(request: Pick<RunRequest, "runId" | "attemptId">): RunResult {
+  return {
+    protocolVersion: 1,
+    runId: request.runId,
+    attemptId: request.attemptId,
+    executionStatus: "interrupted",
+    returnValue: undefined,
+    returnValueTraceSeq: undefined,
+    trace: [],
+    diagnostics: [{ code: "INTERRUPTED", severity: "info", message: "Python 运行已中断。", recoveryAction: "修改代码后重新运行" }],
     streams: { stdout: "", stderr: "", truncated: false },
     metrics: { durationMs: 0, traceEvents: 0 },
   };
@@ -112,10 +128,14 @@ export class PythonRunnerAdapter {
     if (active && active.lease === lease) {
       this.clearActiveTimers(active);
       this.active = undefined;
-      active.resolve(
-        localResult(active.request, "runner_error", "RUNNER_PROCESS_EXITED",
-          `Python 子进程意外退出 (code=${code}, signal=${signal})。`),
-      );
+      if (active.interrupting) {
+        active.resolve(interruptedResult(active.request));
+      } else {
+        active.resolve(
+          localResult(active.request, "runner_error", "RUNNER_PROCESS_EXITED",
+            `Python 子进程意外退出 (code=${code}, signal=${signal})。`),
+        );
+      }
     }
     if (!this.disposed) this.setState("ready");
   }
@@ -202,6 +222,7 @@ export class PythonRunnerAdapter {
     const active = this.active;
     if (!active || active.request.runId !== runId) return Promise.resolve();
     this.setState("interrupting");
+    this.clearTimeoutFn(active.hardTimer);
     active.lease.channel.interrupt();
     const graceTimer = this.setTimeoutFn(() => {
       const stillActive = this.active;
@@ -216,7 +237,7 @@ export class PythonRunnerAdapter {
         localResult(stillActive.request, "timeout", "RUNNER_INTERRUPT_TIMEOUT", "中断等待超时，子进程已终止并重建。"),
       );
     }, active.request.limits.interruptGraceMs);
-    this.active = { ...active, graceTimer };
+    this.active = { ...active, graceTimer, interrupting: true };
     return Promise.resolve();
   }
 

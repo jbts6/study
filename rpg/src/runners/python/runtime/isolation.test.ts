@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { PythonRunnerAdapter } from "../../local/adapter";
+import { PythonBridge } from "../../local/python-bridge";
 import {
+  daemonScript,
   loadPythonDetection,
+  requireDetectedPython,
   sendAndWait,
   withPythonBridge,
 } from "../../local/test-support";
@@ -89,5 +93,70 @@ describe.skipIf(!python)("resident process isolation (CPython 3.12+)", () => {
       expect(second.executionStatus).toBe("completed");
       expect((second.returnValue as Record<string, unknown>)?.leaked).toBeNull();
     });
+  });
+
+  it("interrupts a long-running strategy and continues with a new request", async () => {
+    const detection = await requireDetectedPython();
+    const adapter = new PythonRunnerAdapter({
+      createChannel: () => new PythonBridge({ pythonPath: detection.path, daemonScript }),
+    });
+    try {
+      const longReq: RunRequest = {
+        protocolVersion: 1 as const,
+        runId: "iso-intr-1",
+        attemptId: "iso-a1",
+        questId: "q",
+        language: "python",
+        files: {
+          "main.py":
+            "def choose_turn(world):\n    total = 0\n    while True:\n        total = sum(range(1000))\n    return {'action': {'type': 'wait'}}\n",
+        },
+        entrypoint: { file: "main.py", callable: "choose_turn" },
+        worldView: worldViewFixture,
+        allowedModules: [],
+        limits: {
+          timeoutMs: 30_000,
+          interruptGraceMs: 3_000,
+          maxFiles: 10,
+          maxFileBytes: 65_536,
+          maxSourceBytes: 65_536,
+          maxOutputBytes: 16_384,
+          maxTraceEvents: 100_000,
+          maxValueDepth: 3,
+        },
+      };
+      const promise = adapter.run(longReq);
+      await vi.waitFor(() => expect(adapter.state).toBe("running"));
+      await new Promise<void>((resolve) => setTimeout(resolve, 200));
+      await adapter.interrupt(longReq.runId);
+      const r1 = await promise;
+      expect(r1.executionStatus).toBe("interrupted");
+
+      const shortReq: RunRequest = {
+        protocolVersion: 1 as const,
+        runId: "iso-intr-2",
+        attemptId: "iso-a1",
+        questId: "q",
+        language: "python",
+        files: { "main.py": "def choose_turn(world):\n    return {'action': {'type': 'wait'}}\n" },
+        entrypoint: { file: "main.py", callable: "choose_turn" },
+        worldView: worldViewFixture,
+        allowedModules: [],
+        limits: {
+          timeoutMs: 5_000,
+          interruptGraceMs: 500,
+          maxFiles: 10,
+          maxFileBytes: 65_536,
+          maxSourceBytes: 65_536,
+          maxOutputBytes: 16_384,
+          maxTraceEvents: 1_000,
+          maxValueDepth: 3,
+        },
+      };
+      const r2 = await adapter.run(shortReq);
+      expect(r2.executionStatus).toBe("completed");
+    } finally {
+      await adapter.dispose();
+    }
   });
 });

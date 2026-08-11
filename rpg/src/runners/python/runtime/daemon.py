@@ -34,13 +34,20 @@ def main():
         line = line.strip()
         if not line:
             continue
+        request = None
         try:
             request = json.loads(line)
             result = execute_request(request)
         except KeyboardInterrupt:
-            result = _interrupted_result(request)
-        sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")
-        sys.stdout.flush()
+            if isinstance(request, dict) and request.get("runId") and request.get("attemptId"):
+                result = _interrupted_result(request)
+            else:
+                continue
+        try:
+            sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
+        except KeyboardInterrupt:
+            return
 
 
 if __name__ == "__main__":
