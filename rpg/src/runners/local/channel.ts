@@ -1,4 +1,4 @@
-import type { RunRequest, RunResult } from "../protocol/types";
+import type { RunRequest, RunResult } from "../protocol/types.ts";
 
 export interface LocalRunnerChannel {
   readonly generation: number;

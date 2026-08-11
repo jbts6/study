@@ -1,6 +1,6 @@
-import { validateRunRequest } from "../protocol/validate-request";
-import type { RunRequest, RunResult, RunnerState, RunnerDiagnostic } from "../protocol/types";
-import type { LocalRunnerChannel } from "./channel";
+import { validateRunRequest } from "../protocol/validate-request.ts";
+import type { RunRequest, RunResult, RunnerState, RunnerDiagnostic } from "../protocol/types.ts";
+import type { LocalRunnerChannel } from "./channel.ts";
 
 type TimerHandle = number;
 type TimerStarter = (handler: () => void, ms: number) => TimerHandle;

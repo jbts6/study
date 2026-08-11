@@ -1,8 +1,8 @@
 import { WebSocketServer, WebSocket } from "ws";
-import { PythonRunnerAdapter } from "./adapter";
-import { PythonBridge } from "./python-bridge";
-import { detectPython } from "./python-detector";
-import type { RunRequest } from "../protocol/types";
+import { PythonRunnerAdapter } from "./adapter.ts";
+import { PythonBridge } from "./python-bridge.ts";
+import { detectPython } from "./python-detector.ts";
+import type { RunRequest } from "../protocol/types.ts";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 

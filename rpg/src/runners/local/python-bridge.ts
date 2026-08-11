@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import type { LocalRunnerChannel } from "./channel";
-import type { RunRequest, RunResult } from "../protocol/types";
+import type { LocalRunnerChannel } from "./channel.ts";
+import type { RunRequest, RunResult } from "../protocol/types.ts";
 
 export interface PythonBridgeOptions {
   readonly pythonPath: string;
