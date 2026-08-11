@@ -37,10 +37,10 @@ export function sendAndWait(
       clearTimeout(timer);
       resolve(result);
     };
-    if (!bridge.send(request)) {
+    bridge.send(request).catch((err: unknown) => {
       clearTimeout(timer);
-      reject(new Error("python bridge rejected request"));
-    }
+      reject(err instanceof Error ? err : new Error(String(err)));
+    });
   });
 }
 
@@ -53,6 +53,6 @@ export async function withPythonBridge<T>(
     await bridge.waitReady();
     return await callback(bridge);
   } finally {
-    bridge.kill();
+    await bridge.kill();
   }
 }

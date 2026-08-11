@@ -2,12 +2,13 @@ import type { RunRequest, RunResult } from "../protocol/types";
 
 export interface LocalRunnerChannel {
   readonly generation: number;
+  readonly pid: number | undefined;
   onMessage: ((result: RunResult) => void) | undefined;
   onExit: ((code: number | null, signal: NodeJS.Signals | null) => void) | undefined;
-  send(request: RunRequest): boolean;
+  waitReady(): Promise<void>;
+  send(request: RunRequest): Promise<void>;
   interrupt(): void;
-  kill(): void;
-  readonly pid: number | undefined;
+  kill(): Promise<void>;
 }
 
 export interface LocalRunnerChannelFactory {

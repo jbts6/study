@@ -30,21 +30,27 @@ class MockChannel implements LocalRunnerChannel {
   pid: number | undefined;
   onMessage: ((r: RunResult) => void) | undefined;
   onExit: ((c: number | null, s: NodeJS.Signals | null) => void) | undefined;
-  send = vi.fn(() => true);
+  waitReady = vi.fn((): Promise<void> => Promise.resolve());
+  send = vi.fn((): Promise<void> => Promise.resolve());
   interrupt = vi.fn();
-  kill = vi.fn(() => { this.onExit?.(null, "SIGKILL"); });
+  kill = vi.fn((): Promise<void> => {
+    this.onExit?.(null, "SIGKILL");
+    return Promise.resolve();
+  });
 
   constructor(generation: number) {
     this.generation = generation;
     this.pid = 1000 + generation;
   }
   emitMessage(result: RunResult): void { this.onMessage?.(result); }
+  emitExit(code: number | null, signal: NodeJS.Signals | null): void { this.onExit?.(code, signal); }
 }
 
 function makeRequest(runId: string, timeoutMs = 2000): RunRequest {
   return {
     protocolVersion: 1 as const, runId, attemptId: "a1", questId: "q", language: "python",
-    files: { "main.py": "def choose_turn(world):\n    return {'action': {'type': 'wait'}}\n" }, entrypoint: { file: "main.py", callable: "choose_turn" },
+    files: { "main.py": "def choose_turn(world):\n    return {'action': {'type': 'wait'}}\n" },
+    entrypoint: { file: "main.py", callable: "choose_turn" },
     worldView: worldViewFixture, allowedModules: [],
     limits: { timeoutMs, interruptGraceMs: 200, maxFiles: 10, maxFileBytes: 65536, maxSourceBytes: 65536, maxOutputBytes: 16384, maxTraceEvents: 1000, maxValueDepth: 3 },
   };
@@ -52,13 +58,22 @@ function makeRequest(runId: string, timeoutMs = 2000): RunRequest {
 function makeCompleted(runId: string): RunResult {
   return { protocolVersion: 1, runId, attemptId: "a1", executionStatus: "completed", returnValue: null, returnValueTraceSeq: undefined, trace: [], diagnostics: [], streams: { stdout: "", stderr: "", truncated: false }, metrics: { durationMs: 5, traceEvents: 0 } };
 }
-function createAdapter(): { adapter: PythonRunnerAdapter; channels: MockChannel[] } {
+function createAdapter(opts: { failReady?: boolean } = {}): { adapter: PythonRunnerAdapter; channels: MockChannel[] } {
   const channels: MockChannel[] = [];
   const adapter = new PythonRunnerAdapter({
-    createChannel: () => { const ch = new MockChannel(channels.length); channels.push(ch); return ch; },
+    createChannel: () => {
+      const ch = new MockChannel(channels.length);
+      if (opts.failReady) ch.waitReady.mockRejectedValueOnce(new Error("startup fail"));
+      channels.push(ch);
+      return ch;
+    },
     setTimeoutFn, clearTimeoutFn,
   });
   return { adapter, channels };
+}
+
+async function waitForSend(ch: MockChannel): Promise<void> {
+  await vi.waitFor(() => { expect(ch.send).toHaveBeenCalled(); });
 }
 
 describe("python runner adapter", () => {
@@ -66,8 +81,7 @@ describe("python runner adapter", () => {
     resetTimers();
     const { adapter, channels } = createAdapter();
     const promise = adapter.run(makeRequest("r1"));
-    expect(channels.length).toBe(1);
-    expect(channels[0].send).toHaveBeenCalledTimes(1);
+    await waitForSend(channels[0]);
     channels[0].emitMessage(makeCompleted("r1"));
     const result = await promise;
     expect(result.executionStatus).toBe("completed");
@@ -78,6 +92,7 @@ describe("python runner adapter", () => {
     resetTimers();
     const { adapter, channels } = createAdapter();
     const p1 = adapter.run(makeRequest("r1"));
+    await waitForSend(channels[0]);
     const r2 = await adapter.run(makeRequest("r2"));
     expect(r2.executionStatus).toBe("invalid_request");
     expect(r2.diagnostics[0].code).toBe("RUN_IN_PROGRESS");
@@ -89,6 +104,7 @@ describe("python runner adapter", () => {
     resetTimers();
     const { adapter, channels } = createAdapter();
     const promise = adapter.run(makeRequest("r1", 100));
+    await waitForSend(channels[0]);
     triggerAllTimers();
     const result = await promise;
     expect(result.executionStatus).toBe("timeout");
@@ -100,7 +116,8 @@ describe("python runner adapter", () => {
     resetTimers();
     const { adapter, channels } = createAdapter();
     const promise = adapter.run(makeRequest("r1"));
-    adapter.dispose();
+    await waitForSend(channels[0]);
+    await adapter.dispose();
     const result = await promise;
     expect(result.executionStatus).toBe("runner_error");
     expect(result.diagnostics[0].code).toBe("RUNNER_DISPOSED");
@@ -111,14 +128,48 @@ describe("python runner adapter", () => {
     resetTimers();
     const { adapter, channels } = createAdapter();
     const p1 = adapter.run(makeRequest("r1", 100));
+    await waitForSend(channels[0]);
     triggerAllTimers();
     await p1;
     expect(channels.length).toBe(1);
-    // after kill, channel is undefined; next run creates a new one
     const p2 = adapter.run(makeRequest("r2", 100));
     expect(channels.length).toBe(2);
+    await waitForSend(channels[1]);
     channels[1].emitMessage(makeCompleted("r2"));
     const r2 = await p2;
     expect(r2.executionStatus).toBe("completed");
+  });
+
+  it("maps channel ready failure to RUNNER_START_FAILED", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter({ failReady: true });
+    const result = await adapter.run(makeRequest("r1"));
+    expect(result.executionStatus).toBe("runner_error");
+    expect(result.diagnostics[0].code).toBe("RUNNER_START_FAILED");
+    expect(channels[0].kill).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps channel send failure to RUNNER_SEND_FAILED", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const promise = adapter.run(makeRequest("r1"));
+    channels[0].send.mockRejectedValueOnce(new Error("write fail"));
+    const result = await promise;
+    expect(result.executionStatus).toBe("runner_error");
+    expect(result.diagnostics[0].code).toBe("RUNNER_SEND_FAILED");
+  });
+
+  it("dispose is idempotent and awaits channel kill", async () => {
+    resetTimers();
+    const { adapter, channels } = createAdapter();
+    const promise = adapter.run(makeRequest("r1"));
+    await waitForSend(channels[0]);
+    const d1 = adapter.dispose();
+    const d2 = adapter.dispose();
+    expect(d1).toBe(d2);
+    await d1;
+    expect(channels[0].kill).toHaveBeenCalledTimes(1);
+    const result = await promise;
+    expect(result.diagnostics[0].code).toBe("RUNNER_DISPOSED");
   });
 });

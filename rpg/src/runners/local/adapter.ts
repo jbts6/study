@@ -48,6 +48,7 @@ export class PythonRunnerAdapter {
   private _state: RunnerState = "loading";
   private active: ActiveRun | undefined;
   private disposed = false;
+  private disposePromise: Promise<void> | undefined;
   private readonly listeners = new Set<(state: RunnerState) => void>();
 
   constructor(deps: PythonRunnerAdapterDependencies) {
@@ -76,7 +77,6 @@ export class PythonRunnerAdapter {
     ch.onMessage = (result) => this.handleMessage(result);
     ch.onExit = (code, signal) => this.handleExit(code, signal);
     this.channel = ch;
-    this.setState("ready");
     return ch;
   }
 
@@ -121,12 +121,44 @@ export class PythonRunnerAdapter {
       return Promise.resolve(localResult(validated, "invalid_request", "RUN_IN_PROGRESS", "已有运行请求正在执行。"));
     }
     const channel = this.ensureChannel();
+    return this.executeRun(channel, validated);
+  }
+
+  private async executeRun(channel: LocalRunnerChannel, validated: RunRequest): Promise<RunResult> {
+    try {
+      await channel.waitReady();
+    } catch {
+      await this.dropChannel(channel);
+      return localResult(validated, "runner_error", "RUNNER_START_FAILED", "Python 子进程启动失败。");
+    }
+    if (this.disposed) {
+      return localResult(validated, "runner_error", "RUNNER_DISPOSED", "运行器已释放。");
+    }
+    if (this.active) {
+      return localResult(validated, "invalid_request", "RUN_IN_PROGRESS", "已有运行请求正在执行。");
+    }
     return new Promise<RunResult>((resolve) => {
       const hardTimer = this.setTimeoutFn(() => this.handleHardTimeout(), validated.limits.timeoutMs);
       this.active = { request: validated, resolve, hardTimer };
       this.setState("running");
-      channel.send(validated);
+      channel.send(validated).catch(() => {
+        const active = this.active;
+        if (!active || active.request !== validated) return;
+        this.clearActiveTimers(active);
+        this.active = undefined;
+        if (this._state !== "restarting") this.setState("ready");
+        resolve(localResult(validated, "runner_error", "RUNNER_SEND_FAILED", "Python 子进程写入失败。"));
+      });
     });
+  }
+
+  private async dropChannel(channel: LocalRunnerChannel): Promise<void> {
+    if (this.channel === channel) this.channel = undefined;
+    try {
+      await channel.kill();
+    } catch {
+      /* ignore cleanup errors */
+    }
   }
 
   private handleHardTimeout(): void {
@@ -135,7 +167,9 @@ export class PythonRunnerAdapter {
     this.clearActiveTimers(active);
     this.active = undefined;
     this.setState("restarting");
-    this.channel?.kill();
+    const channel = this.channel;
+    this.channel = undefined;
+    void channel?.kill();
     active.resolve(
       localResult(active.request, "timeout", "RUNNER_TIMEOUT", "Python 运行超时，子进程已终止并重建。"),
     );
@@ -152,7 +186,9 @@ export class PythonRunnerAdapter {
         this.clearActiveTimers(stillActive);
         this.active = undefined;
         this.setState("restarting");
-        this.channel?.kill();
+        const channel = this.channel;
+        this.channel = undefined;
+        void channel?.kill();
         stillActive.resolve(
           localResult(stillActive.request, "timeout", "RUNNER_INTERRUPT_TIMEOUT", "中断等待超时，子进程已终止并重建。"),
         );
@@ -162,7 +198,13 @@ export class PythonRunnerAdapter {
     return Promise.resolve();
   }
 
-  dispose(): void {
+  dispose(): Promise<void> {
+    if (this.disposePromise) return this.disposePromise;
+    this.disposePromise = this.performDispose();
+    return this.disposePromise;
+  }
+
+  private async performDispose(): Promise<void> {
     this.disposed = true;
     const active = this.active;
     if (active) {
@@ -170,8 +212,15 @@ export class PythonRunnerAdapter {
       this.active = undefined;
       active.resolve(localResult(active.request, "runner_error", "RUNNER_DISPOSED", "运行器已释放。"));
     }
-    this.channel?.kill();
+    const channel = this.channel;
     this.channel = undefined;
     this.setState("unavailable");
+    if (channel) {
+      try {
+        await channel.kill();
+      } catch {
+        /* ignore cleanup errors */
+      }
+    }
   }
 }
