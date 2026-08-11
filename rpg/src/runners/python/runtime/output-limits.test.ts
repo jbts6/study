@@ -21,7 +21,10 @@ describe.skipIf(!python)("execute output limits (CPython 3.12+)", () => {
       "print(json.dumps(result, ensure_ascii=False))",
     ].join("; ");
 
-    const { stdout } = await execFileAsync(python.path, ["-B", "-c", script], { encoding: "utf8" });
+    const { stdout } = await execFileAsync(python.path, ["-B", "-c", script], {
+      encoding: "utf8",
+      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+    });
     const result = JSON.parse(stdout) as {
       streams: { stdout: string; stderr: string; truncated: boolean };
     };
