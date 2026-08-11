@@ -30,6 +30,7 @@ const LIMIT_FIELDS = [
   "maxValueDepth",
 ] as const;
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SAFE_ALLOWED_MODULES = new Set(["math"]);
 
 function hasOwn(value: object, key: PropertyKey): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
@@ -159,6 +160,7 @@ export function validateRunRequest(input: unknown): RequestValidationResult {
     const modules = new Set<string>();
     for (const module of snapshot.allowedModules) {
       if (typeof module !== "string" || !SAFE_IDENTIFIER.test(module)) return invalid("INVALID_ALLOWED_MODULE", "allowedModules 必须是不带点的 Python 标识符");
+      if (!SAFE_ALLOWED_MODULES.has(module)) return invalid("UNSUPPORTED_ALLOWED_MODULE", `allowedModules 仅支持: ${[...SAFE_ALLOWED_MODULES].join(", ")}`);
       if (modules.has(module)) return invalid("DUPLICATE_ALLOWED_MODULE", `allowedModules 重复: ${module}`);
       modules.add(module);
     }
