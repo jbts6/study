@@ -138,7 +138,7 @@ function updateGameShell(shell: GameShell, snapshot: GameSnapshot): void {
   const { battleState, runnerState } = snapshot;
   const running = runnerState === "running" || snapshot.activeRunId !== undefined;
   shell.level.textContent = snapshot.currentLevelId;
-  shell.runner.textContent = RUNNER_LABELS[runnerState];
+  shell.runner.textContent = running ? RUNNER_LABELS.running : RUNNER_LABELS[runnerState];
   shell.revision.textContent = String(battleState.revision);
   shell.phase.textContent = PHASE_LABELS[battleState.phase];
   shell.activeUnit.textContent = activeUnitId(battleState) ?? "无";

@@ -1,0 +1,65 @@
+:root {
+  color-scheme: dark;
+  --background: #081018;
+  --surface: #111f29;
+  --surface-deep: #071115;
+  --border: #304d59;
+  --text: #d9e7eb;
+  --text-muted: #8da3aa;
+  --brass: #d2ac62;
+  --arcane: #6be4df;
+  --danger: #e17867;
+  --success: #72d8ae;
+  --warning: #d9b06c;
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-body: "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-code: "Cascadia Code", Consolas, monospace;
+  --radius: 8px;
+  --shadow: 0 12px 32px rgb(0 0 0 / 28%);
+  --space: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 16px;
+  color: var(--text);
+  background: var(--surface-deep);
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+.cm-editor:focus-within {
+  outline: 2px solid var(--arcane);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,287 @@
+.brand-lockup p,
+.panel-heading p {
+  margin: 0 0 3px;
+  color: var(--brass);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.brand-lockup h1,
+.panel-heading h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.brand-lockup h1 {
+  font-size: 25px;
+  letter-spacing: 0.025em;
+}
+
+.status-track dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.status-track dd {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-family: var(--font-code);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+[data-testid="runner-status"] {
+  color: var(--arcane);
+}
+
+.battle-panel,
+.editor-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgb(17 31 41 / 95%), rgb(7 17 21 / 95%));
+  box-shadow: var(--shadow);
+}
+
+.panel-heading h2 {
+  font-size: 19px;
+}
+
+.battlefield {
+  background-color: #0b1a22;
+  background-image:
+    linear-gradient(rgb(107 228 223 / 9%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(107 228 223 / 9%) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.battle-cell {
+  border: 1px solid rgb(48 77 89 / 85%);
+  background: rgb(8 16 24 / 76%);
+}
+
+.battle-cell.is-cover {
+  border-color: var(--brass);
+}
+
+.battle-cell.is-hazard {
+  background-image: repeating-linear-gradient(135deg, rgb(225 120 103 / 18%) 0 7px, transparent 7px 14px);
+  border-color: var(--danger);
+}
+
+.battle-cell.is-blocked {
+  background-color: rgb(48 77 89 / 55%);
+}
+
+.cell-coordinate {
+  color: var(--text-muted);
+  font-family: var(--font-code);
+  font-size: 11px;
+}
+
+.battle-objective {
+  color: var(--brass);
+  font-family: var(--font-code);
+  font-size: 11px;
+}
+
+.battle-unit {
+  position: relative;
+  z-index: 1;
+  margin: 6px;
+  border-inline-start: 3px solid var(--brass);
+  padding: 7px 8px;
+  color: var(--text);
+  background: rgb(7 17 21 / 88%);
+  font-family: var(--font-code);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.battle-unit.is-active {
+  border-color: var(--arcane);
+  box-shadow: 0 0 0 1px rgb(107 228 223 / 34%), 0 0 18px rgb(107 228 223 / 26%);
+  animation: active-pulse 2.8s ease-in-out infinite;
+}
+
+.action-row {
+  border-top: 1px solid var(--border);
+  background: rgb(7 17 21 / 72%);
+}
+
+.run-turn {
+  border-color: var(--brass);
+  color: #18130a;
+  font-weight: 800;
+  background: var(--brass);
+}
+
+.interrupt-run {
+  border-color: var(--arcane);
+  color: var(--arcane);
+}
+
+.reset-trigger {
+  margin-inline-start: auto;
+  border-color: rgb(225 120 103 / 65%);
+  color: var(--danger);
+  background: transparent;
+}
+
+.feedback-panel {
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--arcane);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  background: rgb(7 17 21 / 93%);
+  box-shadow: var(--shadow);
+}
+
+.feedback-panel h2,
+.feedback-panel h3,
+.feedback-panel p {
+  margin: 0 0 6px;
+}
+
+.feedback-panel h2 {
+  color: var(--arcane);
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.feedback-panel h3 {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.feedback-panel p,
+.feedback-output {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.feedback-output {
+  margin-top: 8px;
+}
+
+.feedback-output pre {
+  margin: 0;
+  overflow: auto;
+  color: var(--text);
+  font-family: var(--font-code);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.feedback-success {
+  border-inline-start-color: var(--success);
+  animation: feedback-pulse 580ms ease-out;
+}
+
+.feedback-error {
+  border-inline-start-color: var(--danger);
+  animation: feedback-pulse 580ms ease-out;
+}
+
+.reset-dialog {
+  border: 1px solid var(--brass);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 58%);
+}
+
+.reset-dialog::backdrop {
+  background: rgb(0 0 0 / 62%);
+}
+
+.reset-form h2,
+.reset-form p {
+  margin: 0;
+}
+
+.reset-form h2 {
+  font-family: var(--font-display);
+}
+
+.reset-form label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.reset-form input {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 10px;
+  color: var(--text);
+  background: var(--surface-deep);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dialog-actions [data-reset-save],
+.recovery-panel [data-reset-save] {
+  border-color: var(--danger);
+  color: #27110c;
+  background: var(--danger);
+}
+
+.recovery-shell {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 28px;
+}
+
+.recovery-panel {
+  display: grid;
+  width: min(520px, 100%);
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 28px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.recovery-panel > p {
+  margin: 0;
+  color: var(--brass);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.recovery-panel h1 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+
+.recovery-message {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+@keyframes active-pulse {
+  50% {
+    box-shadow: 0 0 0 2px rgb(107 228 223 / 44%), 0 0 24px rgb(107 228 223 / 42%);
+  }
+}
+
+@keyframes feedback-pulse {
+  0% {
+    box-shadow: inset 0 0 0 1px currentcolor;
+  }
+}
