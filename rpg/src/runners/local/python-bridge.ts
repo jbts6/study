@@ -48,7 +48,7 @@ export class PythonBridge implements LocalRunnerChannel {
 
   private ensureProcess(): ChildProcess {
     if (this.process) return this.process;
-    const proc = spawn(this.options.pythonPath, [this.options.daemonScript], {
+    const proc = spawn(this.options.pythonPath, ["-B", this.options.daemonScript], {
       stdio: ["pipe", "pipe", "pipe"],
     });
     this.process = proc;
