@@ -71,6 +71,6 @@ npm run build
 - `rpg/src/runners/local/`：本地 WebSocket 服务、Python 检测、运行适配器和单次进程管理。
 - `rpg/src/runners/python/runtime/`：玩家文件加载、模块白名单、执行、追踪和结果序列化。
 - `rpg/src/runners/protocol/`：Runner 请求与结果类型、基础 JSON 校验。
-- `docs/superpowers/plans/`：路线图、阶段计划和实施记录。
+- `docs/superpowers/plans/`：当前 Roadmap 与近期实施记录。
 
 当前简化方案见 [`docs/superpowers/plans/2026-08-11-python-rpg-local-simplification.md`](docs/superpowers/plans/2026-08-11-python-rpg-local-simplification.md)。更具体的工程取舍以 [`AGENTS.md`](AGENTS.md) 为准。
