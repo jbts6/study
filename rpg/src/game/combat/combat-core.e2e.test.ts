@@ -8,7 +8,6 @@ describe("core fixture", () => {
 
     for (const command of fixtureCommands) {
       const result = resolveTurn(state, command);
-      expect(result.accepted).toBe(true);
       if (!result.accepted) throw new Error("fixture command rejected");
       state = result.state;
     }
