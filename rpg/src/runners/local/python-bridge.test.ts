@@ -46,6 +46,30 @@ describe.skipIf(!python)("python bridge (CPython 3.12+)", () => {
     }
   });
 
+  it("uses utf-8 for protocol input and player output", async () => {
+    const previousEncoding = process.env.PYTHONIOENCODING;
+    process.env.PYTHONIOENCODING = "ascii";
+    const bridge = new PythonBridge({ pythonPath: python!.path, daemonScript });
+    try {
+      await bridge.waitReady();
+      const request: RunRequest = {
+        ...makeRequest("bridge-utf8"),
+        files: {
+          "main.py":
+            "def choose_turn(world):\n    print('奥术')\n    return {'text': '工业幻想'}\n",
+        },
+      };
+      const result = await sendAndWait(bridge, request);
+      expect(result.executionStatus).toBe("completed");
+      expect(result.streams.stdout).toContain("奥术");
+      expect((result.returnValue as Record<string, unknown>).text).toBe("工业幻想");
+    } finally {
+      await bridge.kill();
+      if (previousEncoding === undefined) delete process.env.PYTHONIOENCODING;
+      else process.env.PYTHONIOENCODING = previousEncoding;
+    }
+  }, 10_000);
+
   it("increments generation after kill and respawn", async () => {
     const bridge = new PythonBridge({ pythonPath: python!.path, daemonScript });
     try {
