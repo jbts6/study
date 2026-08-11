@@ -1,7 +1,24 @@
-import { describe, expect, it } from "vitest";
-import { detectPython } from "./python-detector";
+import { describe, expect, it, vi } from "vitest";
+import { createPythonProbe, detectPython } from "./python-detector";
+import type { PythonProbeExecutor } from "./python-detector";
 
 describe("python detector", () => {
+  it("applies a hard timeout to the underlying interpreter process", async () => {
+    const execute: PythonProbeExecutor = vi.fn((_executable, _args, _options, callback) => {
+      callback(null, "Python 3.12.4", "");
+      return undefined;
+    });
+    const probe = createPythonProbe(execute);
+
+    await expect(probe("python")).resolves.toEqual({ path: "python", version: "3.12.4" });
+    expect(execute).toHaveBeenCalledWith(
+      "python",
+      ["--version"],
+      expect.objectContaining({ encoding: "utf8", timeout: 2_000 }),
+      expect.any(Function),
+    );
+  });
+
   it("selects the first compatible candidate when python3 is too low but python is new", async () => {
     const result = await detectPython({
       candidates: ["python3", "python"],

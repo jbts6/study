@@ -1,13 +1,22 @@
 import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
 
 export type PythonDetection =
   | { ok: true; path: string; version: string }
   | { ok: false; code: "PYTHON_NOT_FOUND" | "PYTHON_VERSION_TOO_LOW"; message: string };
 
 export type PythonProbe = (executable: string) => Promise<{ path: string; version: string } | undefined>;
+
+interface PythonProbeExecOptions {
+  readonly encoding: "utf8";
+  readonly timeout: number;
+}
+
+export type PythonProbeExecutor = (
+  executable: string,
+  args: string[],
+  options: PythonProbeExecOptions,
+  callback: (error: Error | null, stdout: string, stderr: string) => void,
+) => unknown;
 
 export interface DetectPythonOptions {
   readonly candidates?: readonly string[];
@@ -39,15 +48,30 @@ function compareVersions(a: string, b: string): number {
   return (an ?? 0) - (bn ?? 0);
 }
 
-async function defaultProbe(executable: string): Promise<{ path: string; version: string } | undefined> {
-  try {
-    const { stdout, stderr } = await execFileAsync(executable, ["--version"]);
-    const version = parseVersion(`${stdout}\n${stderr}`);
-    return version ? { path: executable, version } : undefined;
-  } catch {
-    return undefined;
-  }
+export function createPythonProbe(execute: PythonProbeExecutor): PythonProbe {
+  return (executable) => new Promise((resolve) => {
+    try {
+      execute(
+        executable,
+        ["--version"],
+        { encoding: "utf8", timeout: PROBE_TIMEOUT_MS },
+        (error, stdout, stderr) => {
+          if (error) {
+            resolve(undefined);
+            return;
+          }
+          const version = parseVersion(`${stdout}\n${stderr}`);
+          resolve(version ? { path: executable, version } : undefined);
+        },
+      );
+    } catch {
+      resolve(undefined);
+    }
+  });
 }
+
+const defaultProbe = createPythonProbe((executable, args, options, callback) =>
+  execFile(executable, args, options, callback));
 
 async function tryDetect(probe: PythonProbe, executable: string): Promise<{ path: string; version: string } | undefined> {
   try {
