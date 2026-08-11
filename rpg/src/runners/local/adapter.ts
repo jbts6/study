@@ -12,8 +12,14 @@ export interface PythonRunnerAdapterDependencies {
   readonly clearTimeoutFn?: TimerClearer;
 }
 
+interface ChannelLease {
+  readonly channel: LocalRunnerChannel;
+  readonly generation: number;
+}
+
 interface ActiveRun {
   readonly request: RunRequest;
+  readonly lease: ChannelLease;
   readonly resolve: (result: RunResult) => void;
   readonly hardTimer: TimerHandle;
   graceTimer?: TimerHandle;
@@ -49,6 +55,7 @@ export class PythonRunnerAdapter {
   private active: ActiveRun | undefined;
   private disposed = false;
   private disposePromise: Promise<void> | undefined;
+  private pendingRestart: Promise<void> | undefined;
   private readonly listeners = new Set<(state: RunnerState) => void>();
 
   constructor(deps: PythonRunnerAdapterDependencies) {
@@ -71,13 +78,16 @@ export class PythonRunnerAdapter {
     for (const listener of this.listeners) listener(state);
   }
 
-  private ensureChannel(): LocalRunnerChannel {
-    if (this.channel) return this.channel;
+  private ensureChannel(): ChannelLease {
+    if (this.channel) {
+      return { channel: this.channel, generation: this.channel.generation };
+    }
     const ch = this.createChannelFn();
-    ch.onMessage = (result) => this.handleMessage(result);
-    ch.onExit = (code, signal) => this.handleExit(code, signal);
+    const lease: ChannelLease = { channel: ch, generation: ch.generation };
+    ch.onMessage = (result) => this.handleMessage(lease, result);
+    ch.onExit = (code, signal) => this.handleExit(lease, code, signal);
     this.channel = ch;
-    return ch;
+    return lease;
   }
 
   private clearActiveTimers(active: ActiveRun): void {
@@ -85,19 +95,21 @@ export class PythonRunnerAdapter {
     if (active.graceTimer) this.clearTimeoutFn(active.graceTimer);
   }
 
-  private handleMessage(result: RunResult): void {
+  private handleMessage(lease: ChannelLease, result: RunResult): void {
     const active = this.active;
-    if (!active) return;
+    if (!active || active.lease !== lease) return;
+    if (result.runId !== active.request.runId || result.attemptId !== active.request.attemptId) return;
     this.clearActiveTimers(active);
     this.active = undefined;
     if (this._state !== "restarting") this.setState("ready");
     active.resolve(result);
   }
 
-  private handleExit(code: number | null, signal: NodeJS.Signals | null): void {
+  private handleExit(lease: ChannelLease, code: number | null, signal: NodeJS.Signals | null): void {
+    if (this.channel !== lease.channel) return;
     this.channel = undefined;
     const active = this.active;
-    if (active) {
+    if (active && active.lease === lease) {
       this.clearActiveTimers(active);
       this.active = undefined;
       active.resolve(
@@ -120,15 +132,26 @@ export class PythonRunnerAdapter {
     if (this.active) {
       return Promise.resolve(localResult(validated, "invalid_request", "RUN_IN_PROGRESS", "已有运行请求正在执行。"));
     }
-    const channel = this.ensureChannel();
-    return this.executeRun(channel, validated);
+    return this.executeRun(validated);
   }
 
-  private async executeRun(channel: LocalRunnerChannel, validated: RunRequest): Promise<RunResult> {
+  private async executeRun(validated: RunRequest): Promise<RunResult> {
+    if (this.pendingRestart) {
+      const pending = this.pendingRestart;
+      this.pendingRestart = undefined;
+      await pending;
+    }
+    if (this.disposed) {
+      return localResult(validated, "runner_error", "RUNNER_DISPOSED", "运行器已释放。");
+    }
+    if (this.active) {
+      return localResult(validated, "invalid_request", "RUN_IN_PROGRESS", "已有运行请求正在执行。");
+    }
+    const lease = this.ensureChannel();
     try {
-      await channel.waitReady();
+      await lease.channel.waitReady();
     } catch {
-      await this.dropChannel(channel);
+      await this.dropLease(lease);
       return localResult(validated, "runner_error", "RUNNER_START_FAILED", "Python 子进程启动失败。");
     }
     if (this.disposed) {
@@ -139,11 +162,11 @@ export class PythonRunnerAdapter {
     }
     return new Promise<RunResult>((resolve) => {
       const hardTimer = this.setTimeoutFn(() => this.handleHardTimeout(), validated.limits.timeoutMs);
-      this.active = { request: validated, resolve, hardTimer };
+      this.active = { request: validated, lease, resolve, hardTimer };
       this.setState("running");
-      channel.send(validated).catch(() => {
+      lease.channel.send(validated).catch(() => {
         const active = this.active;
-        if (!active || active.request !== validated) return;
+        if (!active || active.lease !== lease) return;
         this.clearActiveTimers(active);
         this.active = undefined;
         if (this._state !== "restarting") this.setState("ready");
@@ -152,10 +175,10 @@ export class PythonRunnerAdapter {
     });
   }
 
-  private async dropChannel(channel: LocalRunnerChannel): Promise<void> {
-    if (this.channel === channel) this.channel = undefined;
+  private async dropLease(lease: ChannelLease): Promise<void> {
+    if (this.channel === lease.channel) this.channel = undefined;
     try {
-      await channel.kill();
+      await lease.channel.kill();
     } catch {
       /* ignore cleanup errors */
     }
@@ -167,9 +190,9 @@ export class PythonRunnerAdapter {
     this.clearActiveTimers(active);
     this.active = undefined;
     this.setState("restarting");
-    const channel = this.channel;
+    const lease = active.lease;
     this.channel = undefined;
-    void channel?.kill();
+    this.pendingRestart = lease.channel.kill().catch(() => { /* ignore */ });
     active.resolve(
       localResult(active.request, "timeout", "RUNNER_TIMEOUT", "Python 运行超时，子进程已终止并重建。"),
     );
@@ -179,20 +202,19 @@ export class PythonRunnerAdapter {
     const active = this.active;
     if (!active || active.request.runId !== runId) return Promise.resolve();
     this.setState("interrupting");
-    this.channel?.interrupt();
+    active.lease.channel.interrupt();
     const graceTimer = this.setTimeoutFn(() => {
       const stillActive = this.active;
-      if (stillActive && stillActive.request.runId === runId) {
-        this.clearActiveTimers(stillActive);
-        this.active = undefined;
-        this.setState("restarting");
-        const channel = this.channel;
-        this.channel = undefined;
-        void channel?.kill();
-        stillActive.resolve(
-          localResult(stillActive.request, "timeout", "RUNNER_INTERRUPT_TIMEOUT", "中断等待超时，子进程已终止并重建。"),
-        );
-      }
+      if (!stillActive || stillActive.request.runId !== runId) return;
+      this.clearActiveTimers(stillActive);
+      this.active = undefined;
+      this.setState("restarting");
+      const lease = stillActive.lease;
+      this.channel = undefined;
+      this.pendingRestart = lease.channel.kill().catch(() => { /* ignore */ });
+      stillActive.resolve(
+        localResult(stillActive.request, "timeout", "RUNNER_INTERRUPT_TIMEOUT", "中断等待超时，子进程已终止并重建。"),
+      );
     }, active.request.limits.interruptGraceMs);
     this.active = { ...active, graceTimer };
     return Promise.resolve();
