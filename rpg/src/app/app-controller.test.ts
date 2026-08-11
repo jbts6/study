@@ -8,6 +8,7 @@ import { createPythonMarsh01 } from "../game/content/python-marsh-01";
 class FakeRunner implements RunnerClient {
   readonly state: RunnerDisplayState = "ready";
   connectCount = 0;
+  lastRequest?: RunRequest;
   private readonly listeners = new Set<(state: RunnerDisplayState) => void>();
 
   constructor(private readonly result: RunResult) {}
@@ -16,7 +17,8 @@ class FakeRunner implements RunnerClient {
     this.connectCount += 1;
   }
 
-  async run(_request: RunRequest): Promise<RunResult> {
+  async run(request: RunRequest): Promise<RunResult> {
+    this.lastRequest = request;
     return this.result;
   }
 
@@ -109,6 +111,7 @@ describe("AppController", () => {
     expect(snapshot.battleState.turnOrder[snapshot.battleState.turnIndex]).toBe("scout");
     expect(saves.saved?.battleState.revision).toBe(2);
     expect(snapshot.feedback.kind).toBe("success");
+    expect(runner.lastRequest?.limits.maxValueDepth).toBe(4);
   });
 
   it("keeps battle and save unchanged when Python fails", async () => {

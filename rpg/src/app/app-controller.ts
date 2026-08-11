@@ -14,7 +14,7 @@ const RUN_LIMITS = {
   maxSourceBytes: 65_536,
   maxOutputBytes: 16_384,
   maxTraceEvents: 1_000,
-  maxValueDepth: 3,
+  maxValueDepth: 4,
 } as const;
 
 const RUNNER_UNAVAILABLE_MESSAGE = "本地 Python Runner 不可用。启动 Runner 后刷新页面。";
