@@ -749,9 +749,11 @@ const RUN_LIMITS = {
   maxSourceBytes: 65_536,
   maxOutputBytes: 16_384,
   maxTraceEvents: 1_000,
-  maxValueDepth: 3,
+  maxValueDepth: 4,
 } as const;
 ```
+
+`TurnCommand` may contain `movePath: [{ x, y }]`; its scalar coordinates require depth `4` under the existing Runner serializer. Keep the lower `3` value in the Task 2 wait-only client test, but use `4` for playable AppController requests.
 
 Build each request as:
 
