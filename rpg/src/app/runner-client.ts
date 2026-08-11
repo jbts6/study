@@ -16,9 +16,8 @@ type ActiveRun = Readonly<{
   reject: (error: Error) => void;
 }>;
 
-type ActiveOutcome = Readonly<{ result: RunResult } | { error: Error }>;
-
 const UNAVAILABLE_MESSAGE = "本地 Python Runner 不可用。启动 Runner 后刷新页面。";
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 function displayState(state: RunnerState): RunnerDisplayState {
   if (state === "ready") return "ready";
@@ -33,8 +32,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toError(value: unknown, fallback = UNAVAILABLE_MESSAGE): Error {
   if (value instanceof Error) return value;
-  if (isRecord(value) && typeof value.message === "string") return new Error(value.message);
-  return new Error(fallback);
+  return isRecord(value) && typeof value.message === "string" ? new Error(value.message) : new Error(fallback);
+}
+
+function parseLoopbackWebSocketUrl(value: string): URL {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.replace(/^\[|\]$/g, "");
+    if (url.protocol === "ws:" && LOOPBACK_HOSTS.has(hostname)) return url;
+  } catch {
+  }
+  throw new Error("本地 Python Runner 连接地址必须是 loopback ws:// URL。");
 }
 
 export class WebSocketRunnerClient implements RunnerClient {
@@ -59,19 +67,17 @@ export class WebSocketRunnerClient implements RunnerClient {
     this.connectPromise = new Promise<void>((resolve, reject) => {
       let socket: WebSocket;
       let settled = false;
-      const settleResolve = (): void => {
+      const settle = (callback: () => void): void => {
         if (settled) return;
         settled = true;
-        resolve();
+        callback();
       };
-      const settleReject = (error: Error): void => {
-        if (settled) return;
-        settled = true;
-        reject(error);
-      };
+      const settleResolve = (): void => settle(resolve);
+      const settleReject = (error: Error): void => settle(() => reject(error));
 
       try {
-        socket = new WebSocket(this.url);
+        const url = parseLoopbackWebSocketUrl(this.url);
+        socket = new WebSocket(url.href);
       } catch (error) {
         const connectionError = toError(error);
         this.setState("unavailable");
@@ -85,23 +91,19 @@ export class WebSocketRunnerClient implements RunnerClient {
           socket.send(JSON.stringify({ type: "subscribe_state" }));
           settleResolve();
         } catch (error) {
-          const connectionError = toError(error);
-          this.finishActive({ error: new Error(UNAVAILABLE_MESSAGE) });
-          this.setState("unavailable");
-          settleReject(connectionError);
+          this.failUnavailable();
+          settleReject(toError(error));
         }
       };
       socket.onmessage = (event: MessageEvent): void => {
         this.handleMessage(event.data);
       };
-      socket.onerror = (): void => {
+      const failConnection = (): void => {
         this.failUnavailable();
         settleReject(new Error(UNAVAILABLE_MESSAGE));
       };
-      socket.onclose = (): void => {
-        this.failUnavailable();
-        settleReject(new Error(UNAVAILABLE_MESSAGE));
-      };
+      socket.onerror = failConnection;
+      socket.onclose = failConnection;
     });
 
     return this.connectPromise;
@@ -121,7 +123,7 @@ export class WebSocketRunnerClient implements RunnerClient {
       try {
         socket.send(JSON.stringify({ type: "run", request }));
       } catch (error) {
-        this.finishActive({ error: toError(error) });
+        this.finishActive(toError(error));
       }
     });
   }
@@ -134,14 +136,12 @@ export class WebSocketRunnerClient implements RunnerClient {
 
   onStateChange(listener: (state: RunnerDisplayState) => void): () => void {
     this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
+    return () => this.listeners.delete(listener);
   }
 
   close(): void {
     const socket = this.socket;
-    this.finishActive({ error: new Error(UNAVAILABLE_MESSAGE) });
+    this.finishActive(new Error(UNAVAILABLE_MESSAGE));
     this.setState("unavailable");
     if (socket && socket.readyState !== WebSocket.CLOSED) socket.close();
   }
@@ -163,19 +163,19 @@ export class WebSocketRunnerClient implements RunnerClient {
     }
     if (message.type === "run_result" && isRecord(message.result)) {
       const result = message.result as unknown as RunResult;
-      if (this.active?.runId === result.runId) this.finishActive({ result });
+      if (this.active?.runId === result.runId) this.finishActive(result);
       return;
     }
     if (message.type === "protocol_error") {
       const text = typeof message.error === "string"
         ? message.error
         : typeof message.message === "string" ? message.message : "Runner protocol error";
-      this.finishActive({ error: new Error(text) });
+      this.finishActive(new Error(text));
     }
   }
 
   private failUnavailable(): void {
-    this.finishActive({ error: new Error(UNAVAILABLE_MESSAGE) });
+    this.finishActive(new Error(UNAVAILABLE_MESSAGE));
     this.setState("unavailable");
   }
 
@@ -185,14 +185,11 @@ export class WebSocketRunnerClient implements RunnerClient {
     for (const listener of this.listeners) listener(state);
   }
 
-  private finishActive(outcome: ActiveOutcome): void {
+  private finishActive(outcome: RunResult | Error): void {
     const active = this.active;
     if (!active) return;
     this.active = undefined;
-    if ("result" in outcome) {
-      active.resolve(outcome.result);
-    } else {
-      active.reject(outcome.error);
-    }
+    if (outcome instanceof Error) active.reject(outcome);
+    else active.resolve(outcome);
   }
 }
