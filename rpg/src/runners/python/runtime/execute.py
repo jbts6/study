@@ -79,6 +79,13 @@ def _evict_allowed_modules(allowed_modules: set[str]) -> None:
             del sys.modules[name]
 
 
+def _reject_preloaded_module_collisions(player_module_roots: set[str]) -> None:
+    preloaded_roots = {name.split(".", 1)[0] for name in sys.modules}
+    collisions = player_module_roots & preloaded_roots
+    if collisions:
+        raise RuntimeError("MODULE_NOT_ALLOWED:" + sorted(collisions)[0])
+
+
 class RestrictedPlayerLoader(importlib.abc.MetaPathFinder, importlib.abc.Loader):
     def __init__(self, root: Path, guarded):
         self.root, self.guarded = root, guarded
@@ -318,6 +325,7 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
         player_module_roots, player_file_names = _write_player_files(root, files)
         allowed = _validated_allowed_modules(request)
         _evict_allowed_modules(allowed)
+        _reject_preloaded_module_collisions(player_module_roots)
         guarded = guarded_import(allowed, player_module_roots)
         loader = RestrictedPlayerLoader(root, guarded)
         sys.path.insert(0, str(root))

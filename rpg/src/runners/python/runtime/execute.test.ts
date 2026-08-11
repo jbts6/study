@@ -200,6 +200,25 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     expect(result.diagnostics[0].code).toBe("MODULE_NOT_ALLOWED");
   });
 
+  it("blocks preloaded module access through a colliding player filename", async () => {
+    const result = await withPythonBridge(async (bridge) =>
+      sendAndWait(
+        bridge,
+        baseRequest({
+          runId: "exec-preloaded-collision",
+          files: {
+            "main.py":
+              "def choose_turn(world):\n    import importlib\n    imported = importlib.import_module('socket')\n    return {'module': imported.__name__}\n",
+            "importlib.py": "",
+          },
+          entrypoint: { file: "main.py", callable: "choose_turn" },
+        }),
+      ),
+    );
+    expect(result.executionStatus).toBe("runtime_error");
+    expect(result.diagnostics[0].code).toBe("MODULE_NOT_ALLOWED");
+  });
+
   it("applies SAFE_BUILTINS to entry and player modules", async () => {
     const entry = await withPythonBridge(async (bridge) =>
       sendAndWait(
