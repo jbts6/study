@@ -8,7 +8,6 @@ import sys
 import tempfile
 import time
 import types
-import uuid
 from pathlib import Path
 import importlib.abc
 import importlib.util
@@ -71,13 +70,6 @@ def _validated_allowed_modules(request: dict[str, object]) -> set[str]:
     if unsupported:
         raise RuntimeError("MODULE_NOT_ALLOWED:" + sorted(unsupported)[0])
     return requested
-
-
-def _evict_allowed_modules(allowed_modules: set[str]) -> None:
-    for name in tuple(sys.modules):
-        root = name.split(".", 1)[0]
-        if root in allowed_modules:
-            del sys.modules[name]
 
 
 def _reject_preloaded_module_collisions(player_module_roots: set[str]) -> None:
@@ -221,16 +213,6 @@ def exception_result(request: dict[str, object], error: BaseException, started: 
     )
 
 
-def _restore_modules(snapshot, original=None):
-    target = original if original is not None else sys.modules
-    if sys.modules is not target:
-        sys.modules = target
-    for name in tuple(target):
-        if name not in snapshot:
-            del target[name]
-    target.update(snapshot)
-
-
 def _safe_relative_path(root: Path, filename: str) -> Path:
     if not isinstance(filename, str) or not filename or "\\" in filename:
         raise RuntimeError("INVALID_PLAYER_FILE")
@@ -327,16 +309,10 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
     attempt_id = str(request["attemptId"])
     safe_run = "".join(char if char.isalnum() else "-" for char in run_id)[-48:]
     safe_attempt = "".join(char if char.isalnum() else "-" for char in attempt_id)[-48:]
-    root = Path(tempfile.mkdtemp(prefix=f"python-run-{safe_run}-{safe_attempt}-{uuid.uuid4().hex}-"))
+    root = Path(tempfile.mkdtemp(prefix=f"python-run-{safe_run}-{safe_attempt}-"))
     previous_cwd = os.getcwd()
-    previous_path_object = sys.path
-    previous_path = list(previous_path_object)
     previous_stdout = sys.stdout
     previous_stderr = sys.stderr
-    previous_meta_path_object = sys.meta_path
-    previous_meta_path = list(previous_meta_path_object)
-    previous_modules = dict(sys.modules)
-    previous_modules_object = sys.modules
     previous_trace = sys.gettrace()
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -346,7 +322,6 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
         player_module_roots, player_file_names = _write_player_files(root, files)
         allowed = _validated_allowed_modules(request)
         _reject_preloaded_module_collisions(player_module_roots)
-        _evict_allowed_modules(allowed)
         guarded = guarded_import(allowed, player_module_roots)
         loader = RestrictedPlayerLoader(root, guarded)
         sys.path.insert(0, str(root))
@@ -371,13 +346,6 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
         sys.settrace(previous_trace)
         sys.stdout = previous_stdout
         sys.stderr = previous_stderr
-        if sys.path is not previous_path_object:
-            sys.path = previous_path_object
-        previous_path_object[:] = previous_path
-        if sys.meta_path is not previous_meta_path_object:
-            sys.meta_path = previous_meta_path_object
-        previous_meta_path_object[:] = previous_meta_path
-        _restore_modules(previous_modules, previous_modules_object)
         os.chdir(previous_cwd)
         if root.exists():
             shutil.rmtree(root)
@@ -385,10 +353,6 @@ def execute_isolated_request(request: dict[str, object], started: float) -> dict
 
 def execute_request(request: dict[str, object]) -> dict[str, object]:
     started = time.perf_counter()
-    previous_trace = sys.gettrace()
-    previous_cwd = os.getcwd()
-    modules_before = dict(sys.modules)
-    modules_before_object = sys.modules
     try:
         return execute_isolated_request(request, started)
     except KeyboardInterrupt:
@@ -406,7 +370,3 @@ def execute_request(request: dict[str, object]) -> dict[str, object]:
         return exception_result(request, error, started)
     except BaseException as error:
         return exception_result(request, error, started)
-    finally:
-        sys.settrace(previous_trace)
-        os.chdir(previous_cwd)
-        _restore_modules(modules_before, modules_before_object)

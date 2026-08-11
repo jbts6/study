@@ -1,13 +1,13 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { PythonRunnerAdapter } from "./adapter.ts";
-import { PythonBridge } from "./python-bridge.ts";
+import { PythonRunProcess } from "./python-process.ts";
 import { detectPython } from "./python-detector.ts";
 import type { RunRequest } from "../protocol/types.ts";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-const daemonScript = path.join(moduleDir, "../python/runtime/daemon.py");
+const runOnceScript = path.join(moduleDir, "../python/runtime/run_once.py");
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const CLOSE_GRACE_MS = 500;
 
@@ -103,7 +103,11 @@ export function startRunnerServerWithDetection(
         return;
       }
       const adapter = new PythonRunnerAdapter({
-        createChannel: () => new PythonBridge({ pythonPath: detection.path, daemonScript }),
+        startProcess: (request) => new PythonRunProcess({
+          pythonPath: detection.path,
+          script: runOnceScript,
+          request,
+        }),
       });
       adapters.set(ws, adapter);
 

@@ -1,11 +1,11 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PythonBridge } from "./python-bridge";
+import { PythonRunProcess } from "./python-process";
 import { detectPython } from "./python-detector";
 import type { RunRequest, RunResult } from "../protocol/types";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-export const daemonScript = path.join(moduleDir, "../python/runtime/daemon.py");
+export const runOnceScript = path.join(moduleDir, "../python/runtime/run_once.py");
 
 export type DetectedPython = { path: string; version: string };
 
@@ -22,37 +22,30 @@ export async function loadPythonDetection(): Promise<DetectedPython | null> {
   return detection.ok ? { path: detection.path, version: detection.version } : null;
 }
 
-export function sendAndWait(
-  bridge: PythonBridge,
+export async function runPythonRequest(
   request: RunRequest,
   timeoutMs = 5_000,
 ): Promise<RunResult> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`timeout waiting for ${request.runId}`)),
-      timeoutMs,
-    );
-    bridge.onMessage = (result) => {
-      if (result.runId !== request.runId || result.attemptId !== request.attemptId) return;
-      clearTimeout(timer);
-      resolve(result);
-    };
-    bridge.send(request).catch((err: unknown) => {
-      clearTimeout(timer);
-      reject(err instanceof Error ? err : new Error(String(err)));
-    });
-  });
+  const python = await requireDetectedPython();
+  const process = new PythonRunProcess({ pythonPath: python.path, script: runOnceScript, request });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      process.result,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`timeout waiting for ${request.runId}`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    await process.kill();
+  }
 }
 
-export async function withPythonBridge<T>(
-  callback: (bridge: PythonBridge) => Promise<T>,
-): Promise<T> {
-  const detection = await requireDetectedPython();
-  const bridge = new PythonBridge({ pythonPath: detection.path, daemonScript });
-  try {
-    await bridge.waitReady();
-    return await callback(bridge);
-  } finally {
-    await bridge.kill();
-  }
+export async function withDetectedPython<T>(callback: () => Promise<T>): Promise<T> {
+  await requireDetectedPython();
+  return callback();
 }

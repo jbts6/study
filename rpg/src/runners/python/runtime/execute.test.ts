@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   loadPythonDetection,
-  sendAndWait,
-  withPythonBridge,
+  runPythonRequest,
+  withDetectedPython,
 } from "../../local/test-support";
 import type { RunRequest } from "../../protocol/types";
 import { worldViewFixture } from "../../../game/testing/fixture";
@@ -45,9 +45,8 @@ function baseRequest(overrides: {
 
 describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   it("executes multiple files and captures stdout", async () => {
-    const result = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const result = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-multi",
           files: {
@@ -65,9 +64,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("does not retain entry or player modules across requests", async () => {
-    await withPythonBridge(async (bridge) => {
-      const first = await sendAndWait(
-        bridge,
+    await withDetectedPython(async () => {
+      const first = await runPythonRequest(
         baseRequest({
           runId: "exec-retain-1",
           files: {
@@ -80,8 +78,7 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
       );
       expect((first.returnValue as Record<string, unknown>)?.value).toBe("first");
 
-      const second = await sendAndWait(
-        bridge,
+      const second = await runPythonRequest(
         baseRequest({
           runId: "exec-retain-2",
           files: {
@@ -97,14 +94,13 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("restores daemon sys.modules, sys.path, sys.meta_path and cwd after each request", async () => {
-    await withPythonBridge(async (bridge) => {
+    await withDetectedPython(async () => {
       // Player code cannot reach sys/os: they are outside the allowed set and
       // not in SAFE_BUILTINS, so the guarded import rejects them. This keeps
       // daemon-owned state (cwd, sys.path, sys.meta_path, sys.modules) out of
       // player reach; combined with per-request module restoration (proven by
       // the retain test above) the daemon baseline stays intact across runs.
-      const sysDenied = await sendAndWait(
-        bridge,
+      const sysDenied = await runPythonRequest(
         baseRequest({
           runId: "exec-restore-sys",
           files: {
@@ -117,8 +113,7 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
       expect(sysDenied.executionStatus).toBe("runtime_error");
       expect(sysDenied.diagnostics[0].code).toBe("MODULE_NOT_ALLOWED");
 
-      const osDenied = await sendAndWait(
-        bridge,
+      const osDenied = await runPythonRequest(
         baseRequest({
           runId: "exec-restore-os",
           files: {
@@ -131,8 +126,7 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
       expect(osDenied.diagnostics[0].code).toBe("MODULE_NOT_ALLOWED");
 
       // Daemon is still usable after the rejected attempts.
-      const ok = await sendAndWait(
-        bridge,
+      const ok = await runPythonRequest(
         baseRequest({
           runId: "exec-restore-ok",
           files: {
@@ -146,9 +140,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("rejects imports by default and allows explicitly permitted math", async () => {
-    const denied = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const denied = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-deny-math",
           allowedModules: [],
@@ -163,9 +156,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     expect(denied.executionStatus).toBe("runtime_error");
     expect(denied.diagnostics[0].code).toBe("MODULE_NOT_ALLOWED");
 
-    const allowed = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const allowed = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-allow-math",
           allowedModules: ["math"],
@@ -182,9 +174,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("blocks dynamic loading of a prohibited root", async () => {
-    const result = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const result = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-dynamic-block",
           allowedModules: ["math"],
@@ -203,9 +194,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   it.each(["importlib.py", "ImportLib.py"])(
     "blocks preloaded module access through colliding player filename %s",
     async (collidingFilename) => {
-    const result = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const result = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: `exec-preloaded-collision-${collidingFilename}`,
           files: {
@@ -225,9 +215,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   it.each(["math.py", "Math.py"])(
     "does not let player file %s replace an allowed standard-library module",
     async (collidingFilename) => {
-    const result = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const result = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: `exec-allowed-module-collision-${collidingFilename}`,
           allowedModules: ["math"],
@@ -246,9 +235,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   );
 
   it("provides standard Python builtins to player code", async () => {
-    const result = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const result = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-standard-builtins",
           files: {
@@ -264,9 +252,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("reports useful syntax and runtime error details", async () => {
-    const syntax = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const syntax = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-syntax",
           files: {
@@ -281,9 +268,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     expect(syntax.diagnostics[0].message).toContain("expected ':'");
     expect(syntax.diagnostics[0].location).toMatchObject({ file: "main.py", line: 1 });
 
-    const runtime = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const runtime = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-runtime",
           files: {
@@ -301,9 +287,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("truncates stdout by utf-8 bytes without splitting multibyte sequences", async () => {
-    const result = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const result = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-trunc-utf8",
           limits: { maxOutputBytes: 25 },
@@ -323,9 +308,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("rejects non-json return values and nested depth over the limit", async () => {
-    const setReturn = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const setReturn = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-set-return",
           files: {
@@ -339,9 +323,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
     expect(setReturn.executionStatus).toBe("runtime_error");
     expect(setReturn.diagnostics[0].code).toBe("RETURN_NOT_SERIALIZABLE");
 
-    const deep = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const deep = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-deep",
           limits: { maxValueDepth: 2 },
@@ -358,9 +341,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("enforces trace event limit with seq, type and file filter", async () => {
-    const result = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const result = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-trace-limit",
           limits: { maxTraceEvents: 5 },
@@ -390,9 +372,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("records returnValueTraceSeq pointing at the entry return event", async () => {
-    const result = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const result = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-trace-retseq",
           files: {
@@ -416,9 +397,8 @@ describe.skipIf(!python)("execute contract (CPython 3.12+)", () => {
   });
 
   it("does not invoke player repr, descriptors or container subclass protocols during trace", async () => {
-    const result = await withPythonBridge(async (bridge) =>
-      sendAndWait(
-        bridge,
+    const result = await withDetectedPython(async () =>
+      runPythonRequest(
         baseRequest({
           runId: "exec-trace-safe",
           files: {
