@@ -151,4 +151,15 @@ describe("enemyCommand", () => {
       action: { type: "guard" },
     });
   });
+
+  it("rejects corrupt behavior when the level has multiple key objectives", () => {
+    const state = activeEnemy({
+      objectives: [
+        { id: "relay-a", cell: { x: 1, y: 1 }, durability: 2, completed: false, key: true },
+        { id: "relay-b", cell: { x: 2, y: 1 }, durability: 2, completed: false, key: true },
+      ],
+    });
+
+    expect(() => enemyCommand(fixtureLevel(), state)).toThrow("腐化职责要求关卡恰好包含一个关键目标");
+  });
 });
