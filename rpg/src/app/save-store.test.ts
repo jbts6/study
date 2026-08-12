@@ -52,4 +52,44 @@ describe("LocalSaveStore", () => {
 
     expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
   });
+
+  it("rejects a battle whose active turn points to a disabled enemy", () => {
+    const battleState = createPythonMarsh01();
+    localStorage.setItem("python-rpg.save", JSON.stringify({
+      version: 1,
+      currentLevelId: CURRENT_LEVEL_ID,
+      battleState: {
+        ...battleState,
+        turnIndex: 1,
+        units: battleState.units.map((unit) => unit.id === "golem" ? { ...unit, disabled: true } : unit),
+      },
+      codeDraft: STARTER_CODE,
+    }));
+
+    expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
+  });
+
+  it("rejects a battle whose turn order references an unknown unit", () => {
+    const battleState = createPythonMarsh01();
+    localStorage.setItem("python-rpg.save", JSON.stringify({
+      version: 1,
+      currentLevelId: CURRENT_LEVEL_ID,
+      battleState: { ...battleState, turnOrder: ["scout", "missing-unit"] },
+      codeDraft: STARTER_CODE,
+    }));
+
+    expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
+  });
+
+  it("rejects non-integer battle counters", () => {
+    const battleState = createPythonMarsh01();
+    localStorage.setItem("python-rpg.save", JSON.stringify({
+      version: 1,
+      currentLevelId: CURRENT_LEVEL_ID,
+      battleState: { ...battleState, revision: 0.5 },
+      codeDraft: STARTER_CODE,
+    }));
+
+    expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
+  });
 });

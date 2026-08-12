@@ -54,6 +54,14 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return isFiniteNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return isNonNegativeInteger(value) && value >= 1;
+}
+
 function isCell(value: unknown): value is Cell {
   return isRecord(value) && Number.isInteger(value.x) && Number.isInteger(value.y);
 }
@@ -120,36 +128,45 @@ function isObjective(value: unknown): value is Objective {
 }
 
 function isBattleState(value: unknown): value is BattleState {
-  return isRecord(value)
-    && typeof value.battleId === "string"
-    && typeof value.contentVersion === "string"
-    && isFiniteNumber(value.revision)
-    && isFiniteNumber(value.round)
-    && isFiniteNumber(value.turnIndex)
-    && Array.isArray(value.turnOrder)
-    && value.turnOrder.every((unitId) => typeof unitId === "string")
-    && (value.phase === "in_progress" || value.phase === "won" || value.phase === "lost")
-    && Array.isArray(value.units)
-    && value.units.every(isUnit)
-    && isBoard(value.board)
-    && Array.isArray(value.objectives)
-    && value.objectives.every(isObjective)
-    && isFiniteNumber(value.rngState)
-    && isFiniteNumber(value.maxRounds)
-    && isFailureConditions(value.failureConditions);
+  if (!isRecord(value)
+    || typeof value.battleId !== "string"
+    || typeof value.contentVersion !== "string"
+    || !isNonNegativeInteger(value.revision)
+    || !isPositiveInteger(value.round)
+    || !isNonNegativeInteger(value.turnIndex)
+    || !Array.isArray(value.turnOrder)
+    || value.turnOrder.length === 0
+    || !value.turnOrder.every((unitId) => typeof unitId === "string")
+    || (value.phase !== "in_progress" && value.phase !== "won" && value.phase !== "lost")
+    || !Array.isArray(value.units)
+    || !value.units.every(isUnit)
+    || !isBoard(value.board)
+    || !Array.isArray(value.objectives)
+    || !value.objectives.every(isObjective)
+    || !isNonNegativeInteger(value.rngState)
+    || !isPositiveInteger(value.maxRounds)
+    || !isFailureConditions(value.failureConditions)) return false;
+
+  const unitIds = value.units.map((unit) => unit.id);
+  const uniqueUnitIds = new Set(unitIds);
+  if (uniqueUnitIds.size !== unitIds.length || value.turnIndex >= value.turnOrder.length) return false;
+  if (!value.turnOrder.every((unitId) => uniqueUnitIds.has(unitId))) return false;
+  const activeId = value.turnOrder[value.turnIndex];
+  const activeUnit = value.units.find((unit) => unit.id === activeId);
+  return value.phase !== "in_progress" || (activeUnit !== undefined && !activeUnit.disabled);
 }
 
 function isBoard(value: unknown): boolean {
   return isRecord(value)
-    && isFiniteNumber(value.width)
-    && isFiniteNumber(value.height)
+    && isPositiveInteger(value.width)
+    && isPositiveInteger(value.height)
     && Array.isArray(value.blockedCells)
     && value.blockedCells.every(isCell)
     && Array.isArray(value.hazardCells)
     && value.hazardCells.every(isCell)
     && Array.isArray(value.coverCells)
     && value.coverCells.every(isCell)
-    && isFiniteNumber(value.hazardDamage);
+    && isNonNegativeInteger(value.hazardDamage);
 }
 
 function isFailureConditions(value: unknown): boolean {

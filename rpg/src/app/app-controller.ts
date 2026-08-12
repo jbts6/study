@@ -177,7 +177,9 @@ export class AppController {
   private advanceEnemyTurns(initialState: BattleState): Readonly<{ state: BattleState; events: readonly BattleEvent[] }> {
     let state = initialState;
     const events: BattleEvent[] = [];
-    while (state.phase === "in_progress" && activeUnit(state)?.team === "enemies") {
+    while (state.phase === "in_progress") {
+      const enemy = activeUnit(state);
+      if (enemy?.team !== "enemies" || enemy.disabled) break;
       const resolution = resolveTurn(state, this.dependencies.enemyCommand(state));
       if (!resolution.accepted) throw new Error("应用预设的敌方指令被战斗内核拒绝。");
       state = resolution.state;
