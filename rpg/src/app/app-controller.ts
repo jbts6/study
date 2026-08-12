@@ -8,6 +8,7 @@ import type { LevelDefinition, LevelId } from "../game/content/types";
 import { projectWorldView } from "../game/world/project-world-view";
 import type { RunRequest, RunResult, RunnerDiagnostic } from "../runners/protocol/types";
 import type { RunnerClient, RunnerDisplayState } from "./runner-client";
+import { formatBattleFeedback } from "./battle-feedback";
 import { RESET_CONFIRMATION } from "./save-store";
 import type { SaveDataV2, SaveStore } from "./save-store";
 const RUN_LIMITS = {
@@ -297,7 +298,7 @@ function successFeedback(state: BattleState, events: readonly BattleEvent[], res
   return {
     kind: "success",
     title: "回合已推进",
-    messages: formatBattleEvents(state, events),
+    messages: formatBattleFeedback(state, events),
     stdout: result.streams.stdout,
     stderr: result.streams.stderr,
   };
@@ -375,27 +376,6 @@ function formatDiagnostic(diagnostic: RunnerDiagnostic): string {
   return `${prefix} ${file}:${line}${column === undefined ? "" : `:${column}`} ${diagnostic.message}`;
 }
 
-function formatBattleEvents(state: BattleState, events: readonly BattleEvent[]): readonly string[] {
-  return events.flatMap((event) => {
-    if (event.type === "interacted") return [];
-    if (event.type === "objective_progressed") return formatObjectiveProgress(state, event);
-    return [formatBattleEvent(event)];
-  });
-}
-
-function formatObjectiveProgress(state: BattleState, event: BattleEvent): string {
-  const targetId = event.payload.targetId;
-  const target = typeof targetId === "string" ? state.objectives.find((objective) => objective.id === targetId) : undefined;
-  if (target === undefined) return formatBattleEvent(event);
-  const durability = event.payload.durabilityAfter;
-  const value = typeof durability === "number" ? durability : target.durability;
-  if (target.key) return `中继器受到腐化：${target.id} 耐久 ${value}${value === 0 ? "（已毁）" : ""}`;
-  return `封印激活进度：${target.id} 耐久 ${value}${target.completed ? "（已完成）" : ""}`;
-}
-
-function formatBattleEvent(event: BattleEvent): string {
-  return `[${event.type}] ${JSON.stringify(event.payload)}`;
-}
 function createId(): string {
   return globalThis.crypto.randomUUID();
 }
