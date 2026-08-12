@@ -39,12 +39,12 @@
 - 产出 `ABILITY_CATALOG` 与 `injectUnlockedAbilities(levelId, battleState): BattleState`。
 - `WorldUnit.skills` 增加 `remainingCooldown`，不暴露敌方技能或 `hazardDamage`。
 
-- [ ] 写失败测试：五项能力字段完全匹配规格；按关卡顺序只向 `scout` 注入此前奖励，且不重复注入。
-- [ ] 写失败测试：友方技能投影包含 `remainingCooldown`，敌方隐藏属性仍不公开。
-- [ ] 运行 `npm test -- src/game/content/ability-catalog.test.ts src/game/world/project-world-view.test.ts`，确认因契约/字段缺失而失败。
-- [ ] 最小实现类型、只读能力目录、能力注入与世界视图投影。
-- [ ] 重跑同一命令，确认通过；再运行 `npm exec tsc -- --noEmit`。
-- [ ] 提交：`feat: add campaign content contracts and abilities`。
+- [x] 写失败测试：五项能力字段完全匹配规格；按关卡顺序只向 `scout` 注入此前奖励，且不重复注入。
+- [x] 写失败测试：友方技能投影包含 `remainingCooldown`，敌方隐藏属性仍不公开。
+- [x] 运行 `npm test -- src/game/content/ability-catalog.test.ts src/game/world/project-world-view.test.ts`，确认因契约/字段缺失而失败。
+- [x] 最小实现类型、只读能力目录、能力注入与世界视图投影。
+- [x] 重跑同一命令，确认通过；再运行 `npm exec tsc -- --noEmit`。
+- [x] 提交：`feat: add campaign content contracts and abilities`。
 
 **完成标准：** 五项能力只有一个生产来源；进入任意关卡时 `scout.skills` 恰好包含基础技能与此前已获能力；世界视图只增加规定的冷却字段。
 
