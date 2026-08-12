@@ -1,23 +1,24 @@
 import type { BattleState, BattleUnit, Cell, Objective, Skill, SkillEffect, Status } from "../game/combat/types";
-import { CURRENT_LEVEL_ID } from "../game/content/python-marsh-01";
+import { getLevel } from "../game/content/levels";
+import type { LevelId } from "../game/content/types";
 
 export const SAVE_KEY = "python-rpg.save";
 export const RESET_CONFIRMATION = "重置存档";
 
-export type SaveDataV1 = Readonly<{
-  version: 1;
-  currentLevelId: typeof CURRENT_LEVEL_ID;
+export type SaveDataV2 = Readonly<{
+  version: 2;
+  currentLevelId: LevelId;
   battleState: BattleState;
   codeDraft: string;
 }>;
 
 export type SaveLoadResult =
-  | Readonly<{ ok: true; save: SaveDataV1 | null }>
+  | Readonly<{ ok: true; save: SaveDataV2 | null }>
   | Readonly<{ ok: false; message: string }>;
 
 export interface SaveStore {
   load(): SaveLoadResult;
-  save(value: SaveDataV1): void;
+  save(value: SaveDataV2): void;
   remove(): void;
 }
 
@@ -29,7 +30,7 @@ export class LocalSaveStore implements SaveStore {
     if (raw === null) return { ok: true, save: null };
     try {
       const value: unknown = JSON.parse(raw);
-      return isSaveDataV1(value)
+      return isSaveDataV2(value)
         ? { ok: true, save: value }
         : corrupted();
     } catch {
@@ -37,7 +38,7 @@ export class LocalSaveStore implements SaveStore {
     }
   }
 
-  save(value: SaveDataV1): void {
+  save(value: SaveDataV2): void {
     this.storage.setItem(SAVE_KEY, JSON.stringify(value));
   }
 
@@ -173,12 +174,18 @@ function isFailureConditions(value: unknown): boolean {
   return isRecord(value) && typeof value.keyObjectiveDestroyed === "boolean";
 }
 
-function isSaveDataV1(value: unknown): value is SaveDataV1 {
-  return isRecord(value)
-    && value.version === 1
-    && value.currentLevelId === CURRENT_LEVEL_ID
-    && typeof value.codeDraft === "string"
-    && isBattleState(value.battleState);
+function isSaveDataV2(value: unknown): value is SaveDataV2 {
+  if (!isRecord(value)
+    || value.version !== 2
+    || typeof value.currentLevelId !== "string"
+    || typeof value.codeDraft !== "string"
+    || !isBattleState(value.battleState)) return false;
+  try {
+    return getLevel(value.currentLevelId as LevelId).id === value.currentLevelId
+      && value.battleState.battleId === value.currentLevelId;
+  } catch {
+    return false;
+  }
 }
 
 function corrupted(): SaveLoadResult {

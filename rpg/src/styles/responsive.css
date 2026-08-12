@@ -1,0 +1,62 @@
+@media (max-width: 1180px) {
+  html,
+  body,
+  #app {
+    height: auto;
+    min-height: 100%;
+  }
+
+  body {
+    min-width: 0;
+    overflow: auto;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .status-rail {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .status-track {
+    width: 100%;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .status-track div {
+    padding: 7px 10px;
+    border-block-end: 1px solid var(--border);
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    overflow: visible;
+    padding: var(--space);
+  }
+
+  .battle-panel,
+  .editor-panel,
+  .feedback-panel {
+    min-height: 0;
+  }
+
+  .battlefield {
+    min-height: 380px;
+  }
+
+  .code-editor {
+    min-height: 300px;
+  }
+
+  .feedback-panel {
+    max-block-size: min(45dvh, 360px);
+  }
+}

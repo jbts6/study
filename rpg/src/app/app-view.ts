@@ -1,20 +1,25 @@
-import type { AppController, AppFeedback, GameSnapshot } from "./app-controller";
+import type { AppController, GameSnapshot } from "./app-controller";
 import { mountCodeEditor } from "./code-editor";
 import type { CodeEditorHandle } from "./code-editor";
 import type { BattleState, BattleUnit } from "../game/combat/types";
+import { getLevel } from "../game/content/levels";
+import type { LevelDefinition } from "../game/content/types";
 import { RESET_CONFIRMATION } from "./save-store";
 
 type GameShell = Readonly<{
   element: HTMLElement;
+  controller: AppController;
   level: HTMLSpanElement;
   runner: HTMLSpanElement;
   revision: HTMLSpanElement;
   phase: HTMLSpanElement;
   activeUnit: HTMLSpanElement;
   battlefield: HTMLElement;
+  briefing: HTMLElement;
   feedback: HTMLElement;
   run: HTMLButtonElement;
   interrupt: HTMLButtonElement;
+  reset: HTMLButtonElement;
   editor: CodeEditorHandle;
 }>;
 
@@ -50,6 +55,14 @@ const GAME_SHELL_MARKUP = `
     </section>
     <section class="editor-panel" aria-labelledby="editor-heading">
       <div class="panel-heading"><p>本地 Python</p><h2 id="editor-heading">回合程序</h2></div>
+      <section class="mission-briefing" aria-labelledby="mission-heading">
+        <div class="mission-heading"><p>任务简报</p><h2 id="mission-heading"></h2></div>
+        <ul data-testid="level-objectives" class="mission-objectives"></ul>
+        <p class="mission-constraint"></p>
+        <div class="skill-readout"><h3>Scout 能力</h3><ul data-testid="scout-skills"></ul></div>
+        <div class="api-hints"><h3>API 速查</h3><ul data-testid="api-hints"></ul></div>
+        <details class="concept-hint"><summary>概念提示</summary><p></p></details>
+      </section>
       <div data-testid="code-editor" class="code-editor"></div>
       <div class="action-row">
         <button data-testid="run-turn" class="run-turn" type="button">运行回合</button>
@@ -106,7 +119,8 @@ function createGameShell(controller: AppController, snapshot: GameSnapshot): Gam
   const resetInput = requiredElement<HTMLInputElement>(dialog, "input");
   const resetForm = requiredElement<HTMLFormElement>(dialog, "form");
   const resetButton = requiredElement<HTMLButtonElement>(dialog, "[data-reset-save]");
-  requiredElement<HTMLButtonElement>(element, ".reset-trigger").addEventListener("click", () => dialog.showModal());
+  const reset = requiredElement<HTMLButtonElement>(element, ".reset-trigger");
+  reset.addEventListener("click", () => dialog.showModal());
   requiredElement<HTMLButtonElement>(dialog, "[data-dialog-close]").addEventListener("click", () => dialog.close());
   wireResetConfirmation(resetForm, resetInput, resetButton, (confirmation) => {
     controller.resetSave(confirmation);
@@ -118,15 +132,18 @@ function createGameShell(controller: AppController, snapshot: GameSnapshot): Gam
   });
   const shell: GameShell = {
     element,
+    controller,
     level: requiredElement(element, "[data-testid='current-level-id']"),
     runner: requiredElement(element, "[data-testid='runner-status']"),
     revision: requiredElement(element, "[data-testid='battle-revision']"),
     phase: requiredElement(element, "[data-testid='battle-phase']"),
     activeUnit: requiredElement(element, ".active-unit"),
     battlefield: requiredElement(element, ".battlefield"),
+    briefing: requiredElement(element, ".mission-briefing"),
     feedback: requiredElement(element, "[data-testid='feedback']"),
     run: requiredElement(element, "[data-testid='run-turn']"),
     interrupt: requiredElement(element, "[data-testid='interrupt-run']"),
+    reset,
     editor,
   };
   shell.run.addEventListener("click", () => void controller.runTurn());
@@ -142,13 +159,16 @@ function updateGameShell(shell: GameShell, snapshot: GameSnapshot): void {
   shell.revision.textContent = String(battleState.revision);
   shell.phase.textContent = PHASE_LABELS[battleState.phase];
   shell.activeUnit.textContent = activeUnitId(battleState) ?? "无";
-  shell.editor.setReadOnly(running);
+  const settlement = settlementFor(snapshot);
+  shell.editor.setReadOnly(running || settlement !== undefined);
   shell.editor.setValue(snapshot.codeDraft);
-  shell.run.disabled = runnerState !== "ready" || running || battleState.phase !== "in_progress";
+  shell.run.disabled = runnerState !== "ready" || running || settlement !== undefined || battleState.phase !== "in_progress";
   shell.interrupt.hidden = !running;
   shell.interrupt.disabled = !running;
+  shell.reset.hidden = settlement !== undefined;
   renderBattlefield(shell.battlefield, battleState);
-  renderFeedback(shell.feedback, snapshot.feedback, runnerState);
+  renderBriefing(shell.briefing, getLevel(snapshot.currentLevelId), battleState);
+  renderFeedback(shell.feedback, snapshot, settlement, shell.controller);
 }
 
 function renderRecovery(root: HTMLElement, message: string, controller: AppController): void {
@@ -221,7 +241,34 @@ function renderUnit(unit: BattleUnit, isActive: boolean): HTMLElement {
   return element;
 }
 
-function renderFeedback(container: HTMLElement, feedback: AppFeedback, runnerState: GameSnapshot["runnerState"]): void {
+function renderBriefing(container: HTMLElement, level: LevelDefinition, state: BattleState): void {
+  requiredElement(container, "#mission-heading").textContent = level.title;
+  renderTextList(requiredElement(container, "[data-testid='level-objectives']"), level.briefing);
+  const keyObjectives = state.objectives.filter((objective) => objective.key);
+  const constraints = keyObjectives.length === 0
+    ? `失败约束：在 ${state.maxRounds} 回合内完成任务。`
+    : `失败约束：保护${keyObjectives.map((objective) => objective.id).join("、")}并在 ${state.maxRounds} 回合内完成任务。`;
+  requiredElement(container, ".mission-constraint").textContent = constraints;
+  const scout = state.units.find((unit) => unit.id === "scout");
+  renderTextList(requiredElement(container, "[data-testid='scout-skills']"), (scout?.skills ?? []).map((skill) => (
+    skill.remainingCooldown === 0 ? `${skill.id} · 可用` : `${skill.id} · 冷却 ${skill.remainingCooldown} 回合`
+  )));
+  renderTextList(requiredElement(container, "[data-testid='api-hints']"), level.apiHints);
+  requiredElement(container, ".concept-hint p").textContent = level.id === "python-marsh-01"
+    ? "每回合返回一条指令；使用 world 中的 revision 保持指令与战场一致。"
+    : "先读取 world 的当前状态，再返回一条完整且合法的回合指令。";
+}
+
+function renderTextList(container: HTMLElement, values: readonly string[]): void {
+  container.replaceChildren(...values.map((value) => createTextElement("li", value)));
+}
+
+function renderFeedback(container: HTMLElement, snapshot: GameSnapshot, settlement: Settlement | undefined, controller: AppController): void {
+  const { feedback, runnerState } = snapshot;
+  if (settlement !== undefined) {
+    renderSettlement(container, settlement, controller);
+    return;
+  }
   const messages = runnerState === "unavailable" && !feedback.messages.includes(UNAVAILABLE_HINT)
     ? [UNAVAILABLE_HINT, ...feedback.messages]
     : feedback.messages;
@@ -236,6 +283,57 @@ function renderFeedback(container: HTMLElement, feedback: AppFeedback, runnerSta
   }
 }
 
+type Settlement = Readonly<{ kind: "failed" | "victory" | "complete"; messages: readonly string[] }>;
+
+function settlementFor(snapshot: GameSnapshot): Settlement | undefined {
+  const level = getLevel(snapshot.currentLevelId);
+  const { battleState } = snapshot;
+  const unmetObjectives = battleState.phase === "won"
+    ? battleState.objectives.filter((objective) => !objective.key && !objective.completed).map((objective) => `${objective.id} 尚未激活`)
+    : [];
+  const lockedMessage = "代码已锁定，运行已禁用；可查看最终战场与代码。";
+  if (battleState.phase === "lost") return { kind: "failed", messages: ["战斗失败。重试本关以保留当前代码。", lockedMessage] };
+  if (unmetObjectives.length > 0) return { kind: "failed", messages: [...unmetObjectives.map((reason) => `任务失败：${reason}`), lockedMessage] };
+  if (battleState.phase !== "won") return undefined;
+  if (level.reward.type === "campaign-complete") return { kind: "complete", messages: ["沼心封印已经稳定。最终战场与代码保留供复盘。", lockedMessage] };
+  return { kind: "victory", messages: [`获得新能力：${level.reward.abilityId}`, `完成于第 ${battleState.round} 回合。`, lockedMessage] };
+}
+
+function renderSettlement(container: HTMLElement, settlement: Settlement, controller: AppController): void {
+  container.className = `feedback-panel settlement-panel settlement-${settlement.kind}`;
+  container.replaceChildren();
+  const heading = settlement.kind === "failed" ? "任务失败" : settlement.kind === "complete" ? "战役完成" : "关卡完成";
+  const section = document.createElement("section");
+  section.dataset.testid = `settlement-${settlement.kind}`;
+  section.append(createTextElement("h2", heading));
+  for (const message of settlement.messages) section.append(createTextElement("p", message));
+  const actions = document.createElement("div");
+  actions.className = "settlement-actions";
+  if (settlement.kind === "failed") {
+    actions.append(createAction("retry-level", "重试本关", () => controller.retryLevel()));
+  } else if (settlement.kind === "victory") {
+    actions.append(
+      createAction("advance-level", "进入下一关", () => controller.advanceLevel()),
+      createAction("retry-level", "重试本关", () => controller.retryLevel()),
+    );
+  } else {
+    actions.append(createAction("campaign-reset", "重置存档", () => {
+      requiredElement<HTMLButtonElement>(container.closest(".app-shell")!, ".reset-trigger").click();
+    }));
+  }
+  section.append(actions);
+  container.append(section);
+}
+
+function createAction(testId: string, label: string, action: () => void): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.testid = testId;
+  button.textContent = label;
+  button.addEventListener("click", action);
+  return button;
+}
+
 function createOutput(label: string, value: string): HTMLElement {
   const wrapper = document.createElement("div");
   wrapper.className = "feedback-output";
@@ -246,7 +344,7 @@ function createOutput(label: string, value: string): HTMLElement {
   return wrapper;
 }
 
-function createTextElement(tag: "h2" | "h3" | "p", text: string): HTMLElement {
+function createTextElement(tag: "h2" | "h3" | "p" | "li", text: string): HTMLElement {
   const element = document.createElement(tag);
   element.textContent = text;
   return element;

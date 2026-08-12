@@ -56,7 +56,7 @@ body {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
   grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--space);
   min-height: 0;
@@ -76,7 +76,7 @@ body {
 }
 
 .editor-panel {
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .panel-heading {
@@ -134,8 +134,46 @@ body {
 .feedback-panel {
   grid-column: 1 / -1;
   min-height: 0;
-  max-block-size: 160px;
+  max-block-size: min(32dvh, 260px);
   overflow: auto;
+}
+
+.settlement-panel {
+  border-inline-start-width: 4px;
+  animation: feedback-pulse 360ms ease-out;
+}
+
+.settlement-panel h2 {
+  margin-bottom: 8px;
+}
+
+.settlement-failed {
+  border-inline-start-color: var(--danger);
+}
+
+.settlement-victory,
+.settlement-complete {
+  border-inline-start-color: var(--success);
+}
+
+.settlement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.settlement-actions button:first-child {
+  border-color: var(--brass);
+  color: #18130a;
+  font-weight: 800;
+  background: var(--brass);
+}
+
+.settlement-failed .settlement-actions button {
+  border-color: var(--danger);
+  color: #27110c;
+  background: var(--danger);
 }
 
 .action-row {

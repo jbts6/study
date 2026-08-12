@@ -6,7 +6,6 @@ const forbiddenKeys = new Set([
   "rngState",
   "failureConditions",
   "visibility",
-  "remainingCooldown",
   "hazardDamage",
   "maxRounds",
   "phase",
@@ -58,8 +57,8 @@ describe("projectWorldView", () => {
       attack: 4,
       defense: 0,
       skills: [
-        { id: "spark", range: 2, power: 2, target: "unit", kind: "damage" },
-        { id: "mend", range: 1, power: 3, target: "unit", kind: "heal" },
+        { id: "spark", range: 2, power: 2, remainingCooldown: 0, target: "unit", kind: "damage" },
+        { id: "mend", range: 1, power: 3, remainingCooldown: 0, target: "unit", kind: "heal" },
       ],
     });
     expect(golem).toEqual({
@@ -90,6 +89,23 @@ describe("projectWorldView", () => {
     expect(scout?.cell).toEqual({ x: 0, y: 0 });
     expect(view.board.hazardCells).toEqual([{ x: 2, y: 1 }]);
     expect(view.objectives[0]?.cell).toEqual({ x: 0, y: 1 });
+  });
+
+  it("projects the current cooldown of allied skills without exposing enemy skills", () => {
+    const fixture = createFixtureState();
+    const state = {
+      ...fixture,
+      units: fixture.units.map((unit) => unit.id === "scout"
+        ? { ...unit, skills: unit.skills.map((skill) => skill.id === "spark" ? { ...skill, remainingCooldown: 2 } : skill) }
+        : unit),
+    };
+    const view = projectWorldView(state);
+
+    expect(view.units.find((unit) => unit.id === "scout")?.skills).toEqual([
+      { id: "spark", range: 2, power: 2, remainingCooldown: 2, target: "unit", kind: "damage" },
+      { id: "mend", range: 1, power: 3, remainingCooldown: 0, target: "unit", kind: "heal" },
+    ]);
+    expect(view.units.find((unit) => unit.id === "golem")).not.toHaveProperty("skills");
   });
 
   it("uses the active unit from the current turn index", () => {
