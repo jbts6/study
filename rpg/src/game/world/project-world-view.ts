@@ -34,7 +34,7 @@ function projectUnit(unit: BattleUnit): WorldUnit {
     move: unit.move,
     attack: unit.attack,
     defense: unit.defense,
-    skills: unit.skills.map(({ id, range, power, target, kind }) => ({ id, range, power, target, kind })),
+    skills: unit.skills.map(({ id, range, power, remainingCooldown, target, kind }) => ({ id, range, power, remainingCooldown, target, kind })),
   };
 }
 
