@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { SaveDataV1, SaveLoadResult, SaveStore } from "./save-store";
+import type { SaveDataV2, SaveLoadResult, SaveStore } from "./save-store";
 import type { RunnerClient, RunnerDisplayState } from "./runner-client";
 import type { ExecutionStatus, JsonValue, RunRequest, RunResult } from "../runners/protocol/types";
 import { AppController } from "./app-controller";
-import { createPythonMarsh01 } from "../game/content/python-marsh-01";
+import { getLevel } from "../game/content/levels";
 
 class FakeRunner implements RunnerClient {
   readonly state: RunnerDisplayState = "ready";
@@ -33,7 +33,7 @@ class FakeRunner implements RunnerClient {
 }
 
 class MemorySaveStore implements SaveStore {
-  saved?: SaveDataV1;
+  saved?: SaveDataV2;
   removeCount = 0;
 
   constructor(private readonly initial: SaveLoadResult | null) {}
@@ -42,7 +42,7 @@ class MemorySaveStore implements SaveStore {
     return this.initial ?? { ok: true, save: null };
   }
 
-  save(value: SaveDataV1): void {
+  save(value: SaveDataV2): void {
     this.saved = value;
   }
 
@@ -80,23 +80,16 @@ function createController(runner: FakeRunner, saveStore: MemorySaveStore): AppCo
   return new AppController({
     runner,
     saveStore,
-    createEncounter: createPythonMarsh01,
-    enemyCommand: (state) => ({
-      actorId: state.turnOrder[state.turnIndex]!,
-      expectedRevision: state.revision,
-      action: { type: "wait" },
-    }),
     createId: () => "test-run",
   });
 }
 
 describe("AppController", () => {
-  it("applies a valid player command, auto-waits the enemy, and saves revision 2", async () => {
+  it("rejects a level-invalid player interaction before it advances battle or save", async () => {
     const runner = new FakeRunner(completed({
       actorId: "scout",
       expectedRevision: 0,
-      movePath: [{ x: 1, y: 0 }],
-      action: { type: "attack", targetId: "golem" },
+      action: { type: "interact", targetId: "relay" },
     }));
     const saves = new MemorySaveStore(null);
     const controller = createController(runner, saves);
@@ -107,10 +100,10 @@ describe("AppController", () => {
     const snapshot = controller.getSnapshot();
     expect(snapshot.mode).toBe("game");
     if (snapshot.mode !== "game") throw new Error("expected game mode");
-    expect(snapshot.battleState.revision).toBe(2);
-    expect(snapshot.battleState.turnOrder[snapshot.battleState.turnIndex]).toBe("scout");
-    expect(saves.saved?.battleState.revision).toBe(2);
-    expect(snapshot.feedback.kind).toBe("success");
+    expect(snapshot.battleState.revision).toBe(0);
+    expect(saves.saved?.battleState.revision).toBe(0);
+    expect(snapshot.feedback.kind).toBe("error");
+    expect(snapshot.feedback.messages).toContain("[INTERACTION_INVALID] $.action.targetId scout 只能交互非关键目标");
     expect(runner.lastRequest?.limits.maxValueDepth).toBe(4);
   });
 
@@ -154,7 +147,66 @@ describe("AppController", () => {
     controller.resetSave("重置存档");
     expect(controller.getSnapshot().mode).toBe("game");
     expect(saves.removeCount).toBe(1);
-    expect(saves.saved?.version).toBe(1);
+    expect(saves.saved?.version).toBe(2);
     expect(runner.connectCount).toBe(1);
+  });
+
+  it("derives the first-level reward from victory, restores its settlement, then advances only when requested", async () => {
+    const first = getLevel("python-marsh-01");
+    const victoryBattle = {
+      ...first.initialBattle,
+      units: first.initialBattle.units.map((unit) => unit.id === "golem" ? { ...unit, cell: { x: 1, y: 0 }, hp: 1 } : unit),
+    };
+    const runner = new FakeRunner(completed({ actorId: "scout", expectedRevision: 0, action: { type: "attack", targetId: "golem" } }));
+    const saves = new MemorySaveStore({ ok: true, save: { version: 2, currentLevelId: "python-marsh-01", battleState: victoryBattle, codeDraft: "my code" } });
+    const controller = createController(runner, saves);
+    await controller.start();
+    await controller.runTurn();
+
+    const settled = controller.getSnapshot();
+    if (settled.mode !== "game") throw new Error("expected game mode");
+    expect(settled.battleState.phase).toBe("won");
+    expect(settled.feedback.messages).toContain("获得新能力：ward");
+    expect(saves.saved?.currentLevelId).toBe("python-marsh-01");
+
+    const restored = createController(new FakeRunner(completed(null)), new MemorySaveStore({ ok: true, save: saves.saved! }));
+    await restored.start();
+    const restoredSnapshot = restored.getSnapshot();
+    if (restoredSnapshot.mode !== "game") throw new Error("expected game mode");
+    expect(restoredSnapshot.feedback.messages).toContain("获得新能力：ward");
+
+    controller.advanceLevel();
+    const next = controller.getSnapshot();
+    if (next.mode !== "game") throw new Error("expected game mode");
+    expect(next.currentLevelId).toBe("python-marsh-02");
+    expect(next.codeDraft).toBe(getLevel("python-marsh-02").starterCode);
+  });
+
+  it("blocks an incomplete scout-mark victory without a reward or next level and retries with the current code", async () => {
+    const third = getLevel("python-marsh-03");
+    const failedObjectiveBattle = {
+      ...third.initialBattle,
+      units: third.initialBattle.units.map((unit) => unit.id === "hunter-a"
+        ? { ...unit, cell: { x: 1, y: 0 }, hp: 1 }
+        : unit.id === "hunter-b" ? { ...unit, disabled: true, hp: 0 } : unit),
+    };
+    const runner = new FakeRunner(completed({ actorId: "scout", expectedRevision: 0, action: { type: "attack", targetId: "hunter-a" } }));
+    const saves = new MemorySaveStore({ ok: true, save: { version: 2, currentLevelId: "python-marsh-03", battleState: failedObjectiveBattle, codeDraft: "keep this" } });
+    const controller = createController(runner, saves);
+    await controller.start();
+    await controller.runTurn();
+
+    const settled = controller.getSnapshot();
+    if (settled.mode !== "game") throw new Error("expected game mode");
+    expect(settled.battleState.phase).toBe("won");
+    expect(settled.feedback.messages).toContain("任务失败：勘测印记尚未激活");
+    controller.advanceLevel();
+    expect(controller.getSnapshot()).toEqual(settled);
+
+    controller.retryLevel();
+    const retried = controller.getSnapshot();
+    if (retried.mode !== "game") throw new Error("expected game mode");
+    expect(retried.battleState.phase).toBe("in_progress");
+    expect(retried.codeDraft).toBe("keep this");
   });
 });

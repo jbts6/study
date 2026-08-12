@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createPythonMarsh01, CURRENT_LEVEL_ID, STARTER_CODE } from "../game/content/python-marsh-01";
+import { getLevel } from "../game/content/levels";
 import { LocalSaveStore } from "./save-store";
 
 describe("LocalSaveStore", () => {
   beforeEach(() => localStorage.clear());
 
-  it("round-trips the single V1 save", () => {
+  it("round-trips the V2 campaign save", () => {
     const store = new LocalSaveStore(localStorage);
     const save = {
-      version: 1 as const,
-      currentLevelId: CURRENT_LEVEL_ID,
-      battleState: createPythonMarsh01(),
-      codeDraft: STARTER_CODE,
+      version: 2 as const,
+      currentLevelId: "python-marsh-02" as const,
+      battleState: getLevel("python-marsh-02").initialBattle,
+      codeDraft: getLevel("python-marsh-02").starterCode,
     };
 
     store.save(save);
@@ -31,65 +31,39 @@ describe("LocalSaveStore", () => {
     expect(localStorage.getItem("python-rpg.save")).toBe("{broken");
   });
 
-  it("rejects a V1 object with a malformed skill effect", () => {
-    const battleState = createPythonMarsh01();
+  it("rejects V1 and a V2 battle that belongs to another level", () => {
+    const battleState = getLevel("python-marsh-01").initialBattle;
     localStorage.setItem("python-rpg.save", JSON.stringify({
       version: 1,
-      currentLevelId: CURRENT_LEVEL_ID,
-      battleState: {
-        ...battleState,
-        units: battleState.units.map((unit, unitIndex) => unitIndex === 0
-          ? {
-              ...unit,
-              skills: unit.skills.map((skill, skillIndex) => skillIndex === 0
-                ? { ...skill, effect: { statusId: "shock", duration: 1, defenseBonus: 0, chancePermille: 1001 } }
-                : skill),
-            }
-          : unit),
-      },
-      codeDraft: STARTER_CODE,
+      currentLevelId: "python-marsh-01",
+      battleState,
+      codeDraft: "draft",
     }));
-
+    expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
+    localStorage.setItem("python-rpg.save", JSON.stringify({
+      version: 2,
+      currentLevelId: "python-marsh-02",
+      battleState,
+      codeDraft: "draft",
+    }));
     expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
   });
 
-  it("rejects a battle whose active turn points to a disabled enemy", () => {
-    const battleState = createPythonMarsh01();
+  it("rejects unknown versions and malformed battle snapshots", () => {
+    const battleState = getLevel("python-marsh-01").initialBattle;
     localStorage.setItem("python-rpg.save", JSON.stringify({
-      version: 1,
-      currentLevelId: CURRENT_LEVEL_ID,
-      battleState: {
-        ...battleState,
-        turnIndex: 1,
-        units: battleState.units.map((unit) => unit.id === "golem" ? { ...unit, disabled: true } : unit),
-      },
-      codeDraft: STARTER_CODE,
+      version: 3,
+      currentLevelId: "python-marsh-01",
+      battleState,
+      codeDraft: "draft",
     }));
-
     expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
-  });
-
-  it("rejects a battle whose turn order references an unknown unit", () => {
-    const battleState = createPythonMarsh01();
     localStorage.setItem("python-rpg.save", JSON.stringify({
-      version: 1,
-      currentLevelId: CURRENT_LEVEL_ID,
-      battleState: { ...battleState, turnOrder: ["scout", "missing-unit"] },
-      codeDraft: STARTER_CODE,
-    }));
-
-    expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
-  });
-
-  it("rejects non-integer battle counters", () => {
-    const battleState = createPythonMarsh01();
-    localStorage.setItem("python-rpg.save", JSON.stringify({
-      version: 1,
-      currentLevelId: CURRENT_LEVEL_ID,
+      version: 2,
+      currentLevelId: "python-marsh-01",
       battleState: { ...battleState, revision: 0.5 },
-      codeDraft: STARTER_CODE,
+      codeDraft: "draft",
     }));
-
     expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
   });
 });

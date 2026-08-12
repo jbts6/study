@@ -1,11 +1,15 @@
 import type { BattleEvent, BattleState, TurnCommand } from "../game/combat/types";
 import { resolveTurn } from "../game/combat/resolve-turn";
-import { CURRENT_LEVEL_ID, STARTER_CODE } from "../game/content/python-marsh-01";
+import { enemyCommand } from "../game/campaign/enemy-command";
+import { validateLevelCommand } from "../game/campaign/validate-level-command";
+import { injectUnlockedAbilities } from "../game/content/ability-catalog";
+import { getLevel, getNextLevelId } from "../game/content/levels";
+import type { LevelDefinition, LevelId } from "../game/content/types";
 import { projectWorldView } from "../game/world/project-world-view";
 import type { RunRequest, RunResult, RunnerDiagnostic } from "../runners/protocol/types";
 import type { RunnerClient, RunnerDisplayState } from "./runner-client";
 import { RESET_CONFIRMATION } from "./save-store";
-import type { SaveDataV1, SaveStore } from "./save-store";
+import type { SaveDataV2, SaveStore } from "./save-store";
 const RUN_LIMITS = {
   timeoutMs: 5_000,
   interruptGraceMs: 500,
@@ -29,7 +33,7 @@ export type AppFeedback = Readonly<{
 
 export type GameSnapshot = Readonly<{
   mode: "game";
-  currentLevelId: typeof CURRENT_LEVEL_ID;
+  currentLevelId: LevelId;
   battleState: BattleState;
   codeDraft: string;
   runnerState: RunnerDisplayState;
@@ -47,8 +51,6 @@ export type AppSnapshot = GameSnapshot | SaveRecoverySnapshot;
 export type AppControllerDependencies = Readonly<{
   runner: RunnerClient;
   saveStore: SaveStore;
-  createEncounter: () => BattleState;
-  enemyCommand: (state: Readonly<BattleState>) => TurnCommand;
   createId?: () => string;
 }>;
 
@@ -57,7 +59,8 @@ export class AppController {
   private snapshot: AppSnapshot;
 
   constructor(private readonly dependencies: AppControllerDependencies) {
-    this.snapshot = this.createGameSnapshot(dependencies.createEncounter(), STARTER_CODE, idleFeedback());
+    const level = getLevel("python-marsh-01");
+    this.snapshot = this.createGameSnapshot(level.id, createLevelBattle(level), level.starterCode, idleFeedback());
     dependencies.runner.onStateChange((state) => this.updateRunnerState(state));
   }
 
@@ -68,9 +71,11 @@ export class AppController {
       return;
     }
 
-    const save = loaded.save ?? this.createSave(this.dependencies.createEncounter(), STARTER_CODE);
+    const firstLevel = getLevel("python-marsh-01");
+    const save = loaded.save ?? this.createSave(firstLevel.id, createLevelBattle(firstLevel), firstLevel.starterCode);
     if (loaded.save === null) this.dependencies.saveStore.save(save);
-    this.replaceSnapshot(this.createGameSnapshot(save.battleState, save.codeDraft, idleFeedback()));
+    const level = getLevel(save.currentLevelId);
+    this.replaceSnapshot(this.createGameSnapshot(level.id, injectUnlockedAbilities(level.id, save.battleState), save.codeDraft, settlementFeedback(level, save.battleState)));
     await this.connectRunner();
   }
 
@@ -110,10 +115,34 @@ export class AppController {
   resetSave(confirmation: string): void {
     if (confirmation !== RESET_CONFIRMATION) return;
     this.dependencies.saveStore.remove();
-    const save = this.createSave(this.dependencies.createEncounter(), STARTER_CODE);
+    const level = getLevel("python-marsh-01");
+    const save = this.createSave(level.id, createLevelBattle(level), level.starterCode);
     this.dependencies.saveStore.save(save);
-    this.replaceSnapshot(this.createGameSnapshot(save.battleState, save.codeDraft, idleFeedback()));
+    this.replaceSnapshot(this.createGameSnapshot(level.id, save.battleState, save.codeDraft, idleFeedback()));
     void this.connectRunner();
+  }
+
+  retryLevel(): void {
+    if (this.snapshot.mode !== "game" || !isFailedSettlement(this.snapshot)) return;
+    const level = getLevel(this.snapshot.currentLevelId);
+    const next = this.createGameSnapshot(level.id, createLevelBattle(level), this.snapshot.codeDraft, idleFeedback());
+    this.saveGame(next);
+    this.replaceSnapshot(next);
+  }
+
+  advanceLevel(): void {
+    if (this.snapshot.mode !== "game" || !isSuccessfulSettlement(this.snapshot)) return;
+    const nextLevelId = getNextLevelId(this.snapshot.currentLevelId);
+    if (nextLevelId === undefined) return;
+    let level: LevelDefinition;
+    try {
+      level = getLevel(nextLevelId);
+    } catch {
+      return;
+    }
+    const next = this.createGameSnapshot(level.id, createLevelBattle(level), level.starterCode, idleFeedback());
+    this.saveGame(next);
+    this.replaceSnapshot(next);
   }
 
   subscribe(listener: (snapshot: AppSnapshot) => void): () => void {
@@ -138,7 +167,7 @@ export class AppController {
       protocolVersion: 1,
       runId,
       attemptId: `${runId}:1`,
-      questId: CURRENT_LEVEL_ID,
+      questId: snapshot.currentLevelId,
       language: "python",
       files: { "main.py": snapshot.codeDraft },
       entrypoint: { file: "main.py", callable: "choose_turn" },
@@ -156,31 +185,40 @@ export class AppController {
       return;
     }
 
-    const player = resolveTurn(snapshot.battleState, result.returnValue as unknown);
+    const level = getLevel(snapshot.currentLevelId);
+    const levelValidation = validateCandidateForLevel(level, snapshot.battleState, result.returnValue);
+    if (!levelValidation.accepted) {
+      this.replaceSnapshot({ ...snapshot, activeRunId: undefined, feedback: combatErrorFeedback(levelValidation.errors) });
+      return;
+    }
+    const player = resolveTurn(snapshot.battleState, levelValidation.command);
     if (!player.accepted) {
       this.replaceSnapshot({ ...snapshot, activeRunId: undefined, feedback: combatErrorFeedback(player.errors) });
       return;
     }
 
-    const enemyTurns = this.advanceEnemyTurns(player.state);
+    const enemyTurns = this.advanceEnemyTurns(level, player.state);
     const events = [...player.events, ...enemyTurns.events];
     const next = {
       ...snapshot,
       activeRunId: undefined,
       battleState: enemyTurns.state,
-      feedback: successFeedback(events, result),
+      feedback: successFeedback(enemyTurns.state, events, result),
     };
     this.saveGame(next);
     this.replaceSnapshot(next);
   }
 
-  private advanceEnemyTurns(initialState: BattleState): Readonly<{ state: BattleState; events: readonly BattleEvent[] }> {
+  private advanceEnemyTurns(level: LevelDefinition, initialState: BattleState): Readonly<{ state: BattleState; events: readonly BattleEvent[] }> {
     let state = initialState;
     const events: BattleEvent[] = [];
     while (state.phase === "in_progress") {
       const enemy = activeUnit(state);
       if (enemy?.team !== "enemies" || enemy.disabled) break;
-      const resolution = resolveTurn(state, this.dependencies.enemyCommand(state));
+      const command = enemyCommand(level, state);
+      const validation = validateLevelCommand(level, state, command);
+      if (!validation.accepted) throw new Error("应用预设的敌方指令被关卡规则拒绝。");
+      const resolution = resolveTurn(state, validation.command);
       if (!resolution.accepted) throw new Error("应用预设的敌方指令被战斗内核拒绝。");
       state = resolution.state;
       events.push(...resolution.events);
@@ -188,18 +226,18 @@ export class AppController {
     return { state, events };
   }
 
-  private createSave(battleState: BattleState, codeDraft: string): SaveDataV1 {
-    return { version: 1, currentLevelId: CURRENT_LEVEL_ID, battleState, codeDraft };
+  private createSave(currentLevelId: LevelId, battleState: BattleState, codeDraft: string): SaveDataV2 {
+    return { version: 2, currentLevelId, battleState, codeDraft };
   }
 
   private saveGame(snapshot: GameSnapshot): void {
-    this.dependencies.saveStore.save(this.createSave(snapshot.battleState, snapshot.codeDraft));
+    this.dependencies.saveStore.save(this.createSave(snapshot.currentLevelId, snapshot.battleState, snapshot.codeDraft));
   }
 
-  private createGameSnapshot(battleState: BattleState, codeDraft: string, feedback: AppFeedback): GameSnapshot {
+  private createGameSnapshot(currentLevelId: LevelId, battleState: BattleState, codeDraft: string, feedback: AppFeedback): GameSnapshot {
     return {
       mode: "game",
-      currentLevelId: CURRENT_LEVEL_ID,
+      currentLevelId,
       battleState,
       codeDraft,
       runnerState: this.dependencies.runner.state,
@@ -253,7 +291,9 @@ function idleFeedback(): AppFeedback {
   return { kind: "idle", title: "", messages: [], stdout: "", stderr: "" };
 }
 
-function successFeedback(events: readonly BattleEvent[], result: RunResult): AppFeedback {
+function successFeedback(state: BattleState, events: readonly BattleEvent[], result: RunResult): AppFeedback {
+  const settlement = settlementFeedback(getLevel(state.battleId as LevelId), state);
+  if (settlement.kind !== "idle") return { ...settlement, stdout: result.streams.stdout, stderr: result.streams.stderr };
   return {
     kind: "success",
     title: "回合已推进",
@@ -261,6 +301,45 @@ function successFeedback(events: readonly BattleEvent[], result: RunResult): App
     stdout: result.streams.stdout,
     stderr: result.streams.stderr,
   };
+}
+
+function createLevelBattle(level: LevelDefinition): BattleState {
+  return injectUnlockedAbilities(level.id, structuredClone(level.initialBattle));
+}
+
+function validateCandidateForLevel(level: LevelDefinition, state: BattleState, input: unknown) {
+  if (!isTurnCommand(input)) return resolveTurn(state, input);
+  return validateLevelCommand(level, state, input);
+}
+
+function isTurnCommand(value: unknown): value is TurnCommand {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && "actorId" in value && "expectedRevision" in value && "action" in value
+    && value.action !== null && typeof value.action === "object" && "type" in value.action;
+}
+
+function unmetObjectives(_level: LevelDefinition, state: BattleState): readonly string[] {
+  if (state.phase !== "won") return [];
+  return state.objectives.filter((objective) => !objective.key && !objective.completed)
+    .map((objective) => objective.id === "scout-mark" ? "勘测印记尚未激活" : `${objective.id} 尚未激活`);
+}
+
+function settlementFeedback(level: LevelDefinition, state: BattleState): AppFeedback {
+  if (state.phase === "lost") return errorFeedback("任务失败", ["战斗失败。重试本关以保留当前代码。"]);
+  const unmet = unmetObjectives(level, state);
+  if (unmet.length > 0) return errorFeedback("任务失败", unmet.map((reason) => `任务失败：${reason}`));
+  if (state.phase !== "won") return idleFeedback();
+  return level.reward.type === "ability"
+    ? { kind: "success", title: "关卡完成", messages: [`获得新能力：${level.reward.abilityId}`], stdout: "", stderr: "" }
+    : { kind: "success", title: "战役完成", messages: ["沼心封印已经稳定。"], stdout: "", stderr: "" };
+}
+
+function isSuccessfulSettlement(snapshot: GameSnapshot): boolean {
+  return snapshot.battleState.phase === "won" && unmetObjectives(getLevel(snapshot.currentLevelId), snapshot.battleState).length === 0;
+}
+
+function isFailedSettlement(snapshot: GameSnapshot): boolean {
+  return snapshot.battleState.phase === "lost" || (snapshot.battleState.phase === "won" && !isSuccessfulSettlement(snapshot));
 }
 
 function combatErrorFeedback(errors: readonly Readonly<{ code: string; path: string; message: string }>[]): AppFeedback {

@@ -1,4 +1,5 @@
 import type { BattleState } from "../combat/types";
+import type { LevelDefinition } from "./types";
 
 export const CURRENT_LEVEL_ID = "python-marsh-01" as const;
 
@@ -25,7 +26,7 @@ export function createPythonMarsh01(): BattleState {
     turnOrder: ["scout", "golem"],
     phase: "in_progress",
     rngState: 2463534242,
-    maxRounds: 4,
+    maxRounds: 6,
     board: {
       width: 3,
       height: 2,
@@ -41,7 +42,7 @@ export function createPythonMarsh01(): BattleState {
       completed: false,
       key: true,
     }],
-    failureConditions: { keyObjectiveDestroyed: false },
+    failureConditions: { keyObjectiveDestroyed: true },
     units: [
       {
         id: "scout",
@@ -65,9 +66,9 @@ export function createPythonMarsh01(): BattleState {
         id: "golem",
         team: "enemies",
         visibility: "revealed",
-        cell: { x: 2, y: 0 },
-        hp: 8,
-        maxHp: 8,
+        cell: { x: 2, y: 1 },
+        hp: 6,
+        maxHp: 6,
         attack: 2,
         defense: 1,
         move: 1,
@@ -98,3 +99,14 @@ export function createPythonMarsh01(): BattleState {
     ],
   };
 }
+
+export const PYTHON_MARSH_01: LevelDefinition = {
+  id: CURRENT_LEVEL_ID,
+  title: "唤醒中继器",
+  briefing: ["在中继器被腐化前消灭敌人。", "读取 world 字典并返回一条合法指令。"],
+  starterCode: STARTER_CODE,
+  apiHints: ["world[\"activeUnitId\"] 是当前行动者。", "指令需要 actorId、expectedRevision 和 action。"],
+  initialBattle: createPythonMarsh01(),
+  enemyBehaviors: { golem: { type: "corrupt" } },
+  reward: { type: "ability", abilityId: "ward" },
+};
