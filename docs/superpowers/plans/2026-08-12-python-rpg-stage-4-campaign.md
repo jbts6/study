@@ -95,14 +95,14 @@
 - 存档升级为 `SaveDataV2`；校验 `battleState.battleId === currentLevelId`。
 - `AppController` 新增 `retryLevel()`、`advanceLevel()`；所有玩家/敌方指令先经过关卡校验。
 
-- [ ] 写失败的数据测试：前三关必填字段、重复 ID、单位/目标/能力引用；第一关到第三关的脚手架递减。
-- [ ] 写失败的存档测试：V2 正常读取、刷新恢复；V1/未知版本/战斗 ID 不匹配进入恢复页。
-- [ ] 写失败的控制器测试：非法关卡指令不推进；胜利即时派生奖励；刷新仍停在结算；点击下一关才切换脚手架；重试保留当前代码。
-- [ ] 写关键失败测试：敌人全灭但非关键目标未完成时不发奖、不允许进入下一关，并显示具体失败原因。
-- [ ] 运行 `npm test -- src/game/content/levels.test.ts src/app/save-store.test.ts src/app/app-controller.test.ts`，确认因 V2/战役接口缺失而失败。
-- [ ] 最小实现前三关数据、内容校验、V2 存档与控制器状态流；不创建独立结算状态。
-- [ ] 运行上述定向测试；再运行 `npm run build` 作为前三关阶段性构建。
-- [ ] 提交：`feat: deliver first three campaign levels`。
+- [x] 写失败的数据测试：前三关必填字段、重复 ID、单位/目标/能力引用；第一关到第三关的脚手架递减。
+- [x] 写失败的存档测试：V2 正常读取、刷新恢复；V1/未知版本/战斗 ID 不匹配进入恢复页。
+- [x] 写失败的控制器测试：非法关卡指令不推进；胜利即时派生奖励；刷新仍停在结算；点击下一关才切换脚手架；重试保留当前代码。
+- [x] 写关键失败测试：敌人全灭但非关键目标未完成时不发奖、不允许进入下一关，并显示具体失败原因。
+- [x] 运行 `npm test -- src/game/content/levels.test.ts src/app/save-store.test.ts src/app/app-controller.test.ts`，确认因 V2/战役接口缺失而失败。
+- [x] 最小实现前三关数据、内容校验、V2 存档与控制器状态流；不创建独立结算状态。
+- [x] 运行上述定向测试；再运行 `npm run build` 作为前三关阶段性构建。
+- [x] 提交：`feat: deliver first three campaign levels`。
 
 **完成标准：** 前三关形成编写、运行、反馈、胜利/任务失败、奖励、刷新恢复、重试和下一关的完整状态流；生产构建通过。
 
