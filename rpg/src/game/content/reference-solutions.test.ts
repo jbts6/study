@@ -1,0 +1,216 @@
+import { describe, expect, it } from "vitest";
+import { enemyCommand } from "../campaign/enemy-command";
+import { validateLevelCommand } from "../campaign/validate-level-command";
+import { resolveTurn } from "../combat/resolve-turn";
+import type { BattleState, Cell, TurnCommand, WorldView } from "../combat/types";
+import { injectUnlockedAbilities } from "./ability-catalog";
+import { getLevel, LEVEL_ORDER } from "./levels";
+import type { LevelId } from "./types";
+import { projectWorldView } from "../world/project-world-view";
+
+type ReferenceSolution = (world: WorldView) => TurnCommand;
+type WorldUnit = WorldView["units"][number];
+
+function command(world: WorldView, action: TurnCommand["action"], movePath: readonly Cell[] = []): TurnCommand {
+  if (world.activeUnitId === null) throw new Error("参考解法没有可行动的单位");
+  return movePath.length === 0
+    ? { actorId: world.activeUnitId, expectedRevision: world.revision, action }
+    : { actorId: world.activeUnitId, expectedRevision: world.revision, movePath, action };
+}
+
+function findUnit(world: WorldView, id: string): WorldUnit {
+  const found = world.units.find((candidate) => candidate.id === id);
+  if (found === undefined) throw new Error(`参考解法缺少单位: ${id}`);
+  return found;
+}
+
+function findObjective(world: WorldView, id: string): NonNullable<WorldView["objectives"][number]> {
+  const found = world.objectives.find((candidate) => candidate.id === id);
+  if (found === undefined) throw new Error(`参考解法缺少目标: ${id}`);
+  return found;
+}
+
+function distance(left: Cell, right: Cell): number {
+  return Math.abs(left.x - right.x) + Math.abs(left.y - right.y);
+}
+
+function neighbors(cell: Cell): readonly Cell[] {
+  return [
+    { x: cell.x - 1, y: cell.y },
+    { x: cell.x + 1, y: cell.y },
+    { x: cell.x, y: cell.y - 1 },
+    { x: cell.x, y: cell.y + 1 },
+  ];
+}
+
+function isOpen(world: WorldView, cell: Cell): boolean {
+  return cell.x >= 0 && cell.x < world.board.width && cell.y >= 0 && cell.y < world.board.height
+    && !world.board.blockedCells.some((blocked) => blocked.x === cell.x && blocked.y === cell.y)
+    && !world.units.some((unit) => unit.cell.x === cell.x && unit.cell.y === cell.y);
+}
+
+type PathResult = Readonly<{ path: readonly Cell[]; inRange: boolean }>;
+
+function pathToRange(world: WorldView, target: Cell, range: number, exact = false): PathResult {
+  const scout = findUnit(world, "scout");
+  type Node = Readonly<{ cell: Cell; path: readonly Cell[] }>;
+  const queue: Node[] = [{ cell: scout.cell, path: [] }];
+  const visited = new Set([`${scout.cell.x},${scout.cell.y}`]);
+  let nearest = queue[0];
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    if (current === undefined) break;
+    const currentDistance = distance(current.cell, target);
+    const nearestDistance = nearest === undefined ? Number.POSITIVE_INFINITY : distance(nearest.cell, target);
+    if (currentDistance < nearestDistance || (currentDistance === nearestDistance && current.path.length > (nearest?.path.length ?? -1))) nearest = current;
+    if (exact ? currentDistance === range : currentDistance <= range) return { path: current.path, inRange: true };
+    if (current.path.length >= (scout.move ?? 0)) continue;
+    for (const next of neighbors(current.cell)) {
+      const key = `${next.x},${next.y}`;
+      if (visited.has(key) || !isOpen(world, next)) continue;
+      visited.add(key);
+      queue.push({ cell: next, path: [...current.path, next] });
+    }
+  }
+  return { path: nearest?.path ?? [], inRange: false };
+}
+
+function actAtRange(world: WorldView, target: Cell, range: number, action: TurnCommand["action"], exact = false): TurnCommand {
+  const result = pathToRange(world, target, range, exact);
+  return result.inRange ? command(world, action, result.path) : command(world, { type: "guard" }, result.path);
+}
+
+function skillReady(world: WorldView, skillId: string): boolean {
+  return findUnit(world, "scout").skills?.some((skill) => skill.id === skillId && skill.remainingCooldown === 0) ?? false;
+}
+
+function castOrAttack(world: WorldView, targetId: string, preferredSkills: readonly string[]): TurnCommand {
+  const target = findUnit(world, targetId);
+  const skill = preferredSkills
+    .map((skillId) => findUnit(world, "scout").skills?.find((candidate) => candidate.id === skillId && candidate.remainingCooldown === 0))
+    .find((candidate) => candidate !== undefined);
+  if (skill !== undefined) {
+    const result = pathToRange(world, target.cell, skill.range);
+    return result.inRange
+      ? command(world, { type: "cast", skillId: skill.id, targetId }, result.path)
+      : command(world, { type: "guard" }, result.path);
+  }
+  const result = pathToRange(world, target.cell, 1, true);
+  return result.inRange ? command(world, { type: "attack", targetId }, result.path) : command(world, { type: "guard" }, result.path);
+}
+
+function interactWith(world: WorldView, objectiveId: string): TurnCommand {
+  const target = findObjective(world, objectiveId);
+  return actAtRange(world, target.cell, 1, { type: "interact", targetId: objectiveId }, true);
+}
+
+function selfCastOrGuard(world: WorldView, skillIds: readonly string[]): TurnCommand {
+  for (const skillId of skillIds) {
+    if (skillReady(world, skillId)) return command(world, { type: "cast", skillId, targetId: "scout" });
+  }
+  return command(world, { type: "guard" });
+}
+
+const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
+  "python-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
+  "python-marsh-02": (world) => {
+    const scout = findUnit(world, "scout");
+    const corruptor = findUnit(world, "corruptor");
+    if (corruptor.hp === 8 && scout.cell.x === 0 && scout.cell.y === 0) return command(world, { type: "guard" }, [{ x: 1, y: 0 }, { x: 1, y: 1 }]);
+    if (corruptor.hp === 8 && scout.cell.x === 1 && scout.cell.y === 1) return command(world, { type: "guard" }, [{ x: 1, y: 2 }]);
+    if (corruptor.hp === 8 && scout.cell.x === 1 && scout.cell.y === 2) return castOrAttack(world, "corruptor", ["spark"]);
+    if (corruptor.hp === 5 && scout.cell.x === 1 && scout.cell.y === 2) return castOrAttack(world, "corruptor", []);
+    return castOrAttack(world, "corruptor", ["spark"]);
+  },
+  "python-marsh-03": (world) => {
+    const hunterA = findUnit(world, "hunter-a");
+    if (!hunterA.disabled) return castOrAttack(world, "hunter-a", ["spark"]);
+    if (!findObjective(world, "scout-mark").completed) return interactWith(world, "scout-mark");
+    return castOrAttack(world, "hunter-b", ["spark"]);
+  },
+  "python-marsh-04": (world) => {
+    const corruptor = findUnit(world, "corruptor");
+    if (!corruptor.disabled) return castOrAttack(world, "corruptor", ["spark"]);
+    if (!findObjective(world, "seal").completed) return interactWith(world, "seal");
+    return castOrAttack(world, "guard", ["pierce", "spark"]);
+  },
+  "python-marsh-05": (world) => {
+    if (!findObjective(world, "node-a").completed) return interactWith(world, "node-a");
+    if (!findObjective(world, "node-b").completed) return interactWith(world, "node-b");
+    const hunter = findUnit(world, "hunter");
+    if (!hunter.disabled) return castOrAttack(world, "hunter", ["pierce", "spark"]);
+    const guard = findUnit(world, "guard");
+    if (!guard.disabled && skillReady(world, "fracture") && !guard.statuses.some((status) => status.id === "fracture")) {
+      return castOrAttack(world, "guard", ["fracture"]);
+    }
+    return castOrAttack(world, "guard", ["spark", "pierce"]);
+  },
+  "python-marsh-06": (world) => {
+    const scout = findUnit(world, "scout");
+    const corruptor = findUnit(world, "corruptor");
+    if (!corruptor.disabled) {
+      if (corruptor.hp === 6 && skillReady(world, "ward")) return selfCastOrGuard(world, ["ward"]);
+      return castOrAttack(world, "corruptor", ["spark"]);
+    }
+    const hunter = findUnit(world, "hunter");
+    if (!hunter.disabled) {
+      if (hunter.hp === 5 && skillReady(world, "renew")) return selfCastOrGuard(world, ["renew"]);
+      return castOrAttack(world, "hunter", ["pierce", "spark"]);
+    }
+    if (!findObjective(world, "final-seal").completed) {
+      if (scout.cell.x === 1 && scout.cell.y === 0 && skillReady(world, "aegis") && !scout.statuses.some((status) => status.id === "aegis")) {
+        return selfCastOrGuard(world, ["aegis"]);
+      }
+      return interactWith(world, "final-seal");
+    }
+    const guard = findUnit(world, "guard");
+    if (!guard.disabled && skillReady(world, "fracture") && !guard.statuses.some((status) => status.id === "fracture")) {
+      return castOrAttack(world, "guard", ["fracture"]);
+    }
+    if (!guard.disabled) return castOrAttack(world, "guard", ["spark", "pierce"]);
+    return selfCastOrGuard(world, ["aegis", "renew", "ward"]);
+  },
+};
+
+function parseInstruction(input: TurnCommand): TurnCommand {
+  return JSON.parse(JSON.stringify(input)) as TurnCommand;
+}
+
+function activeUnit(state: BattleState): WorldUnit | undefined {
+  return state.units.find((unit) => unit.id === state.turnOrder[state.turnIndex]);
+}
+
+function runReferenceSolution(levelId: LevelId): BattleState {
+  const level = getLevel(levelId);
+  let state = injectUnlockedAbilities(levelId, structuredClone(level.initialBattle));
+
+  for (let playerTurn = 0; state.phase === "in_progress" && playerTurn <= level.initialBattle.maxRounds; playerTurn += 1) {
+    const beforeWorld = projectWorldView(state);
+    const instruction = parseInstruction(REFERENCE_SOLUTIONS[levelId](beforeWorld));
+    const levelValidation = validateLevelCommand(level, state, instruction);
+    if (!levelValidation.accepted) throw new Error(levelValidation.errors[0]?.message ?? "参考解法违反关卡规则");
+    const playerResolution = resolveTurn(state, levelValidation.command);
+    if (!playerResolution.accepted) throw new Error(playerResolution.errors[0]?.message ?? "参考解法被战斗内核拒绝");
+    state = playerResolution.state;
+
+    while (state.phase === "in_progress" && activeUnit(state)?.team === "enemies") {
+      const enemy = enemyCommand(level, state);
+      const enemyValidation = validateLevelCommand(level, state, enemy);
+      if (!enemyValidation.accepted) throw new Error(enemyValidation.errors[0]?.message ?? "敌方职责指令被拒绝");
+      const enemyResolution = resolveTurn(state, enemyValidation.command);
+      if (!enemyResolution.accepted) throw new Error(enemyResolution.errors[0]?.message ?? "敌方职责指令无法结算");
+      state = enemyResolution.state;
+    }
+  }
+  return state;
+}
+
+describe("campaign reference solutions", () => {
+  it.each(LEVEL_ORDER)("can complete %s through the production turn pipeline", (levelId) => {
+    const level = getLevel(levelId);
+    const result = runReferenceSolution(levelId);
+    expect(result.phase).toBe("won");
+    expect(result.round).toBeLessThanOrEqual(level.initialBattle.maxRounds);
+    expect(result.objectives.filter((objective) => !objective.key).every((objective) => objective.completed)).toBe(true);
+  });
+});
