@@ -63,13 +63,13 @@
 - 产出 `enemyCommand(level, state): TurnCommand`。
 - 基础语法与战斗合法性仍由 `resolveTurn`/现有 validator 负责；本任务只处理关卡用途与职责。
 
-- [ ] 写失败测试：`scout` 只能交互非关键目标；`corrupt` 角色只能交互该关唯一关键目标；拒绝时状态不变并返回具体原因。
-- [ ] 写失败测试：`corrupt`、`hunt-player`、`guard` 分别按规格生成一条完整指令。
-- [ ] 写失败测试：移动前已满足动作条件时不移动；贪心候选按距离、`y`、`x` 决定；无合法格时 `guard`。
-- [ ] 运行 `npm test -- src/game/campaign/validate-level-command.test.ts src/game/campaign/enemy-command.test.ts`，确认函数缺失导致预期失败。
-- [ ] 最小实现两个纯函数，不修改战斗内核胜负顺序。
-- [ ] 重跑定向测试与 `npm exec tsc -- --noEmit`。
-- [ ] 提交：`feat: add campaign command rules and enemy roles`。
+- [x] 写失败测试：`scout` 只能交互非关键目标；`corrupt` 角色只能交互该关唯一关键目标；拒绝时状态不变并返回具体原因。
+- [x] 写失败测试：`corrupt`、`hunt-player`、`guard` 分别按规格生成一条完整指令。
+- [x] 写失败测试：移动前已满足动作条件时不移动；贪心候选按距离、`y`、`x` 决定；无合法格时 `guard`。
+- [x] 运行 `npm test -- src/game/campaign/validate-level-command.test.ts src/game/campaign/enemy-command.test.ts`，确认函数缺失导致预期失败。
+- [x] 最小实现两个纯函数，不修改战斗内核胜负顺序。
+- [x] 重跑定向测试与 `npm exec tsc -- --noEmit`。
+- [x] 提交：`feat: add campaign command rules and enemy roles`。
 
 **完成标准：** 所有关卡交互权限在调用 `resolveTurn` 前拒绝；三类敌人只执行固定职责且结果确定。
 
