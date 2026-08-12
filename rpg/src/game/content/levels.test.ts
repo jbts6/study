@@ -35,12 +35,12 @@ describe("campaign levels", () => {
     expect(second.starterCode).toContain("if ");
     expect(third.starterCode).not.toContain("def choose_turn");
     expect(third.starterCode).toContain('world["units"]');
-    expect(fourth.starterCode).toContain("and");
-    expect(fourth.starterCode).toContain("or");
-    expect(fourth.starterCode).toContain("not");
+    expect(fourth.starterCode).toMatch(/example\s*=\s*\w+\s+and\s+\(\w+\s+or\s+not\s+\w+\)/);
     expect(fourth.starterCode).not.toContain("def choose_turn");
     expect(fifth.starterCode).toContain("辅助函数");
     expect(fifth.starterCode).not.toContain("def choose_turn");
+    expect(sixth.starterCode).toContain("world");
+    expect(sixth.starterCode).not.toMatch(/条件分支|遍历筛选|辅助函数/);
     expect(sixth.starterCode).not.toContain("def choose_turn");
     expect(sixth.apiHints.length).toBeGreaterThan(0);
   });
@@ -58,13 +58,15 @@ describe("campaign levels", () => {
 
     for (const levelId of LEVEL_ORDER) {
       const level = getLevel(levelId);
-      const unitIds = new Set(level.initialBattle.units.map((unit) => unit.id));
-      const objectiveIds = new Set(level.initialBattle.objectives.map((objective) => objective.id));
       expect(level.initialBattle.battleId).toBe(level.id);
-      expect(level.initialBattle.turnOrder.every((unitId) => unitIds.has(unitId))).toBe(true);
-      expect(Object.keys(level.enemyBehaviors).every((unitId) => unitIds.has(unitId))).toBe(true);
-      expect(level.initialBattle.objectives.every((objective) => objectiveIds.has(objective.id))).toBe(true);
-      expect(level.initialBattle.units.some((unit) => unit.id === "scout" && unit.team === "allies")).toBe(true);
+      expect(level.initialBattle.turnOrder.every((unitId) => level.initialBattle.units.some((unit) => unit.id === unitId))).toBe(true);
+      for (const unitId of Object.keys(level.enemyBehaviors)) {
+        expect(level.initialBattle.units.find((unit) => unit.id === unitId)?.team).toBe("enemies");
+      }
+      const keyObjectives = level.initialBattle.objectives.filter((objective) => objective.key);
+      expect(keyObjectives).toHaveLength(level.initialBattle.failureConditions.keyObjectiveDestroyed ? 1 : 0);
+      expect(keyObjectives.every((objective) => objective.durability > 0 && !objective.completed)).toBe(true);
+      expect(level.initialBattle.units.find((unit) => unit.id === "scout")?.team).toBe("allies");
     }
   });
 

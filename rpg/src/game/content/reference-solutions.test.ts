@@ -34,50 +34,29 @@ function distance(left: Cell, right: Cell): number {
   return Math.abs(left.x - right.x) + Math.abs(left.y - right.y);
 }
 
-function neighbors(cell: Cell): readonly Cell[] {
-  return [
-    { x: cell.x - 1, y: cell.y },
-    { x: cell.x + 1, y: cell.y },
-    { x: cell.x, y: cell.y - 1 },
-    { x: cell.x, y: cell.y + 1 },
-  ];
-}
-
-function isOpen(world: WorldView, cell: Cell): boolean {
-  return cell.x >= 0 && cell.x < world.board.width && cell.y >= 0 && cell.y < world.board.height
-    && !world.board.blockedCells.some((blocked) => blocked.x === cell.x && blocked.y === cell.y)
-    && !world.units.some((unit) => unit.cell.x === cell.x && unit.cell.y === cell.y);
-}
-
-type PathResult = Readonly<{ path: readonly Cell[]; inRange: boolean }>;
-
-function pathToRange(world: WorldView, target: Cell, range: number, exact = false): PathResult {
+function stepToward(world: WorldView, target: Cell): readonly Cell[] {
   const scout = findUnit(world, "scout");
-  type Node = Readonly<{ cell: Cell; path: readonly Cell[] }>;
-  const queue: Node[] = [{ cell: scout.cell, path: [] }];
-  const visited = new Set([`${scout.cell.x},${scout.cell.y}`]);
-  let nearest = queue[0];
-  for (let index = 0; index < queue.length; index += 1) {
-    const current = queue[index];
-    if (current === undefined) break;
-    const currentDistance = distance(current.cell, target);
-    const nearestDistance = nearest === undefined ? Number.POSITIVE_INFINITY : distance(nearest.cell, target);
-    if (currentDistance < nearestDistance || (currentDistance === nearestDistance && current.path.length > (nearest?.path.length ?? -1))) nearest = current;
-    if (exact ? currentDistance === range : currentDistance <= range) return { path: current.path, inRange: true };
-    if (current.path.length >= (scout.move ?? 0)) continue;
-    for (const next of neighbors(current.cell)) {
-      const key = `${next.x},${next.y}`;
-      if (visited.has(key) || !isOpen(world, next)) continue;
-      visited.add(key);
-      queue.push({ cell: next, path: [...current.path, next] });
-    }
+  if (scout.cell.x !== target.x) {
+    return [{ x: scout.cell.x + Math.sign(target.x - scout.cell.x), y: scout.cell.y }];
   }
-  return { path: nearest?.path ?? [], inRange: false };
+  if (scout.cell.y !== target.y) {
+    return [{ x: scout.cell.x, y: scout.cell.y + Math.sign(target.y - scout.cell.y) }];
+  }
+  return [];
 }
 
 function actAtRange(world: WorldView, target: Cell, range: number, action: TurnCommand["action"], exact = false): TurnCommand {
-  const result = pathToRange(world, target, range, exact);
-  return result.inRange ? command(world, action, result.path) : command(world, { type: "guard" }, result.path);
+  const currentDistance = distance(findUnit(world, "scout").cell, target);
+  if (exact ? currentDistance === range : currentDistance <= range) return command(world, action);
+  const movePath = stepToward(world, target);
+  const endpoint = movePath[movePath.length - 1];
+  const nextDistance = endpoint === undefined ? currentDistance : distance(endpoint, target);
+  return exact ? nextDistance === range
+    ? command(world, action, movePath)
+    : command(world, { type: "guard" }, movePath)
+    : nextDistance <= range
+      ? command(world, action, movePath)
+      : command(world, { type: "guard" }, movePath);
 }
 
 function skillReady(world: WorldView, skillId: string): boolean {
@@ -90,13 +69,21 @@ function castOrAttack(world: WorldView, targetId: string, preferredSkills: reado
     .map((skillId) => findUnit(world, "scout").skills?.find((candidate) => candidate.id === skillId && candidate.remainingCooldown === 0))
     .find((candidate) => candidate !== undefined);
   if (skill !== undefined) {
-    const result = pathToRange(world, target.cell, skill.range);
-    return result.inRange
-      ? command(world, { type: "cast", skillId: skill.id, targetId }, result.path)
-      : command(world, { type: "guard" }, result.path);
+    const currentCell = findUnit(world, "scout").cell;
+    if (distance(currentCell, target.cell) <= skill.range) return command(world, { type: "cast", skillId: skill.id, targetId });
+    const movePath = stepToward(world, target.cell);
+    const endpoint = movePath[movePath.length - 1];
+    return endpoint !== undefined && distance(endpoint, target.cell) <= skill.range
+      ? command(world, { type: "cast", skillId: skill.id, targetId }, movePath)
+      : command(world, { type: "guard" }, movePath);
   }
-  const result = pathToRange(world, target.cell, 1, true);
-  return result.inRange ? command(world, { type: "attack", targetId }, result.path) : command(world, { type: "guard" }, result.path);
+  const currentCell = findUnit(world, "scout").cell;
+  if (distance(currentCell, target.cell) === 1) return command(world, { type: "attack", targetId });
+  const movePath = stepToward(world, target.cell);
+  const endpoint = movePath[movePath.length - 1];
+  return endpoint !== undefined && distance(endpoint, target.cell) === 1
+    ? command(world, { type: "attack", targetId }, movePath)
+    : command(world, { type: "guard" }, movePath);
 }
 
 function interactWith(world: WorldView, objectiveId: string): TurnCommand {
@@ -141,6 +128,9 @@ const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
     if (!hunter.disabled) return castOrAttack(world, "hunter", ["pierce", "spark"]);
     const guard = findUnit(world, "guard");
     if (!guard.disabled && skillReady(world, "fracture") && !guard.statuses.some((status) => status.id === "fracture")) {
+      const scout = findUnit(world, "scout");
+      if (scout.cell.x === 1 && scout.cell.y === 0) return command(world, { type: "guard" }, [{ x: 1, y: 1 }]);
+      if (scout.cell.x === 1 && scout.cell.y === 1) return command(world, { type: "guard" }, [{ x: 2, y: 1 }]);
       return castOrAttack(world, "guard", ["fracture"]);
     }
     return castOrAttack(world, "guard", ["spark", "pierce"]);
