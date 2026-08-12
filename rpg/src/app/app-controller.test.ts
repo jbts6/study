@@ -274,8 +274,13 @@ describe("AppController", () => {
     expect(victoryView.root.querySelector("[data-testid='retry-level']")).not.toBeNull();
     expect(victoryView.root.querySelector("[data-testid='campaign-reset']")).toBeNull();
     expect(visibleActionIds(victoryView.root)).toEqual(["advance-level", "retry-level"]);
-    victoryView.root.querySelector<HTMLButtonElement>("[data-testid='advance-level']")?.click();
-    expect(victoryController.getSnapshot()).toMatchObject({ mode: "game", currentLevelId: "python-marsh-02" });
+    victoryView.root.querySelector<HTMLButtonElement>("[data-testid='retry-level']")?.click();
+    expect(victoryController.getSnapshot()).toMatchObject({
+      mode: "game",
+      currentLevelId: "python-marsh-01",
+      battleState: { phase: "in_progress" },
+      codeDraft: "advance this",
+    });
     victoryView.unmount();
 
     const completionController = createController(
@@ -295,6 +300,58 @@ describe("AppController", () => {
     expect(completionView.root.querySelector("[data-testid='advance-level']")).toBeNull();
     expect(completionView.root.querySelector("[data-testid='retry-level']")).toBeNull();
     expect(visibleActionIds(completionView.root)).toEqual(["campaign-reset"]);
+    completionController.retryLevel();
+    expect(completionController.getSnapshot()).toMatchObject({
+      mode: "game",
+      currentLevelId: "python-marsh-06",
+      battleState: { phase: "won" },
+      codeDraft: "archive this",
+    });
     completionView.unmount();
+  });
+
+  it("translates relay corruption into one readable objective update", async () => {
+    const runner = new FakeRunner(completed({ actorId: "scout", expectedRevision: 0, action: { type: "wait" } }));
+    const controller = createController(runner, new MemorySaveStore(null));
+    await controller.start();
+
+    await controller.runTurn();
+
+    const snapshot = controller.getSnapshot();
+    if (snapshot.mode !== "game") throw new Error("expected game mode");
+    expect(snapshot.feedback.messages).toContain("中继器受到腐化：relay 耐久 1");
+    expect(snapshot.feedback.messages.some((message) => message.includes("[interacted]") || message.includes("[objective_progressed]"))).toBe(false);
+  });
+
+  it("translates seal activation into one readable objective update", async () => {
+    const third = getLevel("python-marsh-03");
+    const activationBattle = {
+      ...third.initialBattle,
+      objectives: [...third.initialBattle.objectives, {
+        id: "reserve-seal",
+        cell: { x: 1, y: 2 },
+        durability: 1,
+        completed: false,
+        key: false,
+      }],
+    };
+    const runner = new FakeRunner(completed({
+      actorId: "scout",
+      expectedRevision: 0,
+      movePath: [{ x: 0, y: 1 }],
+      action: { type: "interact", targetId: "scout-mark" },
+    }));
+    const controller = createController(runner, new MemorySaveStore({
+      ok: true,
+      save: { version: 2, currentLevelId: third.id, battleState: activationBattle, codeDraft: "activate it" },
+    }));
+    await controller.start();
+
+    await controller.runTurn();
+
+    const snapshot = controller.getSnapshot();
+    if (snapshot.mode !== "game") throw new Error("expected game mode");
+    expect(snapshot.feedback.messages).toContain("封印激活进度：scout-mark 耐久 0（已完成）");
+    expect(snapshot.feedback.messages.some((message) => message.includes("[interacted]") || message.includes("[objective_progressed]"))).toBe(false);
   });
 });

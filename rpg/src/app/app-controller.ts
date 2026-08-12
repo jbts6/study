@@ -123,7 +123,7 @@ export class AppController {
   }
 
   retryLevel(): void {
-    if (this.snapshot.mode !== "game" || !isFailedSettlement(this.snapshot)) return;
+    if (this.snapshot.mode !== "game" || !isRetriableSettlement(this.snapshot)) return;
     const level = getLevel(this.snapshot.currentLevelId);
     const next = this.createGameSnapshot(level.id, createLevelBattle(level), this.snapshot.codeDraft, idleFeedback());
     this.saveGame(next);
@@ -297,7 +297,7 @@ function successFeedback(state: BattleState, events: readonly BattleEvent[], res
   return {
     kind: "success",
     title: "回合已推进",
-    messages: events.map(formatBattleEvent),
+    messages: formatBattleEvents(state, events),
     stdout: result.streams.stdout,
     stderr: result.streams.stderr,
   };
@@ -342,6 +342,11 @@ function isFailedSettlement(snapshot: GameSnapshot): boolean {
   return snapshot.battleState.phase === "lost" || (snapshot.battleState.phase === "won" && !isSuccessfulSettlement(snapshot));
 }
 
+function isRetriableSettlement(snapshot: GameSnapshot): boolean {
+  return isFailedSettlement(snapshot)
+    || (isSuccessfulSettlement(snapshot) && getLevel(snapshot.currentLevelId).reward.type === "ability");
+}
+
 function combatErrorFeedback(errors: readonly Readonly<{ code: string; path: string; message: string }>[]): AppFeedback {
   return errorFeedback("指令无效", errors.map((error) => `[${error.code}] ${error.path} ${error.message}`));
 }
@@ -368,6 +373,24 @@ function formatDiagnostic(diagnostic: RunnerDiagnostic): string {
   if (diagnostic.location === undefined) return `${prefix} ${diagnostic.message}`;
   const { file, line, column } = diagnostic.location;
   return `${prefix} ${file}:${line}${column === undefined ? "" : `:${column}`} ${diagnostic.message}`;
+}
+
+function formatBattleEvents(state: BattleState, events: readonly BattleEvent[]): readonly string[] {
+  return events.flatMap((event) => {
+    if (event.type === "interacted") return [];
+    if (event.type === "objective_progressed") return formatObjectiveProgress(state, event);
+    return [formatBattleEvent(event)];
+  });
+}
+
+function formatObjectiveProgress(state: BattleState, event: BattleEvent): string {
+  const targetId = event.payload.targetId;
+  const target = typeof targetId === "string" ? state.objectives.find((objective) => objective.id === targetId) : undefined;
+  if (target === undefined) return formatBattleEvent(event);
+  const durability = event.payload.durabilityAfter;
+  const value = typeof durability === "number" ? durability : target.durability;
+  if (target.key) return `中继器受到腐化：${target.id} 耐久 ${value}${value === 0 ? "（已毁）" : ""}`;
+  return `封印激活进度：${target.id} 耐久 ${value}${target.completed ? "（已完成）" : ""}`;
 }
 
 function formatBattleEvent(event: BattleEvent): string {
