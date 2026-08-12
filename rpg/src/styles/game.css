@@ -120,7 +120,7 @@
 }
 
 .concept-hint summary {
-  min-height: 28px;
+  min-height: 44px;
   color: var(--text);
   cursor: pointer;
 }

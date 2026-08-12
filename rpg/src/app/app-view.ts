@@ -19,6 +19,7 @@ type GameShell = Readonly<{
   feedback: HTMLElement;
   run: HTMLButtonElement;
   interrupt: HTMLButtonElement;
+  reset: HTMLButtonElement;
   editor: CodeEditorHandle;
 }>;
 
@@ -118,7 +119,8 @@ function createGameShell(controller: AppController, snapshot: GameSnapshot): Gam
   const resetInput = requiredElement<HTMLInputElement>(dialog, "input");
   const resetForm = requiredElement<HTMLFormElement>(dialog, "form");
   const resetButton = requiredElement<HTMLButtonElement>(dialog, "[data-reset-save]");
-  requiredElement<HTMLButtonElement>(element, ".reset-trigger").addEventListener("click", () => dialog.showModal());
+  const reset = requiredElement<HTMLButtonElement>(element, ".reset-trigger");
+  reset.addEventListener("click", () => dialog.showModal());
   requiredElement<HTMLButtonElement>(dialog, "[data-dialog-close]").addEventListener("click", () => dialog.close());
   wireResetConfirmation(resetForm, resetInput, resetButton, (confirmation) => {
     controller.resetSave(confirmation);
@@ -141,6 +143,7 @@ function createGameShell(controller: AppController, snapshot: GameSnapshot): Gam
     feedback: requiredElement(element, "[data-testid='feedback']"),
     run: requiredElement(element, "[data-testid='run-turn']"),
     interrupt: requiredElement(element, "[data-testid='interrupt-run']"),
+    reset,
     editor,
   };
   shell.run.addEventListener("click", () => void controller.runTurn());
@@ -162,6 +165,7 @@ function updateGameShell(shell: GameShell, snapshot: GameSnapshot): void {
   shell.run.disabled = runnerState !== "ready" || running || settlement !== undefined || battleState.phase !== "in_progress";
   shell.interrupt.hidden = !running;
   shell.interrupt.disabled = !running;
+  shell.reset.hidden = settlement !== undefined;
   renderBattlefield(shell.battlefield, battleState);
   renderBriefing(shell.briefing, getLevel(snapshot.currentLevelId), battleState);
   renderFeedback(shell.feedback, snapshot, settlement, shell.controller);
@@ -287,11 +291,12 @@ function settlementFor(snapshot: GameSnapshot): Settlement | undefined {
   const unmetObjectives = battleState.phase === "won"
     ? battleState.objectives.filter((objective) => !objective.key && !objective.completed).map((objective) => `${objective.id} 尚未激活`)
     : [];
-  if (battleState.phase === "lost") return { kind: "failed", messages: ["战斗失败。重试本关以保留当前代码。"] };
-  if (unmetObjectives.length > 0) return { kind: "failed", messages: unmetObjectives.map((reason) => `任务失败：${reason}`) };
+  const lockedMessage = "代码已锁定，运行已禁用；可查看最终战场与代码。";
+  if (battleState.phase === "lost") return { kind: "failed", messages: ["战斗失败。重试本关以保留当前代码。", lockedMessage] };
+  if (unmetObjectives.length > 0) return { kind: "failed", messages: [...unmetObjectives.map((reason) => `任务失败：${reason}`), lockedMessage] };
   if (battleState.phase !== "won") return undefined;
-  if (level.reward.type === "campaign-complete") return { kind: "complete", messages: ["沼心封印已经稳定。最终战场与代码保留供复盘。"] };
-  return { kind: "victory", messages: [`获得新能力：${level.reward.abilityId}`, `完成于第 ${battleState.round} 回合。`] };
+  if (level.reward.type === "campaign-complete") return { kind: "complete", messages: ["沼心封印已经稳定。最终战场与代码保留供复盘。", lockedMessage] };
+  return { kind: "victory", messages: [`获得新能力：${level.reward.abilityId}`, `完成于第 ${battleState.round} 回合。`, lockedMessage] };
 }
 
 function renderSettlement(container: HTMLElement, settlement: Settlement, controller: AppController): void {

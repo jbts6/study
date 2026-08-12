@@ -102,6 +102,12 @@ function winningBattle(levelId: "python-marsh-01" | "python-marsh-06") {
   };
 }
 
+function visibleActionIds(root: HTMLElement): string[] {
+  return [...root.querySelectorAll<HTMLButtonElement>("button:not([disabled]):not([hidden])")]
+    .filter((button) => button.closest("dialog:not([open])") === null)
+    .map((button) => button.dataset.testid ?? button.className);
+}
+
 describe("AppController", () => {
   it("rejects a level-invalid player interaction before it advances battle or save", async () => {
     const runner = new FakeRunner(completed({
@@ -246,6 +252,7 @@ describe("AppController", () => {
     expect(failedView.root.querySelector("[data-testid='retry-level']")).not.toBeNull();
     expect(failedView.root.querySelector("[data-testid='advance-level']")).toBeNull();
     expect(failedView.root.querySelector("[data-testid='campaign-reset']")).toBeNull();
+    expect(visibleActionIds(failedView.root)).toEqual(["retry-level"]);
     failedView.root.querySelector<HTMLButtonElement>("[data-testid='retry-level']")?.click();
     expect(failedController.getSnapshot()).toMatchObject({ mode: "game", battleState: { phase: "in_progress" } });
     failedView.unmount();
@@ -266,6 +273,7 @@ describe("AppController", () => {
     expect(victoryView.root.querySelector("[data-testid='advance-level']")).not.toBeNull();
     expect(victoryView.root.querySelector("[data-testid='retry-level']")).not.toBeNull();
     expect(victoryView.root.querySelector("[data-testid='campaign-reset']")).toBeNull();
+    expect(visibleActionIds(victoryView.root)).toEqual(["advance-level", "retry-level"]);
     victoryView.root.querySelector<HTMLButtonElement>("[data-testid='advance-level']")?.click();
     expect(victoryController.getSnapshot()).toMatchObject({ mode: "game", currentLevelId: "python-marsh-02" });
     victoryView.unmount();
@@ -286,6 +294,7 @@ describe("AppController", () => {
     expect(completionView.root.querySelector("[data-testid='campaign-reset']")).not.toBeNull();
     expect(completionView.root.querySelector("[data-testid='advance-level']")).toBeNull();
     expect(completionView.root.querySelector("[data-testid='retry-level']")).toBeNull();
+    expect(visibleActionIds(completionView.root)).toEqual(["campaign-reset"]);
     completionView.unmount();
   });
 });
