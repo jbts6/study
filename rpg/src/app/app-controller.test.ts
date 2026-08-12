@@ -3,6 +3,7 @@ import type { SaveDataV2, SaveLoadResult, SaveStore } from "./save-store";
 import type { RunnerClient, RunnerDisplayState } from "./runner-client";
 import type { ExecutionStatus, JsonValue, RunRequest, RunResult } from "../runners/protocol/types";
 import { AppController } from "./app-controller";
+import { mountApp } from "./app-view";
 import { getLevel } from "../game/content/levels";
 
 class FakeRunner implements RunnerClient {
@@ -82,6 +83,23 @@ function createController(runner: FakeRunner, saveStore: MemorySaveStore): AppCo
     saveStore,
     createId: () => "test-run",
   });
+}
+
+function mountSettlement(controller: AppController): Readonly<{ root: HTMLDivElement; unmount: () => void }> {
+  const root = document.createElement("div");
+  document.body.append(root);
+  return { root, unmount: mountApp(root, controller) };
+}
+
+function winningBattle(levelId: "python-marsh-01" | "python-marsh-06") {
+  const level = getLevel(levelId);
+  return {
+    ...level.initialBattle,
+    phase: "won" as const,
+    objectives: level.initialBattle.objectives.map((objective) => objective.key
+      ? objective
+      : { ...objective, completed: true, durability: 0 }),
+  };
 }
 
 describe("AppController", () => {
@@ -208,5 +226,66 @@ describe("AppController", () => {
     if (retried.mode !== "game") throw new Error("expected game mode");
     expect(retried.battleState.phase).toBe("in_progress");
     expect(retried.codeDraft).toBe("keep this");
+  });
+
+  it("renders failure, level victory, and campaign completion settlements with only their allowed operations", async () => {
+    const failedLevel = getLevel("python-marsh-03");
+    const failedController = createController(
+      new FakeRunner(completed(null)),
+      new MemorySaveStore({ ok: true, save: {
+        version: 2,
+        currentLevelId: failedLevel.id,
+        battleState: { ...failedLevel.initialBattle, phase: "lost" },
+        codeDraft: "retry this",
+      } }),
+    );
+    const failedView = mountSettlement(failedController);
+    await failedController.start();
+
+    expect(failedView.root.querySelector("[data-testid='settlement-failed']")).not.toBeNull();
+    expect(failedView.root.querySelector("[data-testid='retry-level']")).not.toBeNull();
+    expect(failedView.root.querySelector("[data-testid='advance-level']")).toBeNull();
+    expect(failedView.root.querySelector("[data-testid='campaign-reset']")).toBeNull();
+    failedView.root.querySelector<HTMLButtonElement>("[data-testid='retry-level']")?.click();
+    expect(failedController.getSnapshot()).toMatchObject({ mode: "game", battleState: { phase: "in_progress" } });
+    failedView.unmount();
+
+    const victoryController = createController(
+      new FakeRunner(completed(null)),
+      new MemorySaveStore({ ok: true, save: {
+        version: 2,
+        currentLevelId: "python-marsh-01",
+        battleState: winningBattle("python-marsh-01"),
+        codeDraft: "advance this",
+      } }),
+    );
+    const victoryView = mountSettlement(victoryController);
+    await victoryController.start();
+
+    expect(victoryView.root.querySelector("[data-testid='settlement-victory']")).not.toBeNull();
+    expect(victoryView.root.querySelector("[data-testid='advance-level']")).not.toBeNull();
+    expect(victoryView.root.querySelector("[data-testid='retry-level']")).not.toBeNull();
+    expect(victoryView.root.querySelector("[data-testid='campaign-reset']")).toBeNull();
+    victoryView.root.querySelector<HTMLButtonElement>("[data-testid='advance-level']")?.click();
+    expect(victoryController.getSnapshot()).toMatchObject({ mode: "game", currentLevelId: "python-marsh-02" });
+    victoryView.unmount();
+
+    const completionController = createController(
+      new FakeRunner(completed(null)),
+      new MemorySaveStore({ ok: true, save: {
+        version: 2,
+        currentLevelId: "python-marsh-06",
+        battleState: winningBattle("python-marsh-06"),
+        codeDraft: "archive this",
+      } }),
+    );
+    const completionView = mountSettlement(completionController);
+    await completionController.start();
+
+    expect(completionView.root.querySelector("[data-testid='settlement-complete']")).not.toBeNull();
+    expect(completionView.root.querySelector("[data-testid='campaign-reset']")).not.toBeNull();
+    expect(completionView.root.querySelector("[data-testid='advance-level']")).toBeNull();
+    expect(completionView.root.querySelector("[data-testid='retry-level']")).toBeNull();
+    completionView.unmount();
   });
 });
