@@ -21,8 +21,11 @@ export function enemyCommand(level: LevelDefinition, state: Readonly<BattleState
 }
 
 function corruptCommand(state: Readonly<BattleState>, actor: BattleUnit): TurnCommand {
-  const target = state.objectives.find((objective) => objective.key && !objective.completed);
-  if (target === undefined) return command(state, actor.id, { type: "guard" });
+  const keyObjectives = state.objectives.filter((objective) => objective.key);
+  if (keyObjectives.length !== 1) throw new Error("腐化职责要求关卡恰好包含一个关键目标");
+  const target = keyObjectives[0];
+  if (target === undefined) throw new Error("腐化职责要求关卡恰好包含一个关键目标");
+  if (target.completed) return command(state, actor.id, { type: "guard" });
   if (distance(actor.cell, target.cell) === 1) return command(state, actor.id, { type: "interact", targetId: target.id });
 
   const next = greedyStep(state, actor, target.cell);
