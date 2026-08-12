@@ -122,12 +122,12 @@
 - 完成 `LEVEL_ORDER = python-marsh-01 ... python-marsh-06` 的六关目录。
 - 参考解法测试通过与控制器相同的 `projectWorldView → 指令解析 → validateLevelCommand → resolveTurn → enemyCommand` 流程，不复制战斗逻辑。
 
-- [ ] 扩展失败的数据测试到六关：必填字段、重复 ID、实际单位/目标/能力引用和固定奖励顺序。
-- [ ] 写六份参数化参考解法测试，每关断言最终内核胜利且终局断言通过。
-- [ ] 运行 `npm test -- src/game/content/levels.test.ts src/game/content/reference-solutions.test.ts`，确认后三关缺失或不能通关。
-- [ ] 最小实现后三关地图、单位、目标、脚手架、提示、职责和奖励；调整数值仅以参考解法可达且教学负担符合规格为准。
-- [ ] 重跑上述测试与 `npm exec tsc -- --noEmit`。
-- [ ] 提交：`feat: complete six-level campaign content`。
+- [x] 扩展失败的数据测试到六关：必填字段、重复 ID、实际单位/目标/能力引用和固定奖励顺序。最终整体审查确认现有关键失败路径足够，不再为每关重复参数化同类缺失字段。
+- [x] 写六份参数化参考解法测试，每关断言最终内核胜利且终局断言通过。
+- [x] 运行 `npm test -- src/game/content/levels.test.ts src/game/content/reference-solutions.test.ts`，确认后三关缺失或不能通关。
+- [x] 最小实现后三关地图、单位、目标、脚手架、提示、职责和奖励；调整数值仅以参考解法可达且教学负担符合规格为准。
+- [x] 重跑上述测试与 `npm exec tsc -- --noEmit`。
+- [x] 提交：`feat: complete six-level campaign content`。
 
 **完成标准：** 六关均由各自参考解法在最大回合数内通关；奖励顺序为 `ward → pierce → renew → fracture → aegis`，第六关只标记战役完成。
 
@@ -147,13 +147,13 @@
 - 底部反馈区根据当前关卡、战斗阶段和终局断言即时呈现成功/失败/战役完成结算。
 - 按钮只调用 `controller.retryLevel()`、`controller.advanceLevel()`、现有 `resetSave()`。
 
-- [ ] 在控制器测试补充失败断言：三种结算模型及其允许操作，不新增独立结算存档字段。
-- [ ] 修改单屏结构：任务区、技能冷却、`details` 概念提示、底部结算动作；保留现有战场和编辑器。
-- [ ] 终态禁用编辑器与运行；普通 Python/指令错误仍留在反馈区且不进入任务失败结算。
-- [ ] 更新样式 token 和布局，保证现有桌面/窄屏不重叠、键盘焦点可见、结算内容可滚动；不新建页面或卡片嵌套。
-- [ ] 运行 `npm test -- src/app/app-controller.test.ts` 与 `npm run build`。
-- [ ] 启动本地开发服务后，用浏览器检查第一关进行中、任务失败、普通胜利和第六关完成四种关键状态的桌面/移动截图及控制台错误。
-- [ ] 提交：`feat: add campaign briefing and settlement UI`。
+- [x] 在控制器测试补充失败断言：三种结算模型及其允许操作，不新增独立结算存档字段。
+- [x] 修改单屏结构：任务区、技能冷却、`details` 概念提示、底部结算动作；保留现有战场和编辑器。
+- [x] 终态禁用编辑器与运行；普通 Python/指令错误仍留在反馈区且不进入任务失败结算。
+- [x] 更新样式 token 和布局，保证现有桌面/窄屏不重叠、键盘焦点可见、结算内容可滚动；不新建页面或卡片嵌套。
+- [x] 运行 `npm test -- src/app/app-controller.test.ts` 与 `npm run build`。
+- [x] 启动本地开发服务后，用浏览器检查第一关进行中、任务失败、普通胜利和第六关完成四种关键状态的桌面/移动截图及控制台错误。
+- [x] 提交：`feat: add campaign briefing and settlement UI`；审查修复提交：`fix: enforce campaign settlement constraints`。
 
 **完成标准：** 单屏完整显示任务与能力状态；前五关胜利、任务失败、第六关完成各有正确按钮；刷新后呈现同一结算，不产生额外 UI 状态源。
 
@@ -169,13 +169,13 @@
 **接口：**
 - Playwright 使用测试内参考代码逐关通关；不得把参考解法导入生产 bundle。
 
-- [ ] 扩展唯一浏览器主流程：第一关开始，逐关运行参考代码，断言奖励能力、前五关结算和下一关按钮。
-- [ ] 在至少一个前五关胜利结算和第六关完成后刷新，断言结算、战斗与代码恢复且不重复注入能力。
-- [ ] 断言第六关仅显示重置存档，不发放新能力。
-- [ ] 运行 `npm run test:e2e -- e2e/app-shell.spec.ts`；修复真实集成问题后重跑。
-- [ ] 阶段性完成后运行一次 `npm test` 与 `npm run build`，不增加额外测试矩阵。
-- [ ] 检查生产构建不含参考解法、远程执行路径、未使用内容框架或本机绝对路径。
-- [ ] 提交：`test: verify complete six-level campaign`。
+- [x] 扩展唯一浏览器主流程：第一关开始，逐关运行参考代码，断言奖励能力、前五关结算和下一关按钮。
+- [x] 在至少一个前五关胜利结算和第六关完成后刷新，断言结算、战斗与代码恢复且不重复注入能力。
+- [x] 断言第六关仅显示重置存档，不发放新能力。
+- [x] 运行 `npm run test:e2e -- e2e/app-shell.spec.ts`；修复真实集成问题后重跑。
+- [x] 阶段性完成后运行一次 `npm test` 与 `npm run build`，不增加额外测试矩阵。
+- [x] 检查生产构建不含参考解法、远程执行路径、未使用内容框架或本机绝对路径。
+- [x] 提交：`test: verify complete six-level campaign`；全量回归夹具解耦提交：`test: decouple combat fixture from campaign content`；最终审查修复提交：`fix: address campaign final review`、`refactor: extract battle feedback formatting`。
 
 **完成标准：** 六关浏览器主流程、刷新恢复、能力解锁与最终结算全部通过；定向测试、全量 Vitest 和生产构建无错误。
 
