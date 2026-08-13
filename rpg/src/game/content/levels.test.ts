@@ -33,10 +33,14 @@ describe("campaign levels", () => {
 
     expect(first.starterCode).toContain("def choose_turn");
     expect(first.starterCode).toContain('"movePath": [{"x": 1, "y": 0}, {"x": 1, "y": 1}]');
+    expect(first.starterCode).toContain("movePath 是顶层字段");
+    expect(first.starterCode).toContain("不是 [[1, 0]]");
     expect(first.starterCode).toContain('"action": {"type": "attack", "targetId": "golem"}');
     expect(first.starterCode).toContain('"action": {"type": "cast", "skillId": "spark", "targetId": "golem"}');
-    expect(first.apiHints).toContain('移动：顶层写 "movePath"；攻击：action 写 "type": "attack" 和 "targetId"。');
-    expect(first.apiHints).toContain('施法：action 写 "type": "cast"、"skillId" 和 "targetId"。');
+    expect(first.apiHints.some((hint) => hint.includes('movePath：顶层可选字段，值必须是坐标对象数组'))).toBe(true);
+    expect(first.apiHints.some((hint) => hint.includes('movePath 示例：[{"x": 1, "y": 0}, {"x": 2, "y": 0}]；不能写成 [[1, 0], [2, 0]]。'))).toBe(true);
+    expect(first.apiHints.some((hint) => hint.includes('action') && hint.includes('"attack"') && hint.includes('"cast"') && hint.includes('"wait"'))).toBe(true);
+    expect(first.apiHints.some((hint) => hint.includes('施法格式') && hint.includes('skillId') && hint.includes('targetId'))).toBe(true);
     expect(second.starterCode).toContain("if ");
     expect(third.starterCode).not.toContain("def choose_turn");
     expect(third.starterCode).toContain('world["units"]');

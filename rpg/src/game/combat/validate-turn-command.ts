@@ -14,6 +14,10 @@ type ParsedCommand = Readonly<{
   action: MainAction;
 }>;
 
+const COMMAND_SHAPE_HINT = "顶层命令必须包含 actorId（字符串）、expectedRevision（整数）和 action（字典），movePath 可选；例如 {\"actorId\": world[\"activeUnitId\"], \"expectedRevision\": world[\"revision\"], \"action\": {\"type\": \"wait\"}}";
+const MOVE_PATH_SHAPE_HINT = "movePath 必须是坐标对象数组，每个元素都写成 {\"x\": 整数, \"y\": 整数}；正确示例：[{\"x\": 1, \"y\": 0}]；不能写成 [[1, 0]]";
+const ACTION_TYPE_HINT = "action.type 必须是 \"attack\"、\"cast\"、\"interact\"、\"guard\" 或 \"wait\"";
+
 const rejected = (code: CommandError["code"], path: string, message: string): CommandValidation => ({
   accepted: false,
   errors: [{ code, path, message }],
@@ -38,22 +42,22 @@ function isIntegerCell(value: unknown): value is Cell {
 /** Builds a stable unknown-field validation response. */
 function unknownField(value: Record<string, unknown>, allowed: readonly string[], path: string): CommandValidation | undefined {
   const field = Object.keys(value).find((key) => !allowed.includes(key));
-  return field === undefined ? undefined : rejected("UNKNOWN_FIELD", `${path}.${field}`, "命令包含未知字段");
+  return field === undefined ? undefined : rejected("UNKNOWN_FIELD", `${path}.${field}`, `${path === "$" ? "顶层命令" : "action"} 不支持字段 ${field}；${path === "$" ? COMMAND_SHAPE_HINT : ACTION_TYPE_HINT}`);
 }
 
 /** Parses a movement path without trusting caller-owned objects. */
 function readMovePath(value: Record<string, unknown>): readonly Cell[] | CommandValidation {
   if (!Object.hasOwn(value, "movePath")) return [];
   if (!Array.isArray(value.movePath) || !value.movePath.every(isIntegerCell)) {
-    return rejected("INVALID_MOVE_PATH", "$.movePath", "移动路径必须是整数坐标数组");
+    return rejected("INVALID_MOVE_PATH", "$.movePath", MOVE_PATH_SHAPE_HINT);
   }
   return value.movePath.map((cell) => ({ x: cell.x, y: cell.y }));
 }
 
 /** Parses one exact action object into a safe turn action. */
 function readAction(value: unknown): MainAction | CommandValidation {
-  if (!isRecord(value)) return rejected("INVALID_COMMAND", "$.action", "主动作必须是对象");
-  if (typeof value.type !== "string") return rejected("INVALID_COMMAND", "$.action.type", "主动作类型无效");
+  if (!isRecord(value)) return rejected("INVALID_COMMAND", "$.action", `action 必须是 Python 字典；${COMMAND_SHAPE_HINT}`);
+  if (typeof value.type !== "string") return rejected("INVALID_COMMAND", "$.action.type", ACTION_TYPE_HINT);
 
   const unknown = unknownActionField(value);
   if (unknown !== undefined) return unknown;
@@ -66,11 +70,11 @@ function readAction(value: unknown): MainAction | CommandValidation {
     case "wait":
       return hasExactKeys(value, ["type"])
         ? { type: value.type }
-        : rejected("INVALID_COMMAND", "$.action", "主动作字段无效");
+        : rejected("INVALID_COMMAND", "$.action", `${value.type} 不需要 targetId、skillId 或其他字段；${ACTION_TYPE_HINT}`);
     case "cast":
       return readCastAction(value);
     default:
-      return rejected("INVALID_COMMAND", "$.action.type", "主动作类型无效");
+      return rejected("INVALID_COMMAND", "$.action.type", `${ACTION_TYPE_HINT}；收到 ${JSON.stringify(value.type)}`);
   }
 }
 
@@ -87,35 +91,35 @@ function unknownActionField(value: Record<string, unknown>): CommandValidation |
 /** Parses an exact unit-targeting action. */
 function readTargetAction(value: Record<string, unknown>, type: "attack" | "interact"): MainAction | CommandValidation {
   if (!hasExactKeys(value, ["type", "targetId"]) || typeof value.targetId !== "string") {
-    return rejected("INVALID_COMMAND", "$.action", "主动作字段无效");
+    return rejected("INVALID_COMMAND", "$.action", `${type} 格式必须是 {\"type\": \"${type}\", \"targetId\": \"目标 ID\"}；targetId 必须是字符串`);
   }
   return { type, targetId: value.targetId };
 }
 
 /** Parses an exact cast action with exactly one target form. */
 function readCastAction(value: Record<string, unknown>): MainAction | CommandValidation {
-  if (typeof value.skillId !== "string") return rejected("INVALID_COMMAND", "$.action.skillId", "技能标识无效");
+  if (typeof value.skillId !== "string") return rejected("INVALID_COMMAND", "$.action.skillId", "skillId 必须是字符串，例如 \"spark\"；施法格式是 {\"type\": \"cast\", \"skillId\": \"spark\", \"targetId\": \"golem\"}");
   const hasTargetId = Object.hasOwn(value, "targetId");
   const hasTargetCell = Object.hasOwn(value, "targetCell");
   if (hasTargetId === hasTargetCell || !hasExactKeys(value, ["type", "skillId"], hasTargetId ? ["targetId"] : ["targetCell"])) {
-    return rejected("SKILL_TARGET_SHAPE", "$.action", "技能目标形状无效");
+    return rejected("SKILL_TARGET_SHAPE", "$.action", "cast 必须在 targetId 和 targetCell 中二选一；单位目标使用 targetId 字符串，格子目标使用 {\"x\": 整数, \"y\": 整数} 的 targetCell");
   }
   if (hasTargetId && typeof value.targetId === "string") return { type: "cast", skillId: value.skillId, targetId: value.targetId };
   if (hasTargetCell && isIntegerCell(value.targetCell)) return { type: "cast", skillId: value.skillId, targetCell: { x: value.targetCell.x, y: value.targetCell.y } };
-  return rejected("SKILL_TARGET_SHAPE", "$.action", "技能目标形状无效");
+  return rejected("SKILL_TARGET_SHAPE", "$.action", "cast 的目标格式不正确；单位目标示例：{\"targetId\": \"golem\"}，格子目标示例：{\"targetCell\": {\"x\": 1, \"y\": 0}}");
 }
 
 /** Parses a JSON command into a detached, type-safe value. */
 function readCommand(input: unknown): ParsedCommand | CommandValidation {
-  if (!isRecord(input)) return rejected("INVALID_COMMAND", "$", "命令必须是对象");
+  if (!isRecord(input)) return rejected("INVALID_COMMAND", "$", COMMAND_SHAPE_HINT);
   const unknown = unknownField(input, ["actorId", "expectedRevision", "movePath", "action"], "$");
   if (unknown !== undefined) return unknown;
   if (!hasExactKeys(input, ["actorId", "expectedRevision", "action"], ["movePath"])) {
-    return rejected("INVALID_COMMAND", "$", "命令字段无效");
+    return rejected("INVALID_COMMAND", "$", COMMAND_SHAPE_HINT);
   }
-  if (typeof input.actorId !== "string") return rejected("INVALID_COMMAND", "$.actorId", "行动者标识无效");
+  if (typeof input.actorId !== "string") return rejected("INVALID_COMMAND", "$.actorId", "actorId 必须是字符串，例如 world[\"activeUnitId\"]；它必须是当前行动者的 ID");
   if (typeof input.expectedRevision !== "number" || !Number.isFinite(input.expectedRevision) || !Number.isInteger(input.expectedRevision)) {
-    return rejected("INVALID_COMMAND", "$.expectedRevision", "预期版本必须是有限整数");
+    return rejected("INVALID_COMMAND", "$.expectedRevision", "expectedRevision 必须是整数，直接使用 world[\"revision\"]，不要写字符串 \"0\"");
   }
   const movePath = readMovePath(input);
   if ("accepted" in movePath) return movePath;
@@ -126,21 +130,21 @@ function readCommand(input: unknown): ParsedCommand | CommandValidation {
 
 /** Returns the active unit when the command actor owns this turn. */
 function activeActor(state: BattleState, actorId: string): BattleUnit | CommandValidation {
-  if (state.turnOrder[state.turnIndex] !== actorId) return rejected("NOT_ACTIVE_ACTOR", "$.actorId", "当前不是该单位的回合");
+  if (state.turnOrder[state.turnIndex] !== actorId) return rejected("NOT_ACTIVE_ACTOR", "$.actorId", `actorId 必须等于当前行动者；请使用 world[\"activeUnitId\"]（当前应为 ${state.turnOrder[state.turnIndex] ?? "无"}）`);
   const actor = state.units.find((unit) => unit.id === actorId);
-  return actor === undefined ? rejected("NOT_ACTIVE_ACTOR", "$.actorId", "当前行动者不存在") : actor;
+  return actor === undefined ? rejected("NOT_ACTIVE_ACTOR", "$.actorId", `找不到行动者 ${actorId}；请从 world[\"activeUnitId\"] 读取 ID`) : actor;
 }
 
 /** Checks every movement step and returns the final action origin. */
 function validateMovePath(state: BattleState, actor: BattleUnit, path: readonly Cell[]): Cell | CommandValidation {
-  if (path.length > actor.move) return rejected("MOVE_TOO_FAR", "$.movePath", "移动距离超过上限");
+  if (path.length > actor.move) return rejected("MOVE_TOO_FAR", "$.movePath", `当前单位 ${actor.id} 的 move=${actor.move}，movePath 最多包含 ${actor.move} 个格子，每个元素代表一步；请删掉多余坐标，例如 [{\"x\": 1, \"y\": 0}]`);
   let previous = actor.cell;
   for (let index = 0; index < path.length; index += 1) {
     const cell = path[index];
     if (manhattanDistance(previous, cell) !== 1) {
-      return rejected("INVALID_MOVE_PATH", `$.movePath[${index}]`, "移动路径必须逐格正交相邻");
+      return rejected("INVALID_MOVE_PATH", `$.movePath[${index}]`, `movePath[${index}] 必须是从上一格正交相邻（上下左右一格）的一步；不能斜走或跳格。上一格是 (${previous.x}, ${previous.y})，收到 (${cell.x}, ${cell.y})`);
     }
-    if (!isOnBoard(state, cell) || isBlocked(state, actor.id, cell)) return rejected("MOVE_BLOCKED", `$.movePath[${index}]`, "移动路径被阻挡");
+    if (!isOnBoard(state, cell) || isBlocked(state, actor.id, cell)) return rejected("MOVE_BLOCKED", `$.movePath[${index}]`, `坐标 (${cell.x}, ${cell.y}) 越界或被单位/阻挡格占用；请从战场坐标中选择未被占用的相邻格`);
     previous = cell;
   }
   return previous;
@@ -184,28 +188,28 @@ function validateAction(state: BattleState, actor: BattleUnit, origin: Cell, act
 /** Validates a cast skill, its cooldown, and its declared target type. */
 function validateCast(state: BattleState, actor: BattleUnit, origin: Cell, action: Extract<MainAction, { type: "cast" }>): CommandValidation | undefined {
   const skill = actor.skills.find((candidate) => candidate.id === action.skillId);
-  if (skill === undefined) return rejected("SKILL_NOT_FOUND", "$.action.skillId", "技能不存在");
-  if (skill.remainingCooldown > 0) return rejected("SKILL_ON_COOLDOWN", "$.action.skillId", "技能冷却中");
+  if (skill === undefined) return rejected("SKILL_NOT_FOUND", "$.action.skillId", `技能 ${action.skillId} 不存在；当前单位可用技能：${actor.skills.map((candidate) => candidate.id).join("、") || "无"}。请从这些 ID 中选择，例如 \"spark\"`);
+  if (skill.remainingCooldown > 0) return rejected("SKILL_ON_COOLDOWN", "$.action.skillId", `技能 ${skill.id} 冷却中，冷却剩余 ${skill.remainingCooldown} 回合；读取 world[\"units\"] 中该技能的 remainingCooldown，降为 0 后再施放`);
   if (skill.target === "unit") {
-    if (action.targetId === undefined || action.targetCell !== undefined) return rejected("SKILL_TARGET_SHAPE", "$.action", "技能需要单位目标");
+    if (action.targetId === undefined || action.targetCell !== undefined) return rejected("SKILL_TARGET_SHAPE", "$.action", `技能 ${skill.id} 需要单位目标；targetId 与 targetCell 只能二选一，请使用 {\"targetId\": \"单位 ID\"}，不要使用 targetCell`);
     return validateUnitTarget(state, actor, origin, action.targetId, skill.range, "INVALID_TARGET", "$.action.targetId", skill.kind === "heal" ? "ally" : "enemy");
   }
-  if (action.targetCell === undefined || action.targetId !== undefined) return rejected("SKILL_TARGET_SHAPE", "$.action", "技能需要格子目标");
+  if (action.targetCell === undefined || action.targetId !== undefined) return rejected("SKILL_TARGET_SHAPE", "$.action", `技能 ${skill.id} 需要格子目标；targetId 与 targetCell 只能二选一，请使用 {\"targetCell\": {\"x\": 整数, \"y\": 整数}}，不要使用 targetId`);
   return validateCellTarget(state, actor, origin, action.targetCell, skill.range, skill.kind);
 }
 
 /** Validates that a cell-target skill points to one legal unit occupant. */
 function validateCellTarget(state: BattleState, actor: BattleUnit, origin: Cell, cell: Cell, range: number, kind: "damage" | "heal"): CommandValidation | undefined {
-  if (!isOnBoard(state, cell)) return rejected("INVALID_TARGET", "$.action.targetCell", "技能目标不在战场内");
+  if (!isOnBoard(state, cell)) return rejected("INVALID_TARGET", "$.action.targetCell", `格子目标 (${cell.x}, ${cell.y}) 不在战场内；合法坐标范围是 x=0..${state.board.width - 1}、y=0..${state.board.height - 1}`);
   const occupants = state.units.filter((unit) => sameCell(unit.cell, cell));
   const target = occupants[0];
   const hasRequiredTeam = kind === "damage" ? target?.team !== actor.team : target?.team === actor.team;
   if (occupants.length !== 1 || target === undefined || !hasRequiredTeam || target.visibility !== "revealed" || target.disabled) {
-    return rejected("INVALID_TARGET", "$.action.targetCell", "技能目标无效");
+    return rejected("INVALID_TARGET", "$.action.targetCell", `格子目标 (${cell.x}, ${cell.y}) 必须正好有一个可见且未禁用的${kind === "damage" ? "敌方" : "友方"}单位；请从 world[\"units\"] 的 cell 中选择`);
   }
   return manhattanDistance(origin, cell) <= range
     ? undefined
-    : rejected("TARGET_OUT_OF_RANGE", "$.action.targetCell", "技能目标超出距离");
+    : rejected("TARGET_OUT_OF_RANGE", "$.action.targetCell", `格子目标超出技能距离 ${range}；请移动到目标附近，或选择距离不超过 ${range} 的坐标`);
 }
 
 /** Validates a living unit target, its team, and its range. */
@@ -213,20 +217,23 @@ function validateUnitTarget(state: BattleState, actor: BattleUnit, origin: Cell,
   const target = state.units.find((unit) => unit.id === targetId);
   const hasRequiredTeam = targetTeam === "enemy" ? target?.team !== actor.team : target?.team === actor.team;
   if (target === undefined || !isOnBoard(state, target.cell) || !hasRequiredTeam || target.visibility !== "revealed" || target.disabled) {
-    return rejected(invalidCode, path, "目标无效");
+    const expected = targetTeam === "enemy" ? "敌方" : "友方";
+    const available = state.units.filter((unit) => unit.team === (targetTeam === "enemy" ? "enemies" : "allies") && isOnBoard(state, unit.cell) && unit.visibility === "revealed" && !unit.disabled).map((unit) => unit.id);
+    return rejected(invalidCode, path, `targetId 必须是可见且未禁用的${expected}单位 ID；当前可选：${available.join("、") || "无"}。收到 ${targetId}`);
   }
   return manhattanDistance(origin, target.cell) <= range
     ? undefined
-    : rejected("TARGET_OUT_OF_RANGE", path, "目标超出距离");
+    : rejected("TARGET_OUT_OF_RANGE", path, `目标 ${targetId} 距离为 ${manhattanDistance(origin, target.cell)}，超出允许距离 ${range}；请先在 movePath 中移动到相邻格`);
 }
 
 /** Validates an unfinished objective exactly adjacent to the final position. */
 function validateInteraction(state: BattleState, origin: Cell, targetId: string): CommandValidation | undefined {
   const objective = state.objectives.find((candidate) => candidate.id === targetId);
-  if (objective === undefined || objective.completed) return rejected("INTERACTION_INVALID", "$.action.targetId", "交互目标无效");
+  const available = state.objectives.filter((candidate) => !candidate.completed).map((candidate) => candidate.id);
+  if (objective === undefined || objective.completed) return rejected("INTERACTION_INVALID", "$.action.targetId", `targetId 必须是未完成目标 ID；当前可选：${available.join("、") || "无"}。格式示例：{\"type\": \"interact\", \"targetId\": \"relay\"}`);
   return manhattanDistance(origin, objective.cell) === 1
     ? undefined
-    : rejected("INTERACTION_INVALID", "$.action.targetId", "交互目标必须相邻");
+    : rejected("INTERACTION_INVALID", "$.action.targetId", `目标 ${targetId} 必须与行动者正交相邻才能交互；目标坐标是 (${objective.cell.x}, ${objective.cell.y})，请在 movePath 中走到相邻格`);
 }
 
 /** Strictly validates one turn command without mutating the battle state. */
@@ -234,7 +241,7 @@ export function validateTurnCommand(state: Readonly<BattleState>, input: unknown
   const command = readCommand(input);
   if ("accepted" in command) return command;
   if (state.phase !== "in_progress") return rejected("BATTLE_COMPLETE", "$.phase", "战斗已结束");
-  if (command.expectedRevision !== state.revision) return rejected("EXPECTED_REVISION_MISMATCH", "$.expectedRevision", "预期版本不匹配");
+  if (command.expectedRevision !== state.revision) return rejected("EXPECTED_REVISION_MISMATCH", "$.expectedRevision", `expectedRevision 必须等于当前 world[\"revision\"] 的值 ${state.revision}；收到 ${command.expectedRevision}，请重新读取 world[\"revision\"]`);
   const actor = activeActor(state, command.actorId);
   if ("accepted" in actor) return actor;
   if (actor.disabled) return rejected("ACTOR_DISABLED", "$.actorId", "行动者无法行动");

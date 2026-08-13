@@ -7,12 +7,12 @@
   "workspace": "master",
   "session": "",
   "sessionMode": "unidentified",
-  "updatedAt": "2026-08-08T03:33:28.531Z",
+  "updatedAt": "2026-08-13T06:44:53.816Z",
   "turn": {
     "cwd": "C:\\git\\study",
     "key": "C:\\git\\study::master::default",
     "scope": "project-session",
-    "updatedAt": "2026-08-08T03:33:28.520Z",
+    "updatedAt": "2026-08-13T06:44:53.805Z",
     "kind": "complete",
     "role": "main",
     "phase": "",
@@ -22,6 +22,17 @@
     "reason": ""
   },
   "route": null,
-  "artifacts": {},
-  "turnUpdatedAt": "2026-08-08T03:33:28.526Z"
+  "artifacts": {
+    "qa-review.json": {
+      "path": ".helloagents/sessions/master/default/artifacts/qa-review.json",
+      "updatedAt": "2026-08-13T06:43:35.302Z",
+      "type": "qa-review"
+    },
+    "closeout.json": {
+      "path": ".helloagents/sessions/master/default/artifacts/closeout.json",
+      "updatedAt": "2026-08-13T06:44:11.294Z",
+      "type": "closeout"
+    }
+  },
+  "turnUpdatedAt": "2026-08-13T06:44:53.811Z"
 }

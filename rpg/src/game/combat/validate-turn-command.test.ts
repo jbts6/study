@@ -16,6 +16,13 @@ const expectRejected = (state: BattleState, input: unknown, code: string, path: 
   });
 };
 
+const expectRejectedWithMessage = (state: BattleState, input: unknown, code: string, path: string, fragments: readonly string[]): void => {
+  const result = validateTurnCommand(state, input);
+  expect(result).toMatchObject({ accepted: false, errors: [expect.objectContaining({ code, path })] });
+  if (result.accepted) throw new Error("预期命令校验失败");
+  for (const fragment of fragments) expect(result.errors[0]?.message).toContain(fragment);
+};
+
 describe("validateTurnCommand", () => {
   it("accepts omitted and empty move paths without changing the state", () => {
     const state = createFixtureState();
@@ -39,6 +46,27 @@ describe("validateTurnCommand", () => {
     expectRejected(state, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 2.5, y: 0 } } }, "SKILL_TARGET_SHAPE", "$.action");
   });
 
+  it("explains the legal Python shape when a player uses an invalid command format", () => {
+    const state = createFixtureState();
+
+    expectRejectedWithMessage(state, { ...validWait() as object, movePath: [[1, 0]] }, "INVALID_MOVE_PATH", "$.movePath", [
+      "坐标对象数组",
+      '[{"x": 1, "y": 0}]',
+      "不能写成 [[1, 0]]",
+    ]);
+    expectRejectedWithMessage(state, { ...validWait() as object, expectedRevision: "0" }, "INVALID_COMMAND", "$.expectedRevision", [
+      "整数",
+      'world["revision"]',
+    ]);
+    expectRejectedWithMessage(state, { ...validWait() as object, action: { type: "dash" } }, "INVALID_COMMAND", "$.action.type", [
+      "attack",
+      "cast",
+      "interact",
+      "guard",
+      "wait",
+    ]);
+  });
+
   it("checks phase, revision, active actor, and disabled actor before commands", () => {
     const state = createFixtureState();
 
@@ -58,6 +86,23 @@ describe("validateTurnCommand", () => {
     expectRejected({ ...state, board: { ...state.board, blockedCells: [{ x: 1, y: 0 }] } }, { ...validWait() as object, movePath: [{ x: 1, y: 0 }] }, "MOVE_BLOCKED", "$.movePath[0]");
     expectRejected(state, { ...validWait() as object, movePath: [{ x: 1, y: 0 }, { x: 2, y: 0 }] }, "MOVE_BLOCKED", "$.movePath[1]");
     expectRejected({ ...state, units: state.units.map((unit) => unit.id === "lurker" ? { ...unit, cell: { x: 1, y: 0 } } : unit) }, { ...validWait() as object, movePath: [{ x: 1, y: 0 }] }, "MOVE_BLOCKED", "$.movePath[0]");
+  });
+
+  it("explains movement step, distance, and destination constraints", () => {
+    const state = createFixtureState();
+
+    expectRejectedWithMessage(state, { ...validWait() as object, movePath: [{ x: 1, y: 1 }] }, "INVALID_MOVE_PATH", "$.movePath[0]", [
+      "正交相邻",
+      "上下左右一格",
+    ]);
+    expectRejectedWithMessage(state, { ...validWait() as object, movePath: [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 1 }] }, "MOVE_TOO_FAR", "$.movePath", [
+      "最多包含 2 个格子",
+      "每个元素代表一步",
+    ]);
+    expectRejectedWithMessage(state, { ...validWait() as object, movePath: [{ x: -1, y: 0 }] }, "MOVE_BLOCKED", "$.movePath[0]", [
+      "坐标 (-1, 0)",
+      "越界或被单位/阻挡格占用",
+    ]);
   });
 
   it("uses the completed move endpoint for action distance and target validation", () => {
@@ -185,5 +230,32 @@ describe("validateTurnCommand", () => {
     expect(validateTurnCommand(state, { actorId: "scout", expectedRevision: 0, action: { type: "interact", targetId: "relay" } })).toMatchObject({ accepted: true });
     expectRejected(state, { actorId: "scout", expectedRevision: 0, movePath: [{ x: 0, y: 1 }], action: { type: "interact", targetId: "relay" } }, "INTERACTION_INVALID", "$.action.targetId");
     expectRejected(state, { actorId: "scout", expectedRevision: 0, action: { type: "interact", targetId: "missing" } }, "INTERACTION_INVALID", "$.action.targetId");
+  });
+
+  it("explains legal skill, target, and interaction values after the command shape is valid", () => {
+    const state = createFixtureState();
+
+    expectRejectedWithMessage(state, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "missing", targetId: "golem" } }, "SKILL_NOT_FOUND", "$.action.skillId", [
+      "当前单位可用技能",
+      "spark",
+      "mend",
+    ]);
+    expectRejectedWithMessage({ ...state, units: state.units.map((unit) => unit.id === "scout" ? { ...unit, skills: unit.skills.map((skill) => skill.id === "spark" ? { ...skill, remainingCooldown: 1 } : skill) } : unit) }, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetId: "golem" } }, "SKILL_ON_COOLDOWN", "$.action.skillId", [
+      "spark",
+      "冷却剩余 1 回合",
+    ]);
+    expectRejectedWithMessage(state, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetId: "scout" } }, "INVALID_TARGET", "$.action.targetId", [
+      "敌方单位 ID",
+      "golem",
+    ]);
+    expectRejectedWithMessage(state, { actorId: "scout", expectedRevision: 0, action: { type: "cast", skillId: "spark", targetCell: { x: 2, y: 0 } } }, "SKILL_TARGET_SHAPE", "$.action", [
+      "targetId",
+      "targetCell",
+      "二选一",
+    ]);
+    expectRejectedWithMessage(state, { actorId: "scout", expectedRevision: 0, action: { type: "interact", targetId: "missing" } }, "INTERACTION_INVALID", "$.action.targetId", [
+      "未完成目标 ID",
+      "relay",
+    ]);
   });
 });
