@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "构建 Python RPG 扩展",
+      "type": "npm",
+      "script": "build",
+      "path": "rpg",
+      "problemMatcher": ["$tsc"],
+      "group": "build"
+    }
+  ]
+}

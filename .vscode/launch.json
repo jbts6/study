@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "运行 Python RPG 扩展",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/rpg"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/rpg/dist/**/*.js",
+        "${workspaceFolder}/rpg/dist/**/*.cjs"
+      ],
+      "preLaunchTask": "构建 Python RPG 扩展"
+    }
+  ]
+}

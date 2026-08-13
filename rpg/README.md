@@ -5,7 +5,29 @@
 - Node.js 24.15.0
 - CPython 3.12 or newer available as `python`, `python3`, or `py -3`
 
-## Start
+## VS Code 插件（主入口）
+
+1. 在 VS Code 中打开仓库根目录。
+2. 执行 `npm ci --prefix rpg` 安装依赖。
+3. 按 `F5`，选择“运行 Python RPG 扩展”。
+4. 在新打开的 Extension Development Host 中打开一个工作区文件夹。
+5. 从命令面板运行“Python RPG: 打开游戏”。
+
+插件会在左侧编辑器组打开 `python-rpg/python-marsh-01.py`，在右侧编辑器组打开游戏战场。游戏推进后会切换到下一关对应的 Python 文件。修改代码后可点击“运行回合”，或按 `Ctrl+Enter`；无需保存，插件会读取编辑器内的最新文本。
+
+战役进度保存在 VS Code 的工作区状态中，Python 源码只保存在工作区文件。插件直接启动本机 CPython 子进程，不经过 WebSocket，也不会把代码发送到远端。
+
+可选设置 `pythonRpg.pythonPath` 指定 Python 3.12+ 可执行文件；留空时自动检测 `python3` 或 `python`。
+
+真实扩展宿主集成测试使用隔离的临时工作区与 VS Code 用户数据目录：
+
+```bash
+npm run test:extension
+```
+
+该测试会启动真实 VS Code，执行 `pythonRpg.open`，并验证六个关卡文件、左侧 Python 标签与右侧游戏 Webview 标签。首次运行会下载官方 VS Code 测试运行时。
+
+## 网页开发预览
 
 Terminal 1:
 
@@ -21,10 +43,10 @@ npm run dev
 
 Open `http://127.0.0.1:5174`.
 
-## Local Code Boundary
+## 本地代码边界
 
-Python is edited in the local browser and sent only to `ws://127.0.0.1:5175`. The local Node Runner starts a local CPython process. Code is not sent to a remote service.
+网页开发预览中的 Python 只发送到 `ws://127.0.0.1:5175`，本地 Node Runner 再启动本机 CPython；代码不会发送到远端。VS Code 插件不使用该 WebSocket 链路。
 
-## Save and Reset
+## 存档与重置
 
-The single V1 save is stored in browser `localStorage` under `python-rpg.save`. Reset requires typing `重置存档` exactly before execution.
+网页开发预览的存档保存在浏览器 `localStorage` 的 `python-rpg.save` 下；VS Code 插件使用工作区状态。重置操作只清除战役进度，不删除关卡 Python 文件。

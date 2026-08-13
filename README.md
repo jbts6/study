@@ -17,7 +17,7 @@
 
 ## 当前阶段
 
-阶段 1 已建立战斗核心和应用外壳。阶段 2 已建立本地 Python Runner，并按上述前提完成一轮收敛：
+阶段 1 已建立战斗核心和应用外壳。阶段 2 已建立本地 Python Runner。当前主入口已演进为 VS Code 插件：左侧编辑关卡 Python 文件，右侧显示战场，运行结果直接反馈到游戏面板与 VS Code 诊断。
 
 1. 恢复标准 Python 内建函数，并直接显示语法错误和运行时异常的位置与消息。
 2. 每次运行启动一个独立 Python 子进程；运行结束即退出，不再维护 daemon、generation 或 restart barrier。
@@ -35,7 +35,26 @@
 
 进程隔离自然清除每次运行产生的 Python 模块、工作目录和解释器状态；Adapter 只负责当前运行的超时、中断、终止和结果回传。
 
-## 本地运行
+VS Code 插件不经过上述 WebSocket 服务，而是由扩展宿主直接调用 `PythonRunnerAdapter` 和单次 Python 子进程。网页链路仅保留为开发预览。
+
+## VS Code 插件运行
+
+在仓库根目录安装依赖后按 `F5`，选择“运行 Python RPG 扩展”。在 Extension Development Host 中打开一个工作区文件夹，再从命令面板运行“Python RPG: 打开游戏”。
+
+```bash
+npm ci --prefix rpg
+```
+
+插件会创建缺失的 `python-rpg/python-marsh-01.py` 至 `python-marsh-06.py`，但不会覆盖已有代码。`Ctrl+Enter` 始终运行当前关卡绑定文档的最新内容，包括未保存修改。
+
+运行真实 VS Code 扩展宿主集成测试：
+
+```bash
+cd rpg
+npm run test:extension
+```
+
+## 网页开发预览
 
 要求：Node.js `24.15.0`、CPython `3.12+`。
 
