@@ -32,6 +32,9 @@ describe("campaign levels", () => {
     const sixth = getLevel("python-marsh-06");
 
     expect(first.starterCode).toContain("def choose_turn");
+    expect(first.starterCode).toContain('"movePath": [{"x": 1, "y": 0}, {"x": 1, "y": 1}]');
+    expect(first.starterCode).toContain('"action": {"type": "attack", "targetId": "golem"}');
+    expect(first.starterCode).toContain('"action": {"type": "cast", "skillId": "spark", "targetId": "golem"}');
     expect(second.starterCode).toContain("if ");
     expect(third.starterCode).not.toContain("def choose_turn");
     expect(third.starterCode).toContain('world["units"]');

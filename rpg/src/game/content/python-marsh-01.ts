@@ -8,7 +8,9 @@ export const STARTER_CODE = `def choose_turn(world):
     actor = world["activeUnitId"]
     revision = world["revision"]
 
-    # 把 wait 替换为你的移动、攻击或施法指令。
+    # 移动写在 movePath；普通攻击要写 action.type=attack 和 targetId；施法要写 cast、skillId 和 targetId。
+    # 例如：{"movePath": [{"x": 1, "y": 0}, {"x": 1, "y": 1}], "action": {"type": "attack", "targetId": "golem"}}
+    # 施法示例：{"movePath": [{"x": 1, "y": 0}], "action": {"type": "cast", "skillId": "spark", "targetId": "golem"}}
     return {
         "actorId": actor,
         "expectedRevision": revision,
