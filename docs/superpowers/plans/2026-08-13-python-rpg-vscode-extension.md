@@ -1,6 +1,6 @@
 # Python RPG VS Code Extension Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 交付以 VS Code 原生 Python 编辑器为代码入口、右侧 Webview 为游戏界面的六关 Python RPG 插件，并让网页继续复用同一关卡内容。
 
@@ -40,17 +40,17 @@
 - Produces: `LevelGuidance` with `objective`, `concepts`, `worldFields`, `commandExamples`, `levelRules`; `LevelDefinition.guidance`.
 - Consumes: existing `LevelDefinition`, starter code, briefing and current hint rendering.
 
-- [ ] **Step 1: Write the failing guidance contract test**
+- [x] **Step 1: Write the failing guidance contract test**
 
 Add a test that loops over `LEVEL_ORDER`, asserts every guidance group is an array with at least one non-empty entry, checks second through sixth level-specific concepts, and confirms the sixth level contains API reference without solution-like steps.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `npm test -- --run src/game/content/levels.test.ts`
 
 Expected: TypeScript/test failure because `guidance` does not exist.
 
-- [ ] **Step 3: Add the typed guidance and six level payloads**
+- [x] **Step 3: Add the typed guidance and six level payloads**
 
 Define:
 
@@ -66,17 +66,17 @@ export type LevelGuidance = Readonly<{
 
 Populate all six levels according to the handoff progression. Keep `apiHints` temporarily as a compatibility projection only if the web renderer still needs it within this task; remove duplicate runtime content once `app-view` consumes `guidance`.
 
-- [ ] **Step 4: Render the fixed groups in the browser preview**
+- [x] **Step 4: Render the fixed groups in the browser preview**
 
 Update `renderApiHelp` to fill the existing four groups from `guidance`, merging objective/concepts into level rules where the current browser markup has four groups. Do not create a second copy of hints.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run: `npm test -- --run src/game/content/levels.test.ts src/app/app-controller.test.ts`
 
 Expected: both files pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add rpg/src/game/content rpg/src/app/app-view.ts
@@ -100,43 +100,43 @@ git commit -m "feat: structure guidance for all RPG levels"
 - Produces: `DocumentWorkspace.ensureLevelFiles()`, `readLevelCode(levelId)`, `openLevel(levelId)`; `WorkspaceSaveStore`; `DirectRunnerClient` implementing `RunnerClient`.
 - Consumes: abstract document/file/state ports, `PythonRunProcess`, `detectPython`, `RunRequest`, existing `SaveStore` and `RunnerClient`.
 
-- [ ] **Step 1: Write a failing test for unsaved document reads**
+- [x] **Step 1: Write a failing test for unsaved document reads**
 
 Use an in-memory platform port where disk contains starter code but the open document returns changed text. Assert `readLevelCode("python-marsh-02")` returns the open document text and `ensureLevelFiles()` does not overwrite existing files.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `npm test -- --run src/vscode/level-workspace.test.ts`
 
 Expected: module/API missing.
 
-- [ ] **Step 3: Implement `DocumentWorkspace`**
+- [x] **Step 3: Implement `DocumentWorkspace`**
 
 Map each `LevelId` to `python-rpg/<id>.py`. Read an open document first, then disk. Create only missing files from `getLevel(levelId).starterCode`.
 
-- [ ] **Step 4: Write and pass workspace save-store tests**
+- [x] **Step 4: Write and pass workspace save-store tests**
 
 Test normal `workspaceState` load/save/remove and one corrupted-state result. Reuse exported save validation instead of duplicating the battle schema.
 
-- [ ] **Step 5: Write a failing direct-runner lifecycle test**
+- [x] **Step 5: Write a failing direct-runner lifecycle test**
 
 Inject Python detection and process creation. Assert `connect()` reaches ready, `run()` transitions ready → running → ready, and `interrupt(runId)` reaches the current process only.
 
-- [ ] **Step 6: Implement `DirectRunnerClient`**
+- [x] **Step 6: Implement `DirectRunnerClient`**
 
 Detect Python once, create `PythonRunProcess` per request, preserve existing timeout/interruption behavior through the adapter, and expose the existing `RunnerClient` interface. Do not introduce WebSocket or daemon state.
 
-- [ ] **Step 7: Allow external code injection before a run**
+- [x] **Step 7: Allow external code injection before a run**
 
 Add an `AppController.runCode(code: string)` public method that calls `setCode(code)` and then `runTurn()`. Preserve `runTurn()` for the browser button. Verify the request contains the injected unsaved code.
 
-- [ ] **Step 8: Verify GREEN**
+- [x] **Step 8: Verify GREEN**
 
 Run: `npm test -- --run src/vscode/level-workspace.test.ts src/vscode/workspace-save-store.test.ts src/vscode/direct-runner-client.test.ts src/app/app-controller.test.ts`
 
 Expected: all focused tests pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add rpg/src/vscode rpg/src/app/app-controller.ts rpg/src/app/app-controller.test.ts rpg/src/app/save-store.ts
@@ -159,33 +159,33 @@ git commit -m "feat: add VS Code workspace and runner adapters"
 - Produces: `WebviewCommand`, `ExtensionMessage`, `GameViewSnapshot`, `GameSession.handle(command)`, VS Code activation entry `dist/extension.cjs`.
 - Consumes: `AppController`, `DocumentWorkspace`, `WorkspaceSaveStore`, `DirectRunnerClient`, thin VS Code platform adapter.
 
-- [ ] **Step 1: Write a failing session proof test**
+- [x] **Step 1: Write a failing session proof test**
 
 Arrange the controller on level two, provide an unsaved code string through `DocumentWorkspace`, issue `{ type: "runTurn" }`, and assert the runner request receives that exact string and the published snapshot revision advances. Also issue `{ type: "ready" }` after clearing captured messages and assert one complete snapshot is republished.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `npm test -- --run src/vscode/game-session.test.ts`
 
 Expected: session and message contracts missing.
 
-- [ ] **Step 3: Implement message contracts and `GameSession`**
+- [x] **Step 3: Implement message contracts and `GameSession`**
 
 Handle only `ready`, `runTurn`, `interruptRun`, `retryLevel`, `advanceLevel`, `resetCampaign`, and `setTheme`. Subscribe once to `AppController`; publish full snapshots, never state deltas.
 
-- [ ] **Step 4: Add diagnostic projection**
+- [x] **Step 4: Add diagnostic projection**
 
 Project `RunnerDiagnostic.location` onto the current level document through a narrow diagnostics port. Clear old diagnostics before each run; keep feedback in the Webview snapshot.
 
-- [ ] **Step 5: Add the VS Code activation adapter**
+- [x] **Step 5: Add the VS Code activation adapter**
 
 Register `pythonRpg.open` and `pythonRpg.runTurn`, wire `Ctrl+Enter`, create the Webview in `ViewColumn.Two`, open the current level in `ViewColumn.One`, and instantiate the session. Keep direct `vscode` imports in `extension.ts` only.
 
-- [ ] **Step 6: Add extension packaging configuration**
+- [x] **Step 6: Add extension packaging configuration**
 
 Declare `main`, `engines.vscode`, `activationEvents`, commands, keybindings and an `extension:build` script. Bundle extension-host code as CommonJS using esbuild while keeping Webview assets external.
 
-- [ ] **Step 7: Verify GREEN**
+- [x] **Step 7: Verify GREEN**
 
 Run: `npm test -- --run src/vscode/game-session.test.ts`
 
@@ -193,7 +193,7 @@ Run: `npm run extension:build`
 
 Expected: focused tests pass and `dist/extension.cjs` is generated.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add rpg/src/vscode rpg/package.json rpg/package-lock.json rpg/tsconfig.extension.json rpg/esbuild.extension.mjs
@@ -215,33 +215,33 @@ git commit -m "feat: wire the Python RPG VS Code extension host"
 - Produces: `renderGame(snapshot)`, `calculateCellSize(containerWidth, containerHeight, columns, rows)`, bundled `dist/webview.js` and `dist/webview.css`.
 - Consumes: `GameViewSnapshot`, VS Code message bridge, CSP nonce and Webview resource URIs.
 
-- [ ] **Step 1: Write failing adaptive-grid tests**
+- [x] **Step 1: Write failing adaptive-grid tests**
 
 Assert `calculateCellSize(600, 450, 4, 3)` returns a larger value than the 6×4 case, both fit within width and height, and the result never exceeds the configured maximum or drops below the readable minimum for all six current boards.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `npm test -- --run src/vscode/webview/render-game.test.ts`
 
 Expected: renderer/API missing.
 
-- [ ] **Step 3: Implement the semantic renderer**
+- [x] **Step 3: Implement the semantic renderer**
 
 Render the confirmed five sections with real level data. Use buttons and `details/summary`; include grid, cell and unit labels; render loading, idle, running, error, success and settlement states.
 
-- [ ] **Step 4: Implement tokenized light/dark/system themes**
+- [x] **Step 4: Implement tokenized light/dark/system themes**
 
 Use one component tree and CSS custom properties. Default to `system`; map VS Code body classes and stored player selection. Persist selection through `{ type: "setTheme" }`.
 
-- [ ] **Step 5: Implement adaptive square cells**
+- [x] **Step 5: Implement adaptive square cells**
 
 Use `ResizeObserver` to calculate a CSS `--cell-size` from available battlefield content size, board columns and rows. Keep the complete board centered without horizontal scrolling.
 
-- [ ] **Step 6: Bundle and connect assets**
+- [x] **Step 6: Bundle and connect assets**
 
 Add `webview:build` and include it in `extension:build`. Generate CSP-safe HTML in `extension.ts`; no inline event handlers or remote assets.
 
-- [ ] **Step 7: Verify GREEN**
+- [x] **Step 7: Verify GREEN**
 
 Run: `npm test -- --run src/vscode/webview/render-game.test.ts src/vscode/game-session.test.ts`
 
@@ -249,7 +249,7 @@ Run: `npm run extension:build`
 
 Expected: tests and both bundles pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add rpg/src/vscode/webview rpg/src/vscode/extension.ts rpg/esbuild.webview.mjs rpg/package.json rpg/package-lock.json
@@ -269,21 +269,21 @@ git commit -m "feat: add the adaptive RPG game Webview"
 - Consumes: all prior task interfaces.
 - Produces: documented development launch flow and complete six-level acceptance evidence.
 
-- [ ] **Step 1: Add focused campaign transition coverage**
+- [x] **Step 1: Add focused campaign transition coverage**
 
 Verify the session opens the next level file after a successful settlement and all six files are created without overwriting an existing player file.
 
-- [ ] **Step 2: Verify all level guidance and reference solutions**
+- [x] **Step 2: Verify all level guidance and reference solutions**
 
 Run: `npm test -- --run src/game/content/levels.test.ts src/game/content/reference-solutions.test.ts`
 
 Expected: all six levels remain solvable and guidance contracts pass.
 
-- [ ] **Step 3: Document launch and debugging**
+- [x] **Step 3: Document launch and debugging**
 
 Document `npm install`, `npm run extension:build`, opening `rpg/` in Extension Development Host, `Python RPG: Open Game`, `Ctrl+Enter`, Python 3.12+, workspace files and the browser preview role.
 
-- [ ] **Step 4: Run stage-complete verification**
+- [x] **Step 4: Run stage-complete verification**
 
 Run: `npm test -- --run`
 
@@ -297,10 +297,11 @@ Expected: zero failures and clean build output.
 
 Launch the Extension Development Host and capture/check 1280×800 half-screen views for light and dark themes, plus 4×3 and 6×4 boards. Confirm no horizontal overflow, readable labels, visible focus, correct actions and theme persistence.
 
-- [ ] **Step 6: Commit**
+Pending: 当前会话未暴露可用的浏览器/截图控制接口；已完成真实 VS Code Extension Host 的布局、未保存代码运行与诊断集成测试，但未将其冒充像素级视觉验收。
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add rpg README.md
 git commit -m "docs: complete the VS Code RPG workflow"
 ```
-
