@@ -6,8 +6,10 @@
   "sessionMode": "default",
   "host": "",
   "source": "manual",
-  "hostHint": "ppid:26668",
+  "hostHint": "ppid:15504",
   "aliases": {
+    "65870154": "host-65870154",
+    "89553554": "host-89553554",
     "session:782756c7": "default",
     "782756c7": "default",
     "session:1f1d513a": "host-1f1d513a",
@@ -59,8 +61,12 @@
     "session:daa41537": "host-daa41537",
     "daa41537": "host-daa41537",
     "session:04ec4113": "host-04ec4113",
-    "04ec4113": "host-04ec4113"
+    "04ec4113": "host-04ec4113",
+    "session:65870154": "host-65870154",
+    "session:89553554": "host-89553554",
+    "session:c9e58243": "host-c9e58243",
+    "c9e58243": "host-c9e58243"
   },
-  "cleanupCheckedAt": "2026-08-13T06:38:51.567Z",
-  "updatedAt": "2026-08-13T06:44:53.827Z"
+  "cleanupCheckedAt": "2026-08-13T08:52:10.788Z",
+  "updatedAt": "2026-08-13T09:10:55.817Z"
 }
