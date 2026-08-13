@@ -40,7 +40,7 @@ const lightEditorTheme = EditorView.theme({
     border: "0",
     borderRight: "1px solid #d0d7de",
   },
-  ".cm-activeLine": { backgroundColor: "#f6f8fa" },
+  ".cm-activeLine": { backgroundColor: "rgb(246 248 250 / 55%)" },
   ".cm-activeLineGutter": { backgroundColor: "#f6f8fa", color: "#1f2328" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#0078d4" },
   ".cm-selectionLayer .cm-selectionBackground": { backgroundColor: "#add6ff !important" },
