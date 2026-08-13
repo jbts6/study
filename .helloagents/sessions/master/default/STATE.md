@@ -1,22 +1,22 @@
 # 恢复快照
 
 ## 主线目标
-重排 Python RPG 的第一关提示区域，采用 B 方案“编辑器优先 + 底部提示抽屉”，让玩家保留完整命令契约提示又不牺牲代码编辑空间。
+记录 Python RPG 转为 VS Code 插件主体验的已确认设计，供后续实现直接接手。
 
 ## 正在做什么
-已完成 A/B/C 布局线框比较，用户选择 B；正在确认抽屉展开时的固定高度与内部滚动约束，尚未修改生产 UI。
+已完成 handoff；按用户最后指令停止，不进入开发。
 
 ## 关键上下文
-用户指出完整提示区严重干扰编辑框。B 方案：编辑器顶部只保留紧凑任务条；完整提示收进默认折叠的 API 抽屉，按命令外层字段、`movePath`、`action`、本关规则分组；错误反馈继续留在底部反馈区。`movePath` 必须是 `[{"x": 1, "y": 0}]` 坐标对象数组，不是 `[[1, 0]]`。
+VS Code 插件为主体验，网页仅保留开发预览；左侧逐关 Python 文件、右侧游戏 Webview；扩展宿主持有唯一状态并直接管理 Python 子进程；workspaceState 保存战役；双主题；方格按行列数和可用空间自适应；第二至六关提示需要补齐并与网页共享。
 
 ## 下一步
-确认抽屉展开高度与滚动行为后，写入 UI 设计 spec，再进入实现计划。
+后续实现会话先读取 `docs/superpowers/handoffs/2026-08-13-python-rpg-vscode-extension-handoff.md`，再生成实施计划；当前会话不开发。
 
 ## 阻塞项
-等待用户确认“固定最大高度 + 抽屉内部滚动”的交互约束。
+（无）
 
 ## 方案
-`docs/superpowers/plans/2026-08-13-python-rpg-command-contract-help.md`
+`docs/superpowers/handoffs/2026-08-13-python-rpg-vscode-extension-handoff.md`
 
 ## 已标记技能
-using-superpowers, brainstorming, writing-plans, test-driven-development, hello-ui, verification-before-completion, qa-review, requesting-code-review, receiving-code-review
+using-superpowers, brainstorming, project-design-docs, agent-reach, context-mode, hello-write
