@@ -1,0 +1,222 @@
+import type { BattleState, Cell } from "../../game/combat/types";
+import type { LevelGuidance } from "../../game/content/types";
+import type { GameViewSnapshot } from "../messages";
+
+const CELL_GAP = 5;
+const MAX_CELL_SIZE = 112;
+
+export function calculateCellSize(
+  width: number,
+  height: number,
+  columns: number,
+  rows: number,
+): number {
+  const horizontalGaps = Math.max(0, columns - 1) * CELL_GAP;
+  const verticalGaps = Math.max(0, rows - 1) * CELL_GAP;
+  const widthFit = (width - horizontalGaps) / columns;
+  const heightFit = (height - verticalGaps) / rows;
+  return Math.max(1, Math.min(MAX_CELL_SIZE, Math.floor(widthFit), Math.floor(heightFit)));
+}
+
+export function renderGame(root: HTMLElement, snapshot: GameViewSnapshot): void {
+  root.className = "game-view";
+  root.dataset.theme = snapshot.theme;
+  root.replaceChildren(
+    renderHeader(snapshot),
+    renderMission(snapshot),
+    renderBattle(snapshot.battleState),
+    renderFeedback(snapshot),
+    renderActions(snapshot),
+  );
+}
+
+function renderHeader(snapshot: GameViewSnapshot): HTMLElement {
+  const header = element("header", "game-header");
+  const identity = element("div", "game-identity");
+  identity.append(
+    textElement("p", "game-kicker", `Python RPG · ${snapshot.level.id}`),
+    textElement("h1", "", snapshot.level.title),
+  );
+  const status = element("dl", "game-status");
+  status.append(
+    statusItem("回合", `${snapshot.battleState.round} / ${snapshot.battleState.maxRounds}`),
+    statusItem("行动者", activeUnitId(snapshot.battleState) ?? "无"),
+    statusItem("Python", runnerLabel(snapshot)),
+  );
+  const themes = element("div", "theme-switch");
+  themes.setAttribute("aria-label", "颜色主题");
+  for (const [value, label] of [["system", "跟随"], ["light", "浅色"], ["dark", "深色"]] as const) {
+    const button = commandButton("setTheme", label);
+    button.dataset.theme = value;
+    button.setAttribute("aria-pressed", String(snapshot.theme === value));
+    themes.append(button);
+  }
+  header.append(identity, status, themes);
+  return header;
+}
+
+function renderMission(snapshot: GameViewSnapshot): HTMLElement {
+  const mission = element("section", "mission-strip");
+  const heading = element("div", "mission-heading");
+  heading.append(
+    textElement("h2", "", snapshot.level.guidance.objective.join(" ")),
+    textElement("p", "mission-failure", failureText(snapshot.battleState)),
+  );
+  mission.append(heading, textElement("p", "mission-concept", snapshot.level.guidance.concepts.join(" ")));
+  return mission;
+}
+
+function renderBattle(state: BattleState): HTMLElement {
+  const stage = element("section", "battle-stage");
+  const frame = element("div", "battle-frame");
+  frame.dataset.columns = String(state.board.width);
+  frame.dataset.rows = String(state.board.height);
+  frame.append(textElement("p", "turn-line", `当前指令将作用于 ${activeUnitId(state) ?? "无"} · 修订 ${state.revision}`));
+  const grid = element("div", "battle-grid");
+  grid.setAttribute("role", "grid");
+  grid.setAttribute("aria-label", `${state.battleId} 战场`);
+  grid.setAttribute("aria-rowcount", String(state.board.height));
+  grid.setAttribute("aria-colcount", String(state.board.width));
+  for (let y = 0; y < state.board.height; y += 1) {
+    for (let x = 0; x < state.board.width; x += 1) grid.append(renderCell(state, x, y));
+  }
+  frame.append(grid, renderLegend());
+  stage.append(frame);
+  return stage;
+}
+
+function renderCell(state: BattleState, x: number, y: number): HTMLElement {
+  const cell = element("div", "battle-cell");
+  cell.setAttribute("role", "gridcell");
+  cell.dataset.x = String(x);
+  cell.dataset.y = String(y);
+  if (hasCell(state.board.hazardCells, x, y)) cell.classList.add("cell-hazard");
+  if (hasCell(state.board.coverCells, x, y)) cell.classList.add("cell-cover");
+  if (hasCell(state.board.blockedCells, x, y)) cell.classList.add("cell-blocked");
+  const labels = [`格位 ${x},${y}`];
+  for (const objective of state.objectives.filter((item) => item.cell.x === x && item.cell.y === y)) {
+    const token = textElement("span", objective.key ? "token token-key" : "token token-objective", objective.id);
+    cell.append(token);
+    labels.push(`目标 ${objective.id}，耐久 ${objective.durability}`);
+  }
+  for (const unit of state.units.filter((item) => item.visibility === "revealed" && item.cell.x === x && item.cell.y === y)) {
+    const token = textElement("span", `token token-${unit.team}`, unit.id);
+    if (unit.disabled) token.classList.add("token-disabled");
+    cell.append(token, textElement("span", "token-health", `${unit.hp} / ${unit.maxHp}`));
+    labels.push(`${unit.team === "allies" ? "友方" : "敌方"} ${unit.id}，生命 ${unit.hp}/${unit.maxHp}`);
+  }
+  cell.setAttribute("aria-label", labels.join("；"));
+  return cell;
+}
+
+function renderLegend(): HTMLElement {
+  const legend = element("div", "battle-legend");
+  for (const [className, label] of [
+    ["legend-allies", "scout"],
+    ["legend-enemies", "敌人"],
+    ["legend-key", "关键目标"],
+    ["legend-hazard", "危险格"],
+    ["legend-cover", "掩体"],
+  ]) {
+    const item = element("span", "legend-item");
+    item.append(element("i", className), document.createTextNode(label));
+    legend.append(item);
+  }
+  return legend;
+}
+
+function renderFeedback(snapshot: GameViewSnapshot): HTMLElement {
+  const panel = element("section", `feedback-panel feedback-${snapshot.feedback.kind}`);
+  panel.setAttribute("aria-live", "polite");
+  const heading = element("div", "feedback-heading");
+  heading.append(
+    textElement("h2", "", snapshot.feedback.title || "运行反馈"),
+    renderGuidance(snapshot.level.guidance),
+  );
+  panel.append(heading);
+  const messages = snapshot.feedback.messages.length > 0
+    ? snapshot.feedback.messages
+    : [`等待运行 ${snapshot.level.id}.py。插件会读取编辑器中的最新内容。`];
+  const list = element("ul", "feedback-messages");
+  for (const message of messages) list.append(textElement("li", "", message));
+  panel.append(list);
+  if (snapshot.feedback.stdout) panel.append(textElement("pre", "feedback-output", snapshot.feedback.stdout));
+  if (snapshot.feedback.stderr) panel.append(textElement("pre", "feedback-error", snapshot.feedback.stderr));
+  return panel;
+}
+
+function renderGuidance(guidance: LevelGuidance): HTMLElement {
+  const details = element("details", "guidance-drawer");
+  details.append(textElement("summary", "", "展开本关提示"));
+  for (const [title, values] of [
+    ["本关目标", guidance.objective],
+    ["Python 概念", guidance.concepts],
+    ["world 字段", guidance.worldFields],
+    ["命令示例", guidance.commandExamples],
+    ["本关规则", guidance.levelRules],
+  ] as const) {
+    const section = element("section", "guidance-group");
+    section.append(textElement("h3", "", title));
+    const list = element("ul", "");
+    for (const value of values) list.append(textElement("li", "", value));
+    section.append(list);
+    details.append(section);
+  }
+  return details;
+}
+
+function renderActions(snapshot: GameViewSnapshot): HTMLElement {
+  const actions = element("footer", "action-bar");
+  const running = snapshot.runnerState === "running" || snapshot.activeRunId !== undefined;
+  if (running) actions.append(commandButton("interruptRun", "中断运行"));
+  else if (snapshot.battleState.phase === "in_progress") actions.append(commandButton("runTurn", "运行回合"));
+  else if (snapshot.battleState.phase === "won" && snapshot.level.reward.type === "ability") {
+    actions.append(commandButton("advanceLevel", "进入下一关"), commandButton("retryLevel", "重试本关"));
+  } else if (snapshot.battleState.phase === "lost") actions.append(commandButton("retryLevel", "重试本关"));
+  actions.append(textElement("span", "keyboard-hint", "Ctrl+Enter"));
+  return actions;
+}
+
+function statusItem(label: string, value: string): HTMLElement {
+  const item = element("div", "status-item");
+  item.append(textElement("dt", "", label), textElement("dd", "", value));
+  return item;
+}
+
+function commandButton(command: string, label: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.command = command;
+  button.textContent = label;
+  return button;
+}
+
+function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string): HTMLElementTagNameMap[K] {
+  const value = document.createElement(tag);
+  if (className) value.className = className;
+  return value;
+}
+
+function textElement<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text: string): HTMLElementTagNameMap[K] {
+  const value = element(tag, className);
+  value.textContent = text;
+  return value;
+}
+
+function activeUnitId(state: BattleState): string | undefined {
+  return state.turnOrder[state.turnIndex];
+}
+
+function hasCell(cells: readonly Cell[], x: number, y: number): boolean {
+  return cells.some((cell) => cell.x === x && cell.y === y);
+}
+
+function failureText(state: BattleState): string {
+  const key = state.objectives.find((objective) => objective.key);
+  return key === undefined ? `限制：${state.maxRounds} 回合` : `失败：${key.id} 耐久归零`;
+}
+
+function runnerLabel(snapshot: GameViewSnapshot): string {
+  if (snapshot.activeRunId !== undefined || snapshot.runnerState === "running") return "运行中";
+  return snapshot.runnerState === "ready" ? "可运行" : snapshot.runnerState === "unavailable" ? "不可用" : "检测中";
+}

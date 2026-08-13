@@ -1,1 +1,83 @@
-{"name":"python-rpg","private":true,"version":"0.1.0","type":"module","engines":{"node":"24.15.0"},"scripts":{"dev":"vite","build":"tsc --noEmit && vite build","test":"vitest run","test:e2e":"playwright test","runner":"node --experimental-strip-types src/runners/local/runner-cli.ts","runner:dev":"node --watch --experimental-strip-types src/runners/local/runner-cli.ts"},"dependencies":{"@codemirror/lang-python":"^6.2.1","@codemirror/state":"^6.7.1","codemirror":"^6.0.2","ws":"8.18.0"},"devDependencies":{"@playwright/test":"1.62.1","@types/node":"24.13.3","@types/ws":"8.18.1","jsdom":"30.0.1","typescript":"7.0.2","vite":"8.2.1","vitest":"4.1.10"}}
+{
+  "name": "python-rpg",
+  "displayName": "Python RPG",
+  "description": "在 VS Code 中编写 Python，并在侧边编辑器组中推进六关战术 RPG。",
+  "private": true,
+  "publisher": "local",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/extension.cjs",
+  "engines": {
+    "node": "24.15.0",
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Education",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:pythonRpg.open"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "pythonRpg.open",
+        "title": "Python RPG: 打开游戏"
+      },
+      {
+        "command": "pythonRpg.runTurn",
+        "title": "Python RPG: 运行当前回合"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "pythonRpg.runTurn",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorLangId == python"
+      }
+    ],
+    "configuration": {
+      "title": "Python RPG",
+      "properties": {
+        "pythonRpg.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "可选的 Python 3.12+ 可执行文件路径；留空时自动检测。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && npm run build:web && npm run build:extension && npm run build:webview",
+    "build:web": "vite build",
+    "build:extension": "node esbuild.extension.mjs",
+    "build:extension-test": "node esbuild.extension-test.mjs",
+    "build:webview": "node esbuild.webview.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:extension": "npm run typecheck && npm run build:extension && npm run build:webview && npm run build:extension-test && node src/vscode/test/run-extension-tests.mjs",
+    "runner": "node --experimental-strip-types src/runners/local/runner-cli.ts",
+    "runner:dev": "node --watch --experimental-strip-types src/runners/local/runner-cli.ts"
+  },
+  "dependencies": {
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/state": "^6.7.1",
+    "codemirror": "^6.0.2",
+    "ws": "8.18.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/node": "24.13.3",
+    "@types/vscode": "^1.125.0",
+    "@types/ws": "8.18.1",
+    "@vscode/test-electron": "^3.1.0",
+    "esbuild": "^0.28.2",
+    "jsdom": "30.0.1",
+    "typescript": "7.0.2",
+    "vite": "8.2.1",
+    "vitest": "4.1.10"
+  }
+}

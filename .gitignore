@@ -4,6 +4,7 @@
 .workbuddy/
 node_modules/
 rpg/dist/
+rpg/.vscode-test/
 rpg/node_modules/
 rpg/playwright-report/
 rpg/test-results/
