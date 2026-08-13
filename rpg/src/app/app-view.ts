@@ -17,6 +17,7 @@ type GameShell = Readonly<{
   battlefield: HTMLElement;
   battleDirective: HTMLElement;
   briefing: HTMLElement;
+  apiHelp: HTMLElement;
   feedback: HTMLElement;
   run: HTMLButtonElement;
   interrupt: HTMLButtonElement;
@@ -79,10 +80,30 @@ const GAME_SHELL_MARKUP = `
         <ul data-testid="level-objectives" class="mission-objectives" aria-label="目标状态"></ul>
         <p class="mission-constraint"></p>
         <div class="skill-readout"><h3>Scout 能力</h3><ul data-testid="scout-skills"></ul></div>
-        <div class="api-hints"><h3>API 速查</h3><ul data-testid="api-hints"></ul></div>
         <details class="concept-hint"><summary>概念提示</summary><p></p></details>
       </section>
       <div data-testid="code-editor" class="code-editor"></div>
+      <details class="api-help">
+        <summary>API 提示</summary>
+        <div class="api-help-body" data-testid="api-hints">
+          <section class="api-help-group" aria-labelledby="api-command-fields-heading">
+            <h3 id="api-command-fields-heading">命令外层字段</h3>
+            <ul class="api-command-fields"></ul>
+          </section>
+          <section class="api-help-group" aria-labelledby="api-move-path-heading">
+            <h3 id="api-move-path-heading">movePath</h3>
+            <ul class="api-move-path"></ul>
+          </section>
+          <section class="api-help-group" aria-labelledby="api-action-fields-heading">
+            <h3 id="api-action-fields-heading">action</h3>
+            <ul class="api-action-fields"></ul>
+          </section>
+          <section class="api-help-group" aria-labelledby="api-level-rules-heading">
+            <h3 id="api-level-rules-heading">本关规则</h3>
+            <ul class="api-level-rules"></ul>
+          </section>
+        </div>
+      </details>
       <div class="action-row">
         <button data-testid="run-turn" class="run-turn" type="button">运行回合</button>
         <button data-testid="interrupt-run" class="interrupt-run" type="button" hidden>中断运行</button>
@@ -160,6 +181,7 @@ function createGameShell(controller: AppController, snapshot: GameSnapshot): Gam
     battlefield: requiredElement(element, ".battlefield"),
     battleDirective: requiredElement(element, ".battle-directive"),
     briefing: requiredElement(element, ".mission-briefing"),
+    apiHelp: requiredElement(element, ".api-help"),
     feedback: requiredElement(element, "[data-testid='feedback']"),
     run: requiredElement(element, "[data-testid='run-turn']"),
     interrupt: requiredElement(element, "[data-testid='interrupt-run']"),
@@ -188,7 +210,9 @@ function updateGameShell(shell: GameShell, snapshot: GameSnapshot): void {
   shell.reset.hidden = settlement !== undefined;
   renderBattlefield(shell.battlefield, battleState);
   renderBattleDirective(shell.battleDirective, getLevel(snapshot.currentLevelId), battleState, settlement);
-  renderBriefing(shell.briefing, getLevel(snapshot.currentLevelId), battleState);
+  const level = getLevel(snapshot.currentLevelId);
+  renderBriefing(shell.briefing, level, battleState);
+  renderApiHelp(shell.apiHelp, level);
   renderFeedback(shell.feedback, snapshot, settlement, shell.controller);
 }
 
@@ -291,10 +315,27 @@ function renderBriefing(container: HTMLElement, level: LevelDefinition, state: B
   renderTextList(requiredElement(container, "[data-testid='scout-skills']"), (scout?.skills ?? []).map((skill) => (
     skill.remainingCooldown === 0 ? `${skill.id} · 可用` : `${skill.id} · 冷却 ${skill.remainingCooldown} 回合`
   )));
-  renderTextList(requiredElement(container, "[data-testid='api-hints']"), level.apiHints);
   requiredElement(container, ".concept-hint p").textContent = level.id === "python-marsh-01"
     ? "每回合返回一条指令；使用 world 中的 revision 保持指令与战场一致。"
     : "先读取 world 的当前状态，再返回一条完整且合法的回合指令。";
+}
+
+function renderApiHelp(container: HTMLElement, level: LevelDefinition): void {
+  const groups = level.id === "python-marsh-01"
+    ? [
+      level.apiHints.slice(0, 3),
+      [
+        ...level.apiHints.slice(3, 6),
+        "单步错误示例：[[1, 0]]；movePath 必须使用坐标对象数组。",
+      ],
+      level.apiHints.slice(6, 10),
+      level.apiHints.slice(10),
+    ]
+    : [level.apiHints, [], [], []];
+  const selectors = [".api-command-fields", ".api-move-path", ".api-action-fields", ".api-level-rules"];
+  for (const [index, selector] of selectors.entries()) {
+    renderTextList(requiredElement(container, selector), groups[index] ?? []);
+  }
 }
 
 function renderObjectiveList(container: HTMLElement, state: BattleState): void {

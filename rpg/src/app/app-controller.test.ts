@@ -372,4 +372,56 @@ describe("AppController", () => {
     expect(view.root.querySelector("[data-testid='unit-scout']")?.textContent).toContain("攻击 4");
     view.unmount();
   });
+
+  it("renders the editor-first command help drawer as a closed, stable DOM contract", async () => {
+    const controller = createController(new FakeRunner(completed(null)), new MemorySaveStore(null));
+    const view = mountSettlement(controller);
+    await controller.start();
+
+    const editor = view.root.querySelector<HTMLElement>(".editor-panel");
+    expect(editor).not.toBeNull();
+    expect([...editor!.children].map((child) => child.className)).toEqual([
+      "panel-heading",
+      "mission-briefing",
+      "code-editor",
+      "api-help",
+      "action-row",
+    ]);
+    const help = editor!.querySelector<HTMLDetailsElement>(".api-help");
+    expect(help).not.toBeNull();
+    expect(help!.open).toBe(false);
+    expect(help!.querySelector(".api-command-fields")).not.toBeNull();
+    expect(help!.querySelector(".api-move-path")?.textContent).toContain("坐标对象数组");
+    expect(help!.querySelector(".api-move-path")?.textContent).toContain("[[1, 0]]");
+    expect(help!.querySelector(".api-action-fields")).not.toBeNull();
+    expect(help!.querySelector(".api-level-rules")).not.toBeNull();
+    view.unmount();
+  });
+
+  it("keeps command help collapsible and feedback outside the editor on narrow screens", async () => {
+    const controller = createController(new FakeRunner(completed(null)), new MemorySaveStore(null));
+    const view = mountSettlement(controller);
+    await controller.start();
+
+    const editorPanel = view.root.querySelector<HTMLElement>(".editor-panel");
+    const apiHelp = view.root.querySelector<HTMLDetailsElement>("details.api-help");
+    const summary = apiHelp?.querySelector<HTMLElement>("summary");
+    const runButton = view.root.querySelector<HTMLButtonElement>("[data-testid='run-turn']");
+    const feedback = view.root.querySelector<HTMLElement>("[data-testid='feedback']");
+    const movePath = view.root.querySelector<HTMLElement>(".api-move-path");
+
+    expect(editorPanel).not.toBeNull();
+    expect(apiHelp).not.toBeNull();
+    expect(summary).not.toBeNull();
+    expect(apiHelp?.open).toBe(false);
+    expect(movePath?.textContent).toContain("坐标对象数组");
+    expect(movePath?.textContent).toContain("[[1, 0]]");
+    expect(runButton?.closest(".editor-panel")).toBe(editorPanel);
+    expect(feedback?.closest("details.api-help")).toBeNull();
+
+    summary?.click();
+
+    expect(apiHelp?.open).toBe(true);
+    view.unmount();
+  });
 });
