@@ -141,13 +141,13 @@ summary:focus-visible {
 
 .game-kicker {
   color: var(--game-header-muted);
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.game-identity h1 { margin-top: 2px; font-size: 18px; }
+.game-identity h1 { margin-top: 2px; font-size: 24px; }
 
 .game-status { display: flex; gap: 18px; }
 
@@ -155,12 +155,12 @@ summary:focus-visible {
 
 .game-status dt {
   color: var(--game-header-muted);
-  font-size: 9px;
+  font-size: 16px;
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.game-status dd { margin-top: 2px; font-size: 12px; font-weight: 650; }
+.game-status dd { margin-top: 2px; font-size: 16px; font-weight: 650; }
 
 .theme-switch {
   display: flex;
@@ -176,7 +176,7 @@ summary:focus-visible {
   padding: 0 8px;
   color: var(--game-header-muted);
   background: transparent;
-  font-size: 10px;
+  font-size: 14px;
 }
 
 .theme-switch button[aria-pressed="true"] {
@@ -197,8 +197,8 @@ summary:focus-visible {
   gap: 14px;
 }
 
-.mission-strip h2 { font-size: 15px; line-height: 1.35; }
-.mission-strip p { font-size: 12px; line-height: 1.4; }
+.mission-strip h2 { font-size: 20px; line-height: 1.35; }
+.mission-strip p { font-size: 16px; line-height: 1.45; }
 .mission-concept { margin-top: 4px !important; color: var(--game-muted); }
 .mission-failure { flex: 0 0 auto; color: var(--game-danger); font-weight: 650; }
 
@@ -220,7 +220,7 @@ summary:focus-visible {
 .turn-line {
   margin-bottom: 7px;
   color: var(--game-muted);
-  font-size: 11px;
+  font-size: 16px;
 }
 
 .battle-grid {
@@ -270,7 +270,7 @@ summary:focus-visible {
   padding: 2px;
   text-align: center;
   overflow-wrap: anywhere;
-  font-size: clamp(3px, calc(var(--cell-size) * .11), 12px);
+  font-size: clamp(12px, calc(var(--cell-size) * .14), 16px);
   font-weight: 750;
   line-height: 1.1;
   box-shadow: 0 2px 6px rgb(0 0 0 / 22%);
@@ -287,7 +287,7 @@ summary:focus-visible {
   left: 4px;
   bottom: 3px;
   color: var(--game-muted);
-  font-size: clamp(8px, calc(var(--cell-size) * .12), 10px);
+  font-size: clamp(12px, calc(var(--cell-size) * .14), 16px);
   font-weight: 650;
 }
 
@@ -302,7 +302,7 @@ summary:focus-visible {
   gap: 5px 13px;
   margin-top: 7px;
   color: var(--game-muted);
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .legend-item { display: inline-flex; align-items: center; gap: 4px; }
@@ -323,16 +323,16 @@ summary:focus-visible {
 }
 
 .feedback-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
-.feedback-panel h2 { font-size: 13px; }
-.feedback-messages { margin-top: 5px; padding-inline-start: 18px; color: var(--game-muted); font-size: 11px; line-height: 1.45; }
+.feedback-panel h2 { font-size: 18px; }
+.feedback-messages { margin-top: 5px; padding-inline-start: 18px; color: var(--game-muted); font-size: 16px; line-height: 1.5; }
 .feedback-error { color: var(--game-danger); }
 .feedback-success { border-top-color: var(--game-accent); }
 .feedback-output,
-.feedback-error { margin-top: 7px; white-space: pre-wrap; font: 11px/1.45 var(--vscode-editor-font-family, Consolas, monospace); }
+.feedback-error { margin-top: 7px; white-space: pre-wrap; font: 16px/1.5 var(--vscode-editor-font-family, Consolas, monospace); }
 
-.guidance-drawer { color: var(--game-muted); font-size: 11px; }
+.guidance-drawer { color: var(--game-muted); font-size: 16px; }
 .guidance-drawer summary { min-height: 28px; color: var(--game-accent); cursor: pointer; }
-.guidance-group h3 { margin: 10px 0 3px; color: var(--game-text); font-size: 11px; }
+.guidance-group h3 { margin: 10px 0 3px; color: var(--game-text); font-size: 16px; }
 .guidance-group ul { margin: 0; padding-inline-start: 18px; line-height: 1.45; }
 
 .action-bar {
@@ -353,7 +353,7 @@ summary:focus-visible {
   font-weight: 700;
 }
 
-.keyboard-hint { margin-left: auto; color: var(--game-muted); font-size: 10px; }
+.keyboard-hint { margin-left: auto; color: var(--game-muted); font-size: 16px; }
 
 .recovery-view { place-items: center; padding: 24px; }
 .recovery-panel { max-width: 480px; border: 1px solid var(--game-border); padding: 24px; background: var(--game-surface); box-shadow: var(--game-shadow); }
