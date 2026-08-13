@@ -249,6 +249,8 @@
 .battle-unit {
   position: relative;
   z-index: 1;
+  display: grid;
+  gap: 2px;
   margin: 6px;
   border-inline-start: 3px solid var(--brass);
   padding: 7px 8px;
@@ -257,6 +259,15 @@
   font-family: var(--font-code);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.battle-unit strong {
+  font-weight: 800;
+}
+
+.battle-unit span {
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .battle-unit.is-active {

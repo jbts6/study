@@ -258,7 +258,7 @@ function renderUnit(unit: BattleUnit, isActive: boolean): HTMLElement {
   const element = document.createElement("article");
   element.className = `battle-unit ${unit.id === "scout" ? "is-scout" : "is-enemy"}${isActive ? " is-active" : ""}`;
   element.dataset.testid = `unit-${unit.id}`;
-  element.textContent = `${unit.id === "scout" ? "主角" : "敌人"} ${unit.id} · ${unit.hp} / ${unit.maxHp}`;
+  element.innerHTML = `<strong>${unit.id === "scout" ? "主角" : "敌人"} ${unit.id}</strong><span>生命 ${unit.hp} / ${unit.maxHp}</span><span>攻击 ${unit.attack}</span>`;
   return element;
 }
 

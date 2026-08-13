@@ -365,6 +365,8 @@ describe("AppController", () => {
     expect(view.root.querySelector("[data-testid='battle-action-hint']")?.textContent).toContain("choose_turn");
     expect(view.root.querySelectorAll(".battle-legend .legend-item")).toHaveLength(6);
     expect(view.root.querySelector("[data-testid='mission-summary']")?.textContent).toContain("合法指令");
+    expect(view.root.querySelector("[data-testid='unit-scout']")?.textContent).toContain("生命 10 / 10");
+    expect(view.root.querySelector("[data-testid='unit-scout']")?.textContent).toContain("攻击 4");
     view.unmount();
   });
 });
