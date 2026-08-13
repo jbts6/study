@@ -35,6 +35,8 @@ describe("campaign levels", () => {
     expect(first.starterCode).toContain('"movePath": [{"x": 1, "y": 0}, {"x": 1, "y": 1}]');
     expect(first.starterCode).toContain('"action": {"type": "attack", "targetId": "golem"}');
     expect(first.starterCode).toContain('"action": {"type": "cast", "skillId": "spark", "targetId": "golem"}');
+    expect(first.apiHints).toContain('移动：顶层写 "movePath"；攻击：action 写 "type": "attack" 和 "targetId"。');
+    expect(first.apiHints).toContain('施法：action 写 "type": "cast"、"skillId" 和 "targetId"。');
     expect(second.starterCode).toContain("if ");
     expect(third.starterCode).not.toContain("def choose_turn");
     expect(third.starterCode).toContain('world["units"]');

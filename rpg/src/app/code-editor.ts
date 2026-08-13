@@ -28,7 +28,7 @@ const lightEditorTheme = EditorView.theme({
     minHeight: "100%",
     boxSizing: "border-box",
     padding: "10px 12px 24px",
-    backgroundColor: "#ffffff",
+    backgroundColor: "transparent",
     color: "#1f2328",
     fontFamily: "var(--font-code)",
     fontSize: "14px",
@@ -43,7 +43,8 @@ const lightEditorTheme = EditorView.theme({
   ".cm-activeLine": { backgroundColor: "#f6f8fa" },
   ".cm-activeLineGutter": { backgroundColor: "#f6f8fa", color: "#1f2328" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#0078d4" },
-  ".cm-selectionBackground": { backgroundColor: "#add6ff !important" },
+  ".cm-selectionLayer .cm-selectionBackground": { backgroundColor: "#add6ff !important" },
+  ".cm-content::selection": { backgroundColor: "#add6ff" },
   ".cm-matchingBracket": { backgroundColor: "#e8f2ff", border: "1px solid #0078d4" },
   ".cm-nonmatchingBracket": { backgroundColor: "#fff1f0", border: "1px solid #c9362b" },
 }, { dark: false });

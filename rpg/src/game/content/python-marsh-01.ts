@@ -107,7 +107,12 @@ export const PYTHON_MARSH_01: LevelDefinition = {
   title: "唤醒中继器",
   briefing: ["在中继器被腐化前消灭敌人。", "读取 world 字典并返回一条合法指令。"],
   starterCode: STARTER_CODE,
-  apiHints: ["world[\"activeUnitId\"] 是当前行动者。", "指令需要 actorId、expectedRevision 和 action。"],
+  apiHints: [
+    "world[\"activeUnitId\"] 是当前行动者。",
+    "指令需要 actorId、expectedRevision 和 action。",
+    "移动：顶层写 \"movePath\"；攻击：action 写 \"type\": \"attack\" 和 \"targetId\"。",
+    "施法：action 写 \"type\": \"cast\"、\"skillId\" 和 \"targetId\"。",
+  ],
   initialBattle: createPythonMarsh01(),
   enemyBehaviors: { golem: { type: "corrupt" } },
   reward: { type: "ability", abilityId: "ward" },
