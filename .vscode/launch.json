@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "运行 Python RPG 扩展",
+      "name": "调试 Python RPG 扩展（新窗口）",
       "type": "extensionHost",
       "request": "launch",
       "args": [

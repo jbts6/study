@@ -8,6 +8,13 @@
       "path": "rpg",
       "problemMatcher": ["$tsc"],
       "group": "build"
+    },
+    {
+      "label": "安装 Python RPG 到当前 VS Code",
+      "type": "npm",
+      "script": "install:local",
+      "path": "rpg",
+      "problemMatcher": []
     }
   ]
 }

@@ -16,9 +16,28 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:pythonRpg.open"
+    "onCommand:pythonRpg.open",
+    "onView:pythonRpg.launcher"
   ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pythonRpg",
+          "title": "Python RPG",
+          "icon": "media/python-rpg.svg"
+        }
+      ]
+    },
+    "views": {
+      "pythonRpg": [
+        {
+          "id": "pythonRpg.launcher",
+          "name": "Python RPG",
+          "icon": "media/python-rpg.svg"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "pythonRpg.open",
@@ -55,6 +74,8 @@
     "build:extension": "node esbuild.extension.mjs",
     "build:extension-test": "node esbuild.extension-test.mjs",
     "build:webview": "node esbuild.webview.mjs",
+    "package:vsix": "npm run build && vsce package --out dist/python-rpg.vsix",
+    "install:local": "npm run package:vsix && code --install-extension dist/python-rpg.vsix --force",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
@@ -74,6 +95,7 @@
     "@types/vscode": "^1.125.0",
     "@types/ws": "8.18.1",
     "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.2",
     "jsdom": "30.0.1",
     "typescript": "7.0.2",

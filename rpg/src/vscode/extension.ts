@@ -6,6 +6,7 @@ import { detectPython } from "../runners/local/python-detector";
 import { PythonRunProcess } from "../runners/local/python-process";
 import type { RunnerDiagnostic } from "../runners/protocol/types";
 import { DirectRunnerClient } from "./direct-runner-client";
+import { GameLauncher } from "./game-launcher";
 import { GameSession, type SessionDiagnostics } from "./game-session";
 import { DocumentWorkspace, levelFilePath, type WorkspaceDocument, type WorkspaceHost } from "./level-workspace";
 import type { ThemePreference, WebviewCommand } from "./messages";
@@ -33,6 +34,7 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   context.subscriptions.push(
+    vscode.window.registerTreeDataProvider("pythonRpg.launcher", new GameLauncher()),
     vscode.commands.registerCommand("pythonRpg.open", openGame),
     vscode.commands.registerCommand("pythonRpg.runTurn", async () => {
       const game = await openGame();
