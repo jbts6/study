@@ -28,7 +28,8 @@ describe("game Webview renderer", () => {
     const largeBoard = calculateCellSize(600, 450, 6, 4);
 
     expect(smallBoard).toBeGreaterThan(largeBoard);
-    expect(smallBoard).toBeLessThanOrEqual(112);
+    expect(smallBoard).toBe(146);
+    expect(smallBoard).toBeGreaterThan(112);
     expect(largeBoard * 6 + 5 * 5).toBeLessThanOrEqual(600);
     expect(largeBoard * 4 + 3 * 5).toBeLessThanOrEqual(450);
     expect(largeBoard).toBeGreaterThanOrEqual(42);

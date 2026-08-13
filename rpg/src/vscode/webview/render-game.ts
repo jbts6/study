@@ -3,7 +3,6 @@ import type { LevelGuidance } from "../../game/content/types";
 import type { GameViewSnapshot } from "../messages";
 
 const CELL_GAP = 5;
-const MAX_CELL_SIZE = 112;
 
 export function calculateCellSize(
   width: number,
@@ -15,7 +14,7 @@ export function calculateCellSize(
   const verticalGaps = Math.max(0, rows - 1) * CELL_GAP;
   const widthFit = (width - horizontalGaps) / columns;
   const heightFit = (height - verticalGaps) / rows;
-  return Math.max(1, Math.min(MAX_CELL_SIZE, Math.floor(widthFit), Math.floor(heightFit)));
+  return Math.max(1, Math.min(Math.floor(widthFit), Math.floor(heightFit)));
 }
 
 export function renderGame(root: HTMLElement, snapshot: GameViewSnapshot): void {
