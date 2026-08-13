@@ -3,6 +3,10 @@ import type { LevelDefinition } from "./types";
 
 export const STARTER_CODE_05 = `# 可以把“选敌人”“选目标”“选行动”拆成辅助函数。
 # 本关不提供函数骨架，请从 world 视图开始组织代码。
+# API 速查：
+# world["activeUnitId"] 填入 "actorId"，world["revision"] 填入 "expectedRevision"。
+# world["units"] 提供 hunter、guard 和技能状态；world["objectives"] 提供 node-a、node-b。
+# 返回命令可包含 "movePath": [{"x": 1, "y": 0}] 和 "action": {"type": "guard"}。
 `;
 
 function createPythonMarsh05(): BattleState {
@@ -122,16 +126,31 @@ export const PYTHON_MARSH_05: LevelDefinition = {
   title: "裂隙节点",
   briefing: [
     "猎手会追击 scout，守卫保护节点。",
-    "依次激活两处节点，再用 fracture 处理高防守卫。",
+    "激活两处节点，再用 fracture 处理高防守卫。",
     "把选敌人、选目标、选行动拆成辅助函数。",
   ],
   starterCode: STARTER_CODE_05,
   guidance: {
-    objective: ["依次激活 node-a 与 node-b，并消灭猎手和高防守卫。"],
-    concepts: ["把选敌人、选目标和选行动拆成辅助函数，让决策逻辑保持清楚。"],
-    worldFields: ["world[\"units\"] 提供敌人状态；world[\"objectives\"] 提供节点完成状态。"],
-    commandExamples: ["对高防 guard 使用 fracture，再用 attack 或伤害技能处理。"],
-    levelRules: ["node-a 必须先于 node-b 激活；hunter 会追击 scout，guard 会保护节点。"],
+    objective: ["保护 relay，激活 node-a 与 node-b，并在 14 回合内消灭 hunter 和 guard。"],
+    concepts: [
+      "把查找单位、查找目标、检查技能冷却和选择行动拆成小型辅助函数。",
+      "辅助函数只负责一个判断，choose_turn 负责组合结果并返回最终命令。",
+    ],
+    worldFields: [
+      "world[\"activeUnitId\"] 是本回合 actorId；world[\"revision\"] 是 expectedRevision。",
+      "world[\"units\"] 提供 hunter、guard 和 scout 的 cell、hp、disabled 与 statuses。",
+      "world[\"objectives\"] 提供 node-a、node-b 的 cell 与 completed，也包含需要保护的 relay。",
+      "scout 的 skills 中 remainingCooldown 为 0 表示 fracture、pierce 等技能当前可用。",
+    ],
+    commandExamples: [
+      "完整外层结构：{\"actorId\": world[\"activeUnitId\"], \"expectedRevision\": world[\"revision\"], \"movePath\": [{\"x\": 1, \"y\": 0}], \"action\": {\"type\": \"guard\"}}。",
+      "激活节点分别使用 {\"action\": {\"type\": \"interact\", \"targetId\": \"node-a\"}} 和 {\"action\": {\"type\": \"interact\", \"targetId\": \"node-b\"}}。",
+      "削弱高防 guard：{\"action\": {\"type\": \"cast\", \"skillId\": \"fracture\", \"targetId\": \"guard\"}}。",
+    ],
+    levelRules: [
+      "node-a 与 node-b 都必须激活；交互时 scout 必须位于目标的正交相邻格。",
+      "hunter 会追击 scout，guard 会保护关键位置；relay 被毁、scout 失能或超过 14 回合都会失败。",
+    ],
   },
   initialBattle: createPythonMarsh05(),
   enemyBehaviors: {

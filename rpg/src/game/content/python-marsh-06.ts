@@ -4,9 +4,10 @@ import type { LevelDefinition } from "./types";
 export const STARTER_CODE_06 = `# 保护中继器、穿过危险地形、消灭敌人并激活最终封印。
 # 在最大回合数内完成战役。
 # API 速查：
-# world["activeUnitId"] 和 world["revision"] 标识当前回合。
+# world["activeUnitId"] 填入 "actorId"，world["revision"] 填入 "expectedRevision"。
 # world["units"]、world["objectives"] 和 world["board"] 提供战场状态。
 # scout.skills 中的 remainingCooldown 表示技能是否可用。
+# 返回命令可包含 "movePath": [{"x": 1, "y": 0}] 和 "action": {"type": "guard"}。
 `;
 
 function createPythonMarsh06(): BattleState {
@@ -140,10 +141,25 @@ export const PYTHON_MARSH_06: LevelDefinition = {
   starterCode: STARTER_CODE_06,
   guidance: {
     objective: ["保护 relay，消灭三类敌人并激活 final-seal，在 18 回合内完成战役。"],
-    concepts: ["综合使用条件、遍历、辅助函数和全部已解锁能力。"],
-    worldFields: ["world[\"units\"]、world[\"objectives\"] 和 world[\"board\"] 提供完整战场状态。", "skills 中的 remainingCooldown 表示技能是否可用。"],
-    commandExamples: ["通用命令仍由 actorId、expectedRevision、可选 movePath 与 \"action\" 组成。"],
-    levelRules: ["corruptor 腐化目标，hunter 追击 scout，guard 保护关键位置；危险格造成 1 点伤害。"],
+    concepts: [
+      "综合使用条件、遍历和辅助函数，让不同敌人、目标、生命值与冷却共享一套决策入口。",
+      "把能力是否可用和目标是否完成作为数据判断，不依赖固定回合数写死行动。",
+    ],
+    worldFields: [
+      "world[\"activeUnitId\"] 是本回合 actorId；world[\"revision\"] 是 expectedRevision。",
+      "world[\"units\"] 提供三类敌人和 scout 的状态；world[\"objectives\"] 提供 relay 与 final-seal 状态。",
+      "world[\"board\"] 提供 hazardCells、coverCells 和地图尺寸；scout 的 skills 提供 remainingCooldown。",
+    ],
+    commandExamples: [
+      "完整外层结构：{\"actorId\": world[\"activeUnitId\"], \"expectedRevision\": world[\"revision\"], \"movePath\": [{\"x\": 1, \"y\": 0}], \"action\": {\"type\": \"guard\"}}。",
+      "面对敌人攻击前可使用 aegis 提升防御：{\"action\": {\"type\": \"cast\", \"skillId\": \"aegis\", \"targetId\": \"scout\"}}。危险格仍会直接造成伤害。",
+      "激活最终封印：{\"action\": {\"type\": \"interact\", \"targetId\": \"final-seal\"}}。",
+      "对高防 guard 可使用 fracture：{\"action\": {\"type\": \"cast\", \"skillId\": \"fracture\", \"targetId\": \"guard\"}}。",
+    ],
+    levelRules: [
+      "corruptor 会腐化 relay，hunter 会追击 scout，guard 会保护关键位置；危险格造成 1 点伤害。",
+      "final-seal 必须激活，且全部敌人失能；relay 被毁、scout 失能或超过 18 回合都会失败。",
+    ],
   },
   initialBattle: createPythonMarsh06(),
   enemyBehaviors: {

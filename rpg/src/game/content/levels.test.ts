@@ -79,6 +79,54 @@ describe("campaign levels", () => {
     expect(finale.levelRules.join(" ")).not.toMatch(/先.*再.*最后/);
   });
 
+  it("keeps levels three through six guidance self-contained and aligned with unlocked abilities", () => {
+    for (const levelId of LEVEL_ORDER.slice(2)) {
+      const level = getLevel(levelId);
+      const guidance = level.guidance;
+      const worldFields = guidance.worldFields.join(" ");
+      const commandExamples = guidance.commandExamples.join(" ");
+
+      expect(level.starterCode, levelId).toContain('world["activeUnitId"]');
+      expect(level.starterCode, levelId).toContain('world["revision"]');
+      expect(level.starterCode, levelId).toContain('"actorId"');
+      expect(level.starterCode, levelId).toContain('"expectedRevision"');
+      expect(level.starterCode, levelId).toContain('"movePath"');
+      expect(level.starterCode, levelId).toContain('"action"');
+      expect(worldFields, levelId).toContain('world["activeUnitId"]');
+      expect(worldFields, levelId).toContain('world["revision"]');
+      expect(worldFields, levelId).toContain('world["units"]');
+      expect(worldFields, levelId).toContain('world["objectives"]');
+      expect(commandExamples, levelId).toContain('"actorId"');
+      expect(commandExamples, levelId).toContain('"expectedRevision"');
+      expect(commandExamples, levelId).toContain('"movePath"');
+      expect(commandExamples, levelId).toContain('"action"');
+    }
+
+    const third = getLevel("python-marsh-03").guidance;
+    expect(third.commandExamples.join(" ")).toContain('"scout-mark"');
+    expect(third.levelRules.join(" ")).toContain("未激活印记");
+
+    const fourth = getLevel("python-marsh-04").guidance;
+    expect(fourth.commandExamples.join(" ")).toContain('"movePath": [{"x": 1, "y": 0}]');
+    expect(fourth.commandExamples.join(" ")).not.toContain('"movePath": [{"x": 1, "y": 1}]');
+    expect(fourth.commandExamples.join(" ")).toContain('"pierce"');
+    expect(fourth.commandExamples.join(" ")).toContain('"renew"');
+    expect(fourth.commandExamples.join(" ")).not.toContain('"fracture"');
+
+    const fifth = getLevel("python-marsh-05").guidance;
+    expect(fifth.commandExamples.join(" ")).toContain('"node-a"');
+    expect(fifth.commandExamples.join(" ")).toContain('"node-b"');
+    expect(fifth.commandExamples.join(" ")).toContain('"fracture"');
+
+    const sixth = getLevel("python-marsh-06").guidance;
+    expect(sixth.commandExamples.join(" ")).toContain('"final-seal"');
+    expect(sixth.commandExamples.join(" ")).toContain('"aegis"');
+    expect(sixth.commandExamples.join(" ")).toContain("面对敌人攻击前");
+    expect(sixth.commandExamples.join(" ")).not.toContain("进入危险区域前");
+    expect(sixth.levelRules.join(" ")).toContain("危险格造成 1 点伤害");
+    expect(sixth.levelRules.join(" ")).toContain("18 回合");
+  });
+
   it("keeps every level fully referenced and rewards abilities in campaign order", () => {
     const rewards = LEVEL_ORDER.map((levelId) => getLevel(levelId).reward);
     expect(rewards).toEqual([

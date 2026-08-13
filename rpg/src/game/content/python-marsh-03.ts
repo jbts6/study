@@ -3,6 +3,10 @@ import type { LevelDefinition } from "./types";
 
 export const STARTER_CODE_03 = `# 遍历 world["units"]，选择优先处理的敌人。
 # 敌人全部失能前，请激活 scout-mark。
+# API 速查：
+# world["activeUnitId"] 填入 "actorId"，world["revision"] 填入 "expectedRevision"。
+# world["units"] 提供敌人状态；world["objectives"] 提供 scout-mark 的 cell 和 completed。
+# 返回命令可包含 "movePath": [{"x": 1, "y": 0}] 和 "action": {"type": "guard"}。
 `;
 
 function createPythonMarsh03(): BattleState {
@@ -24,10 +28,24 @@ export const PYTHON_MARSH_03: LevelDefinition = {
   id: "python-marsh-03", title: "勘测印记", briefing: ["激活勘测印记后再消灭最后一名敌人。", "遍历可见敌人，选择优先目标。"], starterCode: STARTER_CODE_03,
   guidance: {
     objective: ["激活 scout-mark 后，再消灭最后一名敌人。"],
-    concepts: ["使用 for 遍历单位列表，并用条件筛选优先目标。"],
-    worldFields: ["world[\"units\"] 中每个单位包含 team、hp、cell 和 disabled。"],
-    commandExamples: ["交互：{\"action\": {\"type\": \"interact\", \"targetId\": \"scout-mark\"}}。"],
-    levelRules: ["scout 必须移动到 scout-mark 相邻格才能激活；未激活印记就消灭全部敌人会失败。"],
+    concepts: [
+      "使用 for 遍历 world[\"units\"]，筛出 team 为 enemies 且 disabled 为 false 的单位。",
+      "把印记是否完成也放进条件判断，避免过早消灭最后一名敌人。",
+    ],
+    worldFields: [
+      "world[\"activeUnitId\"] 是本回合 actorId；world[\"revision\"] 是 expectedRevision。",
+      "world[\"units\"] 提供 id、team、hp、cell 和 disabled，可用于筛选仍能行动的敌人。",
+      "world[\"objectives\"] 中找到 id 为 scout-mark 的目标，读取 cell 和 completed。",
+    ],
+    commandExamples: [
+      "完整外层结构：{\"actorId\": world[\"activeUnitId\"], \"expectedRevision\": world[\"revision\"], \"movePath\": [{\"x\": 0, \"y\": 1}], \"action\": {\"type\": \"guard\"}}。",
+      "激活印记：{\"action\": {\"type\": \"interact\", \"targetId\": \"scout-mark\"}}。",
+      "攻击筛选出的敌人：{\"action\": {\"type\": \"attack\", \"targetId\": \"hunter-a\"}}。",
+    ],
+    levelRules: [
+      "scout 必须移动到 scout-mark 的正交相邻格才能 interact。",
+      "未激活印记就消灭全部敌人会结算为任务失败；两名 hunter 都会追击 scout，最多 10 回合。",
+    ],
   },
   initialBattle: createPythonMarsh03(), enemyBehaviors: { "hunter-a": { type: "hunt-player" }, "hunter-b": { type: "hunt-player" } }, reward: { type: "ability", abilityId: "renew" },
 };
