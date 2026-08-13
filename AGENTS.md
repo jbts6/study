@@ -13,6 +13,12 @@
 - 不为极端进程竞态、重复关闭、信号排列、Proxy/访问器、对象篡改、跨版本迁移或未来扩展增加状态机、协议字段和测试矩阵。
 - 测试覆盖正常路径和一个关键失败路径。先简化实现，再删除只验证旧实现细节的测试；不得只为提高测试数量增加用例。
 
+## VS Code 扩展交付
+
+- 修改 `rpg/` 中会进入 VS Code 扩展或 Webview 的代码后，完成必要验证后必须在 `rpg/` 目录运行 `npm run install:local`。
+- `npm run install:local` 会重新构建、打包 `dist/python-rpg.vsix` 并用 `code --install-extension ... --force` 替换本机已安装扩展；仅运行 `npm run build` 不足以更新普通 VS Code 窗口。
+- 安装完成后，重载 VS Code 窗口并重新打开游戏页面，再报告界面改动可供检查。
+
 ## 子代理工具编排
 
 - 命令等待与子代理等待必须严格分流：只有执行命令明确返回 `Script running with cell ID ...` 时，才能把该真实且仍有效的 `cell_id` 交给命令等待工具；等待子代理只能使用协作工具的 `wait_agent`、`list_agents` 等代理接口，严禁用命令等待工具代替。
