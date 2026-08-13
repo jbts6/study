@@ -77,10 +77,7 @@ const GAME_SHELL_MARKUP = `
       <section class="mission-briefing" aria-labelledby="mission-heading">
         <div class="mission-heading"><p>任务简报</p><h2 id="mission-heading"></h2></div>
         <p data-testid="mission-summary" class="mission-summary"></p>
-        <ul data-testid="level-objectives" class="mission-objectives" aria-label="目标状态"></ul>
         <p class="mission-constraint"></p>
-        <div class="skill-readout"><h3>Scout 能力</h3><ul data-testid="scout-skills"></ul></div>
-        <details class="concept-hint"><summary>概念提示</summary><p></p></details>
       </section>
       <div data-testid="code-editor" class="code-editor"></div>
       <details class="api-help">
@@ -305,19 +302,11 @@ function renderBattleDirective(
 function renderBriefing(container: HTMLElement, level: LevelDefinition, state: BattleState): void {
   requiredElement(container, "#mission-heading").textContent = level.title;
   requiredElement(container, "[data-testid='mission-summary']").textContent = level.briefing.join(" ");
-  renderObjectiveList(requiredElement(container, "[data-testid='level-objectives']"), state);
   const keyObjectives = state.objectives.filter((objective) => objective.key);
   const constraints = keyObjectives.length === 0
-    ? `失败约束：在 ${state.maxRounds} 回合内完成任务。`
-    : `失败约束：保护${keyObjectives.map((objective) => objective.id).join("、")}并在 ${state.maxRounds} 回合内完成任务。`;
+    ? `当前行动：${activeUnitId(state) ?? "无"} · 回合限制：${state.maxRounds}`
+    : `当前行动：${activeUnitId(state) ?? "无"} · 回合限制：${state.maxRounds} · 保护${keyObjectives.map((objective) => objective.id).join("、")}`;
   requiredElement(container, ".mission-constraint").textContent = constraints;
-  const scout = state.units.find((unit) => unit.id === "scout");
-  renderTextList(requiredElement(container, "[data-testid='scout-skills']"), (scout?.skills ?? []).map((skill) => (
-    skill.remainingCooldown === 0 ? `${skill.id} · 可用` : `${skill.id} · 冷却 ${skill.remainingCooldown} 回合`
-  )));
-  requiredElement(container, ".concept-hint p").textContent = level.id === "python-marsh-01"
-    ? "每回合返回一条指令；使用 world 中的 revision 保持指令与战场一致。"
-    : "先读取 world 的当前状态，再返回一条完整且合法的回合指令。";
 }
 
 function renderApiHelp(container: HTMLElement, level: LevelDefinition): void {
@@ -336,14 +325,6 @@ function renderApiHelp(container: HTMLElement, level: LevelDefinition): void {
   for (const [index, selector] of selectors.entries()) {
     renderTextList(requiredElement(container, selector), groups[index] ?? []);
   }
-}
-
-function renderObjectiveList(container: HTMLElement, state: BattleState): void {
-  container.replaceChildren(...state.objectives.map((objective) => {
-    const item = createTextElement("li", `${objective.key ? "保护" : "激活"} ${objective.id} · ${objective.completed ? "已完成" : `进行中，耐久 ${objective.durability}`}`);
-    item.className = objective.completed ? "is-complete" : objective.key ? "is-key" : "is-activate";
-    return item;
-  }));
 }
 
 function renderTextList(container: HTMLElement, values: readonly string[]): void {

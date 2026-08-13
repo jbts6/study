@@ -404,6 +404,7 @@ describe("AppController", () => {
     await controller.start();
 
     const editorPanel = view.root.querySelector<HTMLElement>(".editor-panel");
+    const workspace = view.root.querySelector<HTMLElement>(".workspace");
     const apiHelp = view.root.querySelector<HTMLDetailsElement>("details.api-help");
     const summary = apiHelp?.querySelector<HTMLElement>("summary");
     const runButton = view.root.querySelector<HTMLButtonElement>("[data-testid='run-turn']");
@@ -411,6 +412,11 @@ describe("AppController", () => {
     const movePath = view.root.querySelector<HTMLElement>(".api-move-path");
 
     expect(editorPanel).not.toBeNull();
+    expect([...workspace!.children].map((child) => child.className)).toEqual([
+      "battle-panel",
+      "editor-panel",
+      "feedback-panel feedback-idle",
+    ]);
     expect(apiHelp).not.toBeNull();
     expect(summary).not.toBeNull();
     expect(apiHelp?.open).toBe(false);

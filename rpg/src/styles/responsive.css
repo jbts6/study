@@ -8,7 +8,8 @@
 
   body {
     min-width: 0;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .app-shell {
@@ -38,7 +39,12 @@
   .workspace {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto;
+    grid-template-areas:
+      "battle"
+      "editor"
+      "feedback";
     overflow: visible;
+    overflow-x: hidden;
     padding: var(--space);
   }
 
@@ -46,7 +52,18 @@
   .editor-panel,
   .feedback-panel {
     min-height: 0;
+    max-width: 100%;
+    overflow-x: hidden;
   }
+
+  .battle-panel { grid-area: battle; }
+
+  .editor-panel {
+    grid-area: editor;
+    grid-template-rows: auto auto minmax(300px, auto) auto auto;
+  }
+
+  .feedback-panel { grid-area: feedback; }
 
   .battlefield {
     min-height: 380px;
@@ -58,6 +75,22 @@
 
   .code-editor {
     min-height: 300px;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .api-help-body {
+    max-block-size: min(40dvh, 320px);
+    overflow-x: hidden;
+  }
+
+  .api-help-body pre,
+  .api-help-body .api-example,
+  .api-help-body .code-example {
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .feedback-panel {

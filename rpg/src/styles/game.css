@@ -466,6 +466,175 @@
   line-height: 1.5;
 }
 
+/* Keep the editor's always-visible context compact so the code area owns the flexible track. */
+.mission-briefing,
+.mission-strip,
+.task-bar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 50px;
+  gap: 4px 12px;
+  padding: 8px 16px;
+}
+
+.mission-briefing > *,
+.mission-strip > *,
+.task-bar > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mission-briefing h2,
+.mission-strip h2,
+.task-bar h2,
+.mission-briefing p,
+.mission-strip p,
+.task-bar p {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.mission-summary,
+.mission-strip .task-summary,
+.mission-strip .mission-summary,
+.task-bar .task-summary,
+.task-bar .mission-summary {
+  line-height: 1.35;
+}
+
+.api-help {
+  background: var(--surface);
+}
+
+.api-help > summary,
+.api-help summary {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 16px;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-help > summary::marker,
+.api-help summary::marker {
+  color: var(--arcane);
+}
+
+.api-help > summary:focus-visible,
+.api-help summary:focus-visible,
+.concept-hint summary:focus-visible {
+  outline: 2px solid var(--arcane);
+  outline-offset: -2px;
+}
+
+.api-help-body {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 16px 12px;
+  background: var(--surface-deep);
+}
+
+.api-help-body,
+.api-help-body * {
+  overflow-wrap: anywhere;
+}
+
+.api-group,
+.api-help-group {
+  min-width: 0;
+  max-width: 100%;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.api-group:last-child,
+.api-help-group:last-child {
+  border-bottom: 0;
+}
+
+.api-group h3,
+.api-help-group h3 {
+  margin: 0 0 6px;
+  color: var(--brass);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.api-group p,
+.api-help-group p,
+.api-group ul,
+.api-help-group ul,
+.api-group ol,
+.api-help-group ol {
+  min-width: 0;
+  max-width: 100%;
+  margin-block: 0;
+}
+
+.api-group ul,
+.api-help-group ul,
+.api-group ol,
+.api-help-group ol {
+  padding-inline-start: 18px;
+}
+
+.api-example,
+.code-example,
+.api-help-body pre {
+  max-width: 100%;
+  margin: 8px 0 0;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--arcane);
+  padding: 8px 10px;
+  color: var(--text);
+  background: var(--surface);
+  font-family: var(--font-code);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.api-example code,
+.code-example code,
+.api-help-body pre code {
+  white-space: inherit;
+  overflow-wrap: inherit;
+}
+
+.editor-panel,
+.editor-panel > *,
+.editor-panel button,
+.editor-panel code,
+.editor-panel li {
+  min-width: 0;
+}
+
+.editor-panel code,
+.editor-panel li,
+.api-hints li {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.action-row {
+  position: relative;
+  z-index: 1;
+}
+
 @keyframes active-pulse {
   50% {
     border-inline-start-color: #106ebe;
