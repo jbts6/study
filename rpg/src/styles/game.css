@@ -88,6 +88,12 @@
   font-size: 18px;
 }
 
+.mission-summary {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .mission-objectives,
 .skill-readout ul,
 .api-hints ul {
@@ -142,6 +148,45 @@
   font-size: 19px;
 }
 
+.battle-directive .directive-kicker {
+  margin: 0;
+  color: var(--brass);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.battle-directive h3,
+.battle-directive p { margin: 0; }
+
+.battle-directive h3 {
+  max-width: 42rem;
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.25;
+}
+
+.battle-action-hint {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.battle-constraint {
+  border-inline-start: 3px solid var(--warning);
+  padding-inline-start: 8px;
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.legend-scout { border-color: var(--arcane); background: #e8f2ff; }
+.legend-enemy { border-color: var(--danger); background: #fff0ee; }
+.legend-key { border-color: var(--brass); background: #fff8e1; }
+.legend-activate { border-color: var(--success); border-style: dashed; background: #eef8f0; }
+.legend-hazard { border-color: var(--danger); background: repeating-linear-gradient(135deg, #fff0ee 0 3px, #ffffff 3px 6px); }
+.legend-blocked { border-color: var(--border-strong); background: #d8dee4; }
+
 .battlefield {
   background-color: #eef2f5;
   background-image:
@@ -149,6 +194,20 @@
     linear-gradient(90deg, rgb(87 113 135 / 10%) 1px, transparent 1px);
   background-size: 18px 18px;
 }
+
+.mission-objectives {
+  list-style: none;
+  padding-inline-start: 0;
+}
+
+.mission-objectives li {
+  border-inline-start: 3px solid var(--border-strong);
+  padding-inline-start: 8px;
+}
+
+.mission-objectives li.is-key { border-inline-start-color: var(--brass); }
+.mission-objectives li.is-activate { border-inline-start-color: var(--success); }
+.mission-objectives li.is-complete { color: var(--success); text-decoration: line-through; }
 
 .battle-cell {
   border: 1px solid #c8d1da;
@@ -172,13 +231,20 @@
   color: var(--text-muted);
   font-family: var(--font-code);
   font-size: 11px;
+  opacity: 0.72;
 }
 
 .battle-objective {
   color: var(--brass);
+  border: 1px solid currentcolor;
+  padding: 3px 5px;
+  background: #fff8e1;
   font-family: var(--font-code);
   font-size: 11px;
 }
+
+.battle-objective.is-activate { border-style: dashed; color: var(--success); background: #eef8f0; }
+.battle-objective.is-complete { opacity: 0.7; text-decoration: line-through; }
 
 .battle-unit {
   position: relative;
@@ -199,6 +265,9 @@
   box-shadow: none;
   animation: active-pulse 2.8s ease-in-out infinite;
 }
+
+.battle-unit.is-scout { border-inline-start-color: var(--arcane); background: #e8f2ff; }
+.battle-unit.is-enemy { border-inline-start-color: var(--danger); background: #fff8f7; }
 
 .action-row {
   border-top: 1px solid var(--border);

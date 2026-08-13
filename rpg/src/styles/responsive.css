@@ -52,6 +52,10 @@
     min-height: 380px;
   }
 
+  .battle-state {
+    justify-content: flex-start;
+  }
+
   .code-editor {
     min-height: 300px;
   }

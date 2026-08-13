@@ -354,4 +354,17 @@ describe("AppController", () => {
     expect(snapshot.feedback.messages).toContain("封印激活进度：scout-mark 耐久 0（已完成）");
     expect(snapshot.feedback.messages.some((message) => message.includes("[interacted]") || message.includes("[objective_progressed]"))).toBe(false);
   });
+
+  it("puts the mission goal before the battlefield details", async () => {
+    const controller = createController(new FakeRunner(completed(null)), new MemorySaveStore(null));
+    const view = mountSettlement(controller);
+    await controller.start();
+
+    expect(view.root.querySelector("[data-testid='battle-objective-summary']")?.textContent).toContain("中继器");
+    expect(view.root.querySelector("[data-testid='battle-constraint']")?.textContent).toContain("回合");
+    expect(view.root.querySelector("[data-testid='battle-action-hint']")?.textContent).toContain("choose_turn");
+    expect(view.root.querySelectorAll(".battle-legend .legend-item")).toHaveLength(6);
+    expect(view.root.querySelector("[data-testid='mission-summary']")?.textContent).toContain("合法指令");
+    view.unmount();
+  });
 });

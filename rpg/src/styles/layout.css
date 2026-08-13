@@ -71,7 +71,7 @@ body {
 }
 
 .battle-panel {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
 }
 
 .editor-panel {
@@ -168,6 +168,57 @@ body {
   color: #ffffff;
   font-weight: 800;
   background: var(--arcane);
+}
+
+.battle-heading {
+  min-height: 72px;
+}
+
+.battle-state {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.battle-state strong {
+  color: var(--text);
+  font-family: var(--font-code);
+}
+
+.battle-directive {
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-deep);
+}
+
+.battle-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-strong);
 }
 
 .settlement-failed .settlement-actions button {

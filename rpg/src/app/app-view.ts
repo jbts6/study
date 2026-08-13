@@ -15,6 +15,7 @@ type GameShell = Readonly<{
   phase: HTMLSpanElement;
   activeUnit: HTMLSpanElement;
   battlefield: HTMLElement;
+  battleDirective: HTMLElement;
   briefing: HTMLElement;
   feedback: HTMLElement;
   run: HTMLButtonElement;
@@ -50,14 +51,32 @@ const GAME_SHELL_MARKUP = `
   </header>
   <div class="workspace">
     <section class="battle-panel" aria-labelledby="battle-heading">
-      <div class="panel-heading"><p>蓝图战场</p><h2 id="battle-heading">遭遇状态：<span data-testid="battle-phase"></span></h2></div>
+      <div class="panel-heading battle-heading">
+        <div><p>蓝图战场</p><h2 id="battle-heading"></h2></div>
+        <div class="battle-state"><span>遭遇 <strong data-testid="battle-phase"></strong></span><span>修订 <strong data-testid="battle-revision"></strong></span></div>
+      </div>
+      <section class="battle-directive" aria-labelledby="directive-heading">
+        <p class="directive-kicker">先完成这些</p>
+        <h3 id="directive-heading" data-testid="battle-objective-summary"></h3>
+        <p class="battle-action-hint" data-testid="battle-action-hint"></p>
+        <p class="battle-constraint" data-testid="battle-constraint"></p>
+      </section>
+      <div class="battle-legend" aria-label="战场图例">
+        <span class="legend-item"><i class="legend-swatch legend-scout" aria-hidden="true"></i>主角 scout</span>
+        <span class="legend-item"><i class="legend-swatch legend-enemy" aria-hidden="true"></i>敌人</span>
+        <span class="legend-item"><i class="legend-swatch legend-key" aria-hidden="true"></i>关键目标</span>
+        <span class="legend-item"><i class="legend-swatch legend-activate" aria-hidden="true"></i>可激活目标</span>
+        <span class="legend-item"><i class="legend-swatch legend-hazard" aria-hidden="true"></i>危险格</span>
+        <span class="legend-item"><i class="legend-swatch legend-blocked" aria-hidden="true"></i>阻挡格</span>
+      </div>
       <div class="battlefield" role="grid" aria-label="Python 沼泽战场"></div>
     </section>
     <section class="editor-panel" aria-labelledby="editor-heading">
       <div class="panel-heading"><p>本地 Python</p><h2 id="editor-heading">回合程序</h2></div>
       <section class="mission-briefing" aria-labelledby="mission-heading">
         <div class="mission-heading"><p>任务简报</p><h2 id="mission-heading"></h2></div>
-        <ul data-testid="level-objectives" class="mission-objectives"></ul>
+        <p data-testid="mission-summary" class="mission-summary"></p>
+        <ul data-testid="level-objectives" class="mission-objectives" aria-label="目标状态"></ul>
         <p class="mission-constraint"></p>
         <div class="skill-readout"><h3>Scout 能力</h3><ul data-testid="scout-skills"></ul></div>
         <div class="api-hints"><h3>API 速查</h3><ul data-testid="api-hints"></ul></div>
@@ -139,6 +158,7 @@ function createGameShell(controller: AppController, snapshot: GameSnapshot): Gam
     phase: requiredElement(element, "[data-testid='battle-phase']"),
     activeUnit: requiredElement(element, ".active-unit"),
     battlefield: requiredElement(element, ".battlefield"),
+    battleDirective: requiredElement(element, ".battle-directive"),
     briefing: requiredElement(element, ".mission-briefing"),
     feedback: requiredElement(element, "[data-testid='feedback']"),
     run: requiredElement(element, "[data-testid='run-turn']"),
@@ -167,6 +187,7 @@ function updateGameShell(shell: GameShell, snapshot: GameSnapshot): void {
   shell.interrupt.disabled = !running;
   shell.reset.hidden = settlement !== undefined;
   renderBattlefield(shell.battlefield, battleState);
+  renderBattleDirective(shell.battleDirective, getLevel(snapshot.currentLevelId), battleState, settlement);
   renderBriefing(shell.briefing, getLevel(snapshot.currentLevelId), battleState);
   renderFeedback(shell.feedback, snapshot, settlement, shell.controller);
 }
@@ -223,8 +244,8 @@ function renderBattlefield(container: HTMLElement, state: BattleState): void {
       cell.innerHTML = `<span class="cell-coordinate" aria-hidden="true">${x},${y}</span>`;
       for (const objective of state.objectives.filter((item) => atCell(item, x, y))) {
         const marker = document.createElement("span");
-        marker.className = "battle-objective";
-        marker.textContent = `${objective.id} · ${objective.completed ? "完成" : objective.durability}`;
+        marker.className = `battle-objective ${objective.key ? "is-key" : "is-activate"}${objective.completed ? " is-complete" : ""}`;
+        marker.textContent = `${objective.key ? "保护" : "激活"} ${objective.id} · ${objective.completed ? "完成" : `耐久 ${objective.durability}`}`;
         cell.append(marker);
       }
       for (const unit of units) cell.append(renderUnit(unit, unit.id === activeId));
@@ -235,15 +256,32 @@ function renderBattlefield(container: HTMLElement, state: BattleState): void {
 
 function renderUnit(unit: BattleUnit, isActive: boolean): HTMLElement {
   const element = document.createElement("article");
-  element.className = `battle-unit${isActive ? " is-active" : ""}`;
+  element.className = `battle-unit ${unit.id === "scout" ? "is-scout" : "is-enemy"}${isActive ? " is-active" : ""}`;
   element.dataset.testid = `unit-${unit.id}`;
-  element.textContent = `${unit.id} · ${unit.hp} / ${unit.maxHp}`;
+  element.textContent = `${unit.id === "scout" ? "主角" : "敌人"} ${unit.id} · ${unit.hp} / ${unit.maxHp}`;
   return element;
+}
+
+function renderBattleDirective(
+  container: HTMLElement,
+  level: LevelDefinition,
+  state: BattleState,
+  settlement: Settlement | undefined,
+): void {
+  requiredElement(container, "[data-testid='battle-objective-summary']").textContent = level.briefing[0] ?? "完成关卡目标。";
+  requiredElement(container, "[data-testid='battle-action-hint']").textContent = settlement === undefined
+    ? `当前行动：${activeUnitId(state) ?? "无"}。编辑 choose_turn(world)，返回一条指令后运行回合。`
+    : "本场战斗已结算。你可以复盘最终战场与代码。";
+  const keyObjectives = state.objectives.filter((objective) => objective.key);
+  requiredElement(container, "[data-testid='battle-constraint']").textContent = keyObjectives.length === 0
+    ? `失败约束：在 ${state.maxRounds} 回合内完成任务。`
+    : `失败约束：保护${keyObjectives.map((objective) => objective.id).join("、")}并在 ${state.maxRounds} 回合内完成任务。`;
 }
 
 function renderBriefing(container: HTMLElement, level: LevelDefinition, state: BattleState): void {
   requiredElement(container, "#mission-heading").textContent = level.title;
-  renderTextList(requiredElement(container, "[data-testid='level-objectives']"), level.briefing);
+  requiredElement(container, "[data-testid='mission-summary']").textContent = level.briefing.join(" ");
+  renderObjectiveList(requiredElement(container, "[data-testid='level-objectives']"), state);
   const keyObjectives = state.objectives.filter((objective) => objective.key);
   const constraints = keyObjectives.length === 0
     ? `失败约束：在 ${state.maxRounds} 回合内完成任务。`
@@ -257,6 +295,14 @@ function renderBriefing(container: HTMLElement, level: LevelDefinition, state: B
   requiredElement(container, ".concept-hint p").textContent = level.id === "python-marsh-01"
     ? "每回合返回一条指令；使用 world 中的 revision 保持指令与战场一致。"
     : "先读取 world 的当前状态，再返回一条完整且合法的回合指令。";
+}
+
+function renderObjectiveList(container: HTMLElement, state: BattleState): void {
+  container.replaceChildren(...state.objectives.map((objective) => {
+    const item = createTextElement("li", `${objective.key ? "保护" : "激活"} ${objective.id} · ${objective.completed ? "已完成" : `进行中，耐久 ${objective.durability}`}`);
+    item.className = objective.completed ? "is-complete" : objective.key ? "is-key" : "is-activate";
+    return item;
+  }));
 }
 
 function renderTextList(container: HTMLElement, values: readonly string[]): void {
