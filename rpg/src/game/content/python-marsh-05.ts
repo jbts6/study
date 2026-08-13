@@ -126,11 +126,13 @@ export const PYTHON_MARSH_05: LevelDefinition = {
     "把选敌人、选目标、选行动拆成辅助函数。",
   ],
   starterCode: STARTER_CODE_05,
-  apiHints: [
-    "先遍历 world[\"units\"] 找到 team 为 enemies 的单位。",
-    "目标完成状态在 world[\"objectives\"] 中。",
-    "fracture 会暂时降低目标防御。",
-  ],
+  guidance: {
+    objective: ["依次激活 node-a 与 node-b，并消灭猎手和高防守卫。"],
+    concepts: ["把选敌人、选目标和选行动拆成辅助函数，让决策逻辑保持清楚。"],
+    worldFields: ["world[\"units\"] 提供敌人状态；world[\"objectives\"] 提供节点完成状态。"],
+    commandExamples: ["对高防 guard 使用 fracture，再用 attack 或伤害技能处理。"],
+    levelRules: ["node-a 必须先于 node-b 激活；hunter 会追击 scout，guard 会保护节点。"],
+  },
   initialBattle: createPythonMarsh05(),
   enemyBehaviors: {
     hunter: { type: "hunt-player" },

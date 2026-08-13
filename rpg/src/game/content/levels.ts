@@ -27,7 +27,12 @@ export function getNextLevelId(levelId: LevelId): LevelId | undefined {
 export function validateLevels(levels: readonly LevelDefinition[]): void {
   const ids = new Set<string>();
   for (const level of levels) {
-    if (!level.id || !level.title || level.briefing.length === 0 || level.starterCode === undefined || level.apiHints.length === 0) throw new Error("关卡缺少必填字段");
+    const guidance = level.guidance;
+    const guidanceGroups = [guidance.objective, guidance.concepts, guidance.worldFields, guidance.commandExamples, guidance.levelRules];
+    if (!level.id || !level.title || level.briefing.length === 0 || level.starterCode === undefined
+      || guidanceGroups.some((group) => group.length === 0 || group.some((entry) => entry.trim().length === 0))) {
+      throw new Error("关卡缺少必填字段");
+    }
     if (ids.has(level.id)) throw new Error("关卡 ID 重复");
     ids.add(level.id);
     const units = new Set(level.initialBattle.units.map((unit) => unit.id));

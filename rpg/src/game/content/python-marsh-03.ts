@@ -22,5 +22,12 @@ function createPythonMarsh03(): BattleState {
 
 export const PYTHON_MARSH_03: LevelDefinition = {
   id: "python-marsh-03", title: "勘测印记", briefing: ["激活勘测印记后再消灭最后一名敌人。", "遍历可见敌人，选择优先目标。"], starterCode: STARTER_CODE_03,
-  apiHints: ["for unit in world[\"units\"]: 可遍历单位。", "通过 unit[\"team\"]、hp 和 cell 筛选目标。"], initialBattle: createPythonMarsh03(), enemyBehaviors: { "hunter-a": { type: "hunt-player" }, "hunter-b": { type: "hunt-player" } }, reward: { type: "ability", abilityId: "renew" },
+  guidance: {
+    objective: ["激活 scout-mark 后，再消灭最后一名敌人。"],
+    concepts: ["使用 for 遍历单位列表，并用条件筛选优先目标。"],
+    worldFields: ["world[\"units\"] 中每个单位包含 team、hp、cell 和 disabled。"],
+    commandExamples: ["交互：{\"action\": {\"type\": \"interact\", \"targetId\": \"scout-mark\"}}。"],
+    levelRules: ["scout 必须移动到 scout-mark 相邻格才能激活；未激活印记就消灭全部敌人会失败。"],
+  },
+  initialBattle: createPythonMarsh03(), enemyBehaviors: { "hunter-a": { type: "hunt-player" }, "hunter-b": { type: "hunt-player" } }, reward: { type: "ability", abilityId: "renew" },
 };

@@ -122,11 +122,13 @@ export const PYTHON_MARSH_04: LevelDefinition = {
     "用 and、or、not 安排行动优先级。",
   ],
   starterCode: STARTER_CODE_04,
-  apiHints: [
-    "用 unit[\"disabled\"] 判断敌人是否失能。",
-    "用 objective[\"completed\"] 判断目标是否完成。",
-    "and、or、not 可以组合多个条件。",
-  ],
+  guidance: {
+    objective: ["保护 relay，破防并自疗后激活 seal，再消灭敌人。"],
+    concepts: ["使用 and、or、not 组合多个条件并安排优先级。"],
+    worldFields: ["unit[\"disabled\"] 表示单位是否失能；objective[\"completed\"] 表示目标是否完成。", "skills 中的 remainingCooldown 表示技能冷却。"],
+    commandExamples: ["破防使用 fracture：{\"action\": {\"type\": \"cast\", \"skillId\": \"fracture\", \"targetId\": \"guard\"}}。"],
+    levelRules: ["完成破防、自疗和 seal 交互要求后才能结束战斗。"],
+  },
   initialBattle: createPythonMarsh04(),
   enemyBehaviors: {
     corruptor: { type: "corrupt" },

@@ -310,17 +310,14 @@ function renderBriefing(container: HTMLElement, level: LevelDefinition, state: B
 }
 
 function renderApiHelp(container: HTMLElement, level: LevelDefinition): void {
-  const groups = level.id === "python-marsh-01"
-    ? [
-      level.apiHints.slice(0, 3),
-      [
-        ...level.apiHints.slice(3, 6),
-        "单步错误示例：[[1, 0]]；movePath 必须使用坐标对象数组。",
-      ],
-      level.apiHints.slice(6, 10),
-      level.apiHints.slice(10),
-    ]
-    : [level.apiHints, [], [], []];
+  const movePathExamples = level.guidance.commandExamples.filter((entry) => entry.includes("movePath"));
+  const actionExamples = level.guidance.commandExamples.filter((entry) => !entry.includes("movePath"));
+  const groups = [
+    level.guidance.worldFields,
+    movePathExamples,
+    actionExamples,
+    [...level.guidance.objective, ...level.guidance.concepts, ...level.guidance.levelRules],
+  ];
   const selectors = [".api-command-fields", ".api-move-path", ".api-action-fields", ".api-level-rules"];
   for (const [index, selector] of selectors.entries()) {
     renderTextList(requiredElement(container, selector), groups[index] ?? []);

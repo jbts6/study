@@ -24,5 +24,12 @@ function createPythonMarsh02(): BattleState {
 
 export const PYTHON_MARSH_02: LevelDefinition = {
   id: "python-marsh-02", title: "毒沼岔路", briefing: ["中继器不能被毁。", "用条件分支在危险、攻击、自疗和防御间取舍。"], starterCode: STARTER_CODE_02,
-  apiHints: ["world[\"units\"] 可读取单位状态。", "world[\"board\"][\"hazardCells\"] 标出危险格。"], initialBattle: createPythonMarsh02(), enemyBehaviors: { corruptor: { type: "corrupt" } }, reward: { type: "ability", abilityId: "pierce" },
+  guidance: {
+    objective: ["保护 relay，并在 8 回合内消灭 corruptor。"],
+    concepts: ["使用 if 条件分支，根据生命、距离和危险格选择行动。"],
+    worldFields: ["world[\"units\"] 提供生命、位置和阵营。", "world[\"board\"][\"hazardCells\"] 标出危险格。"],
+    commandExamples: ["防御：{\"action\": {\"type\": \"guard\"}}；自疗时使用 mend 并把 targetId 设为 scout。"],
+    levelRules: ["危险格会造成 2 点伤害；corruptor 会持续接近 relay。"],
+  },
+  initialBattle: createPythonMarsh02(), enemyBehaviors: { corruptor: { type: "corrupt" } }, reward: { type: "ability", abilityId: "pierce" },
 };

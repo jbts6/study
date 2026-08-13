@@ -138,11 +138,13 @@ export const PYTHON_MARSH_06: LevelDefinition = {
     "在最大回合数内完成战役。",
   ],
   starterCode: STARTER_CODE_06,
-  apiHints: [
-    "world[\"board\"][\"hazardCells\"] 标出危险格。",
-    "scout.skills 中的 remainingCooldown 表示技能是否可用。",
-    "敌人职责分别是 corrupt、hunt-player 和 guard。",
-  ],
+  guidance: {
+    objective: ["保护 relay，消灭三类敌人并激活 final-seal，在 18 回合内完成战役。"],
+    concepts: ["综合使用条件、遍历、辅助函数和全部已解锁能力。"],
+    worldFields: ["world[\"units\"]、world[\"objectives\"] 和 world[\"board\"] 提供完整战场状态。", "skills 中的 remainingCooldown 表示技能是否可用。"],
+    commandExamples: ["通用命令仍由 actorId、expectedRevision、可选 movePath 与 \"action\" 组成。"],
+    levelRules: ["corruptor 腐化目标，hunter 追击 scout，guard 保护关键位置；危险格造成 1 点伤害。"],
+  },
   initialBattle: createPythonMarsh06(),
   enemyBehaviors: {
     corruptor: { type: "corrupt" },

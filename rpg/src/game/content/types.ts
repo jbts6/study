@@ -19,12 +19,20 @@ export type LevelReward =
   | Readonly<{ type: "ability"; abilityId: AbilityId }>
   | Readonly<{ type: "campaign-complete" }>;
 
+export type LevelGuidance = Readonly<{
+  objective: readonly string[];
+  concepts: readonly string[];
+  worldFields: readonly string[];
+  commandExamples: readonly string[];
+  levelRules: readonly string[];
+}>;
+
 export type LevelDefinition = Readonly<{
   id: LevelId;
   title: string;
   briefing: readonly string[];
   starterCode: string;
-  apiHints: readonly string[];
+  guidance: LevelGuidance;
   initialBattle: BattleState;
   enemyBehaviors: Readonly<Record<string, EnemyBehaviorSpec>>;
   reward: LevelReward;

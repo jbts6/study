@@ -37,10 +37,10 @@ describe("campaign levels", () => {
     expect(first.starterCode).toContain("不是 [[1, 0]]");
     expect(first.starterCode).toContain('"action": {"type": "attack", "targetId": "golem"}');
     expect(first.starterCode).toContain('"action": {"type": "cast", "skillId": "spark", "targetId": "golem"}');
-    expect(first.apiHints.some((hint) => hint.includes('movePath：顶层可选字段，值必须是坐标对象数组'))).toBe(true);
-    expect(first.apiHints.some((hint) => hint.includes('movePath 示例：[{"x": 1, "y": 0}, {"x": 2, "y": 0}]；不能写成 [[1, 0], [2, 0]]。'))).toBe(true);
-    expect(first.apiHints.some((hint) => hint.includes('action') && hint.includes('"attack"') && hint.includes('"cast"') && hint.includes('"wait"'))).toBe(true);
-    expect(first.apiHints.some((hint) => hint.includes('施法格式') && hint.includes('skillId') && hint.includes('targetId'))).toBe(true);
+    expect(first.guidance.commandExamples.some((hint) => hint.includes("坐标对象数组"))).toBe(true);
+    expect(first.guidance.commandExamples.some((hint) => hint.includes('不能写成 [[1, 0], [2, 0]]'))).toBe(true);
+    expect(first.guidance.commandExamples.some((hint) => hint.includes('"attack"'))).toBe(true);
+    expect(first.guidance.commandExamples.some((hint) => hint.includes('skillId') && hint.includes('targetId'))).toBe(true);
     expect(second.starterCode).toContain("if ");
     expect(third.starterCode).not.toContain("def choose_turn");
     expect(third.starterCode).toContain('world["units"]');
@@ -51,7 +51,32 @@ describe("campaign levels", () => {
     expect(sixth.starterCode).toContain("world");
     expect(sixth.starterCode).not.toMatch(/条件分支|遍历筛选|辅助函数/);
     expect(sixth.starterCode).not.toContain("def choose_turn");
-    expect(sixth.apiHints.length).toBeGreaterThan(0);
+    expect(sixth.guidance.worldFields.length).toBeGreaterThan(0);
+  });
+
+  it("provides structured guidance for every campaign lesson", () => {
+    for (const levelId of LEVEL_ORDER) {
+      const guidance = getLevel(levelId).guidance;
+      for (const group of [
+        guidance.objective,
+        guidance.concepts,
+        guidance.worldFields,
+        guidance.commandExamples,
+        guidance.levelRules,
+      ]) {
+        expect(group.length).toBeGreaterThan(0);
+        expect(group.every((entry) => entry.trim().length > 0)).toBe(true);
+      }
+    }
+
+    expect(getLevel("python-marsh-02").guidance.concepts.join(" ")).toContain("if");
+    expect(getLevel("python-marsh-03").guidance.concepts.join(" ")).toContain("for");
+    expect(getLevel("python-marsh-04").guidance.concepts.join(" ")).toContain("and、or、not");
+    expect(getLevel("python-marsh-05").guidance.concepts.join(" ")).toContain("辅助函数");
+    const finale = getLevel("python-marsh-06").guidance;
+    expect(finale.worldFields.join(" ")).toContain('world["units"]');
+    expect(finale.commandExamples.join(" ")).toContain('"action"');
+    expect(finale.levelRules.join(" ")).not.toMatch(/先.*再.*最后/);
   });
 
   it("keeps every level fully referenced and rewards abilities in campaign order", () => {

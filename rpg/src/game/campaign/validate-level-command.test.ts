@@ -10,7 +10,7 @@ function fixtureLevel(): LevelDefinition {
     title: "fixture",
     briefing: [],
     starterCode: "",
-    apiHints: [],
+    guidance: { objective: ["test"], concepts: ["test"], worldFields: ["test"], commandExamples: ["test"], levelRules: ["test"] },
     initialBattle: createFixtureState(),
     enemyBehaviors: { golem: { type: "corrupt" } },
     reward: { type: "ability", abilityId: "ward" },
