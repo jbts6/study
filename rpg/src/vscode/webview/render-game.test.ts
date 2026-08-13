@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import "./styles.css";
 import { getLevel, LEVEL_ORDER } from "../../game/content/levels";
 import type { LevelId } from "../../game/content/types";
 import { calculateCellSize, renderGame } from "./render-game";
@@ -17,6 +18,11 @@ function snapshot(levelId: LevelId, theme: GameViewSnapshot["theme"] = "dark"): 
 }
 
 describe("game Webview renderer", () => {
+  it("removes the Webview host padding so the game fills the editor group", () => {
+    expect(Number.parseFloat(getComputedStyle(document.body).paddingLeft)).toBe(0);
+    expect(Number.parseFloat(getComputedStyle(document.body).paddingRight)).toBe(0);
+  });
+
   it("scales square cells from available size and board dimensions", () => {
     const smallBoard = calculateCellSize(600, 450, 4, 3);
     const largeBoard = calculateCellSize(600, 450, 6, 4);

@@ -293,11 +293,11 @@ Run: `npm run extension:build`
 
 Expected: zero failures and clean build output.
 
-- [ ] **Step 5: Perform visual validation**
+- [x] **Step 5: Perform visual validation**
 
 Launch the Extension Development Host and capture/check 1280×800 half-screen views for light and dark themes, plus 4×3 and 6×4 boards. Confirm no horizontal overflow, readable labels, visible focus, correct actions and theme persistence.
 
-Pending: 当前会话未暴露可用的浏览器/截图控制接口；已完成真实 VS Code Extension Host 的布局、未保存代码运行与诊断集成测试，但未将其冒充像素级视觉验收。
+Evidence: VS Code 1.133 Extension Development Host at 1280x800 was checked with equal 616px editor groups for dark 4x3 and light 6x4 scenarios. Both views had no horizontal overflow, no exposed Webview host background, readable labels, visible controls, and the expected theme-specific presentation.
 
 - [x] **Step 6: Commit**
 

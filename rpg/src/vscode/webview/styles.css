@@ -74,9 +74,15 @@ body.vscode-high-contrast .game-view[data-theme="system"] {
 
 html,
 body,
-#game-root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+#game-root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
 
-body { background: var(--game-bg); }
+body { background: var(--vscode-editor-background, var(--game-bg)); }
 
 button,
 summary { font: inherit; }
