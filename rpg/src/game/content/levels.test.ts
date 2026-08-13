@@ -36,7 +36,10 @@ describe("campaign levels", () => {
     expect(first.starterCode).toContain("movePath 是顶层字段");
     expect(first.starterCode).toContain("不是 [[1, 0]]");
     expect(first.starterCode).toContain('"action": {"type": "attack", "targetId": "golem"}');
-    expect(first.starterCode).toContain('"action": {"type": "cast", "skillId": "spark", "targetId": "golem"}');
+    expect(first.starterCode).toContain('"action": {');
+    expect(first.starterCode).toContain('"type": "cast"');
+    expect(first.starterCode).toContain('"skillId": "spark"');
+    expect(first.starterCode).toContain('"targetId": "golem"');
     expect(first.guidance.commandExamples.some((hint) => hint.includes("坐标对象数组"))).toBe(true);
     expect(first.guidance.commandExamples.some((hint) => hint.includes('不能写成 [[1, 0], [2, 0]]'))).toBe(true);
     expect(first.guidance.commandExamples.some((hint) => hint.includes('"attack"'))).toBe(true);
@@ -52,6 +55,13 @@ describe("campaign levels", () => {
     expect(sixth.starterCode).not.toMatch(/条件分支|遍历筛选|辅助函数/);
     expect(sixth.starterCode).not.toContain("def choose_turn");
     expect(sixth.guidance.worldFields.length).toBeGreaterThan(0);
+  });
+
+  it("formats every starter-code line within 60 characters", () => {
+    for (const levelId of LEVEL_ORDER) {
+      const lines = getLevel(levelId).starterCode.split("\n");
+      expect(Math.max(...lines.map((line) => [...line].length), 0), levelId).toBeLessThanOrEqual(60);
+    }
   });
 
   it("provides structured guidance for every campaign lesson", () => {

@@ -4,8 +4,16 @@ import type { LevelDefinition } from "./types";
 export const STARTER_CODE_02 = `def choose_turn(world):
     # 用 if 根据生命、位置或危险格选择行动。
     if world["activeUnitId"] == "scout":
-        return {"actorId": "scout", "expectedRevision": world["revision"], "action": {"type": "guard"}}
-    return {"actorId": world["activeUnitId"], "expectedRevision": world["revision"], "action": {"type": "wait"}}
+        return {
+            "actorId": "scout",
+            "expectedRevision": world["revision"],
+            "action": {"type": "guard"},
+        }
+    return {
+        "actorId": world["activeUnitId"],
+        "expectedRevision": world["revision"],
+        "action": {"type": "wait"},
+    }
 `;
 
 function createPythonMarsh02(): BattleState {
