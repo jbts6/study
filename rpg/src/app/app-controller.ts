@@ -8,7 +8,17 @@ import type { LevelDefinition, LevelId } from "../game/content/types";
 import { projectWorldView } from "../game/world/project-world-view";
 import type { RunRequest, RunResult, RunnerDiagnostic } from "../runners/protocol/types";
 import type { RunnerClient, RunnerDisplayState } from "./runner-client";
-import { formatBattleFeedback } from "./battle-feedback";
+import {
+  combatErrorFeedback,
+  errorFeedback,
+  feedbackFromRunResult,
+  idleFeedback,
+  isRetriableSettlement,
+  isSuccessfulSettlement,
+  settlementFeedback,
+  successFeedback,
+  type AppFeedback,
+} from "./app-feedback";
 import { RESET_CONFIRMATION } from "./save-store";
 import type { SaveDataV2, SaveStore } from "./save-store";
 const RUN_LIMITS = {
@@ -24,13 +34,7 @@ const RUN_LIMITS = {
 
 const RUNNER_UNAVAILABLE_MESSAGE = "本地 Python Runner 不可用。启动 Runner 后刷新页面。";
 
-export type AppFeedback = Readonly<{
-  kind: "idle" | "success" | "error" | "info";
-  title: string;
-  messages: readonly string[];
-  stdout: string;
-  stderr: string;
-}>;
+export type { AppFeedback } from "./app-feedback";
 
 export type GameSnapshot = Readonly<{
   mode: "game";
@@ -39,6 +43,7 @@ export type GameSnapshot = Readonly<{
   codeDraft: string;
   runnerState: RunnerDisplayState;
   feedback: AppFeedback;
+  diagnostics: readonly RunnerDiagnostic[];
   activeRunId?: string;
 }>;
 
@@ -92,7 +97,7 @@ export class AppController {
     if (!this.canRun(snapshot)) return;
 
     const runId = (this.dependencies.createId ?? createId)();
-    this.replaceSnapshot({ ...snapshot, activeRunId: runId });
+    this.replaceSnapshot({ ...snapshot, activeRunId: runId, diagnostics: [] });
     let result: RunResult;
     try {
       result = await this.dependencies.runner.run(this.createRunRequest(snapshot, runId));
@@ -106,6 +111,11 @@ export class AppController {
     } finally {
       this.clearActiveRun(runId);
     }
+  }
+
+  async runCode(code: string): Promise<void> {
+    this.setCode(code);
+    await this.runTurn();
   }
 
   async interrupt(): Promise<void> {
@@ -124,7 +134,8 @@ export class AppController {
   }
 
   retryLevel(): void {
-    if (this.snapshot.mode !== "game" || !isRetriableSettlement(this.snapshot)) return;
+    if (this.snapshot.mode !== "game"
+      || !isRetriableSettlement(this.snapshot.currentLevelId, this.snapshot.battleState)) return;
     const level = getLevel(this.snapshot.currentLevelId);
     const next = this.createGameSnapshot(level.id, createLevelBattle(level), this.snapshot.codeDraft, idleFeedback());
     this.saveGame(next);
@@ -132,7 +143,8 @@ export class AppController {
   }
 
   advanceLevel(): void {
-    if (this.snapshot.mode !== "game" || !isSuccessfulSettlement(this.snapshot)) return;
+    if (this.snapshot.mode !== "game"
+      || !isSuccessfulSettlement(this.snapshot.currentLevelId, this.snapshot.battleState)) return;
     const nextLevelId = getNextLevelId(this.snapshot.currentLevelId);
     if (nextLevelId === undefined) return;
     let level: LevelDefinition;
@@ -182,19 +194,24 @@ export class AppController {
     const snapshot = this.activeGameSnapshot(runId);
     if (snapshot === undefined) return;
     if (result.executionStatus !== "completed") {
-      this.replaceSnapshot({ ...snapshot, activeRunId: undefined, feedback: feedbackFromRunResult(result) });
+      this.replaceSnapshot({
+        ...snapshot,
+        activeRunId: undefined,
+        feedback: feedbackFromRunResult(result),
+        diagnostics: result.diagnostics,
+      });
       return;
     }
 
     const level = getLevel(snapshot.currentLevelId);
     const levelValidation = validateCandidateForLevel(level, snapshot.battleState, result.returnValue);
     if (!levelValidation.accepted) {
-      this.replaceSnapshot({ ...snapshot, activeRunId: undefined, feedback: combatErrorFeedback(levelValidation.errors) });
+      this.replaceSnapshot({ ...snapshot, activeRunId: undefined, feedback: combatErrorFeedback(levelValidation.errors), diagnostics: [] });
       return;
     }
     const player = resolveTurn(snapshot.battleState, levelValidation.command);
     if (!player.accepted) {
-      this.replaceSnapshot({ ...snapshot, activeRunId: undefined, feedback: combatErrorFeedback(player.errors) });
+      this.replaceSnapshot({ ...snapshot, activeRunId: undefined, feedback: combatErrorFeedback(player.errors), diagnostics: [] });
       return;
     }
 
@@ -205,6 +222,7 @@ export class AppController {
       activeRunId: undefined,
       battleState: enemyTurns.state,
       feedback: successFeedback(enemyTurns.state, events, result),
+      diagnostics: [],
     };
     this.saveGame(next);
     this.replaceSnapshot(next);
@@ -243,6 +261,7 @@ export class AppController {
       codeDraft,
       runnerState: this.dependencies.runner.state,
       feedback,
+      diagnostics: [],
     };
   }
 
@@ -250,8 +269,15 @@ export class AppController {
     try {
       await this.dependencies.runner.connect();
       this.updateRunnerState(this.dependencies.runner.state);
-    } catch {
-      this.updateRunnerState("unavailable");
+    } catch (error) {
+      if (this.snapshot.mode !== "game") return;
+      const message = error instanceof Error ? error.message : RUNNER_UNAVAILABLE_MESSAGE;
+      this.replaceSnapshot({
+        ...this.snapshot,
+        runnerState: "unavailable",
+        feedback: errorFeedback("Python Runner 不可用", [message]),
+        diagnostics: [],
+      });
     }
   }
 
@@ -263,6 +289,7 @@ export class AppController {
       activeRunId: undefined,
       runnerState: "unavailable",
       feedback: errorFeedback("Python Runner 不可用", [RUNNER_UNAVAILABLE_MESSAGE]),
+      diagnostics: [],
     });
   }
 
@@ -288,22 +315,6 @@ export class AppController {
 function activeUnit(state: BattleState) {
   return state.units.find((unit) => unit.id === state.turnOrder[state.turnIndex]);
 }
-function idleFeedback(): AppFeedback {
-  return { kind: "idle", title: "", messages: [], stdout: "", stderr: "" };
-}
-
-function successFeedback(state: BattleState, events: readonly BattleEvent[], result: RunResult): AppFeedback {
-  const settlement = settlementFeedback(getLevel(state.battleId as LevelId), state);
-  if (settlement.kind !== "idle") return { ...settlement, stdout: result.streams.stdout, stderr: result.streams.stderr };
-  return {
-    kind: "success",
-    title: "回合已推进",
-    messages: formatBattleFeedback(state, events),
-    stdout: result.streams.stdout,
-    stderr: result.streams.stderr,
-  };
-}
-
 function createLevelBattle(level: LevelDefinition): BattleState {
   return injectUnlockedAbilities(level.id, structuredClone(level.initialBattle));
 }
@@ -317,63 +328,6 @@ function isTurnCommand(value: unknown): value is TurnCommand {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     && "actorId" in value && "expectedRevision" in value && "action" in value
     && value.action !== null && typeof value.action === "object" && "type" in value.action;
-}
-
-function unmetObjectives(_level: LevelDefinition, state: BattleState): readonly string[] {
-  if (state.phase !== "won") return [];
-  return state.objectives.filter((objective) => !objective.key && !objective.completed)
-    .map((objective) => objective.id === "scout-mark" ? "勘测印记尚未激活" : `${objective.id} 尚未激活`);
-}
-
-function settlementFeedback(level: LevelDefinition, state: BattleState): AppFeedback {
-  if (state.phase === "lost") return errorFeedback("任务失败", ["战斗失败。重试本关以保留当前代码。"]);
-  const unmet = unmetObjectives(level, state);
-  if (unmet.length > 0) return errorFeedback("任务失败", unmet.map((reason) => `任务失败：${reason}`));
-  if (state.phase !== "won") return idleFeedback();
-  return level.reward.type === "ability"
-    ? { kind: "success", title: "关卡完成", messages: [`获得新能力：${level.reward.abilityId}`], stdout: "", stderr: "" }
-    : { kind: "success", title: "战役完成", messages: ["沼心封印已经稳定。"], stdout: "", stderr: "" };
-}
-
-function isSuccessfulSettlement(snapshot: GameSnapshot): boolean {
-  return snapshot.battleState.phase === "won" && unmetObjectives(getLevel(snapshot.currentLevelId), snapshot.battleState).length === 0;
-}
-
-function isFailedSettlement(snapshot: GameSnapshot): boolean {
-  return snapshot.battleState.phase === "lost" || (snapshot.battleState.phase === "won" && !isSuccessfulSettlement(snapshot));
-}
-
-function isRetriableSettlement(snapshot: GameSnapshot): boolean {
-  return isFailedSettlement(snapshot)
-    || (isSuccessfulSettlement(snapshot) && getLevel(snapshot.currentLevelId).reward.type === "ability");
-}
-
-function combatErrorFeedback(errors: readonly Readonly<{ code: string; path: string; message: string }>[]): AppFeedback {
-  return errorFeedback("指令无效", errors.map((error) => `[${error.code}] ${error.path} ${error.message}`));
-}
-
-function feedbackFromRunResult(result: RunResult): AppFeedback {
-  const interrupted = result.executionStatus === "interrupted";
-  const messages = result.diagnostics.map(formatDiagnostic);
-  if (interrupted) messages.unshift("运行已中断，回合未推进。");
-  return {
-    kind: interrupted ? "info" : "error",
-    title: interrupted ? "运行已中断" : "Python 运行失败",
-    messages,
-    stdout: result.streams.stdout,
-    stderr: result.streams.stderr,
-  };
-}
-
-function errorFeedback(title: string, messages: readonly string[]): AppFeedback {
-  return { kind: "error", title, messages, stdout: "", stderr: "" };
-}
-
-function formatDiagnostic(diagnostic: RunnerDiagnostic): string {
-  const prefix = `[${diagnostic.severity}] ${diagnostic.code}`;
-  if (diagnostic.location === undefined) return `${prefix} ${diagnostic.message}`;
-  const { file, line, column } = diagnostic.location;
-  return `${prefix} ${file}:${line}${column === undefined ? "" : `:${column}`} ${diagnostic.message}`;
 }
 
 function createId(): string {

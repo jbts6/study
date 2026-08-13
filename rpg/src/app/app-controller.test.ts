@@ -156,6 +156,24 @@ describe("AppController", () => {
     );
   });
 
+  it("runs an externally supplied unsaved code draft", async () => {
+    const runner = new FakeRunner(completed({
+      actorId: "scout",
+      expectedRevision: 0,
+      action: { type: "wait" },
+    }));
+    const controller = createController(runner, new MemorySaveStore(null));
+    await controller.start();
+
+    const unsaved = "def choose_turn(world):\\n    return {'actorId': world['activeUnitId'], 'expectedRevision': world['revision'], 'action': {'type': 'wait'}}\\n";
+    await controller.runCode(unsaved);
+
+    expect(runner.lastRequest?.files["main.py"]).toBe(unsaved);
+    const snapshot = controller.getSnapshot();
+    expect(snapshot.mode).toBe("game");
+    expect(snapshot.mode === "game" && snapshot.battleState.revision).toBe(2);
+  });
+
   it("requires the exact reset phrase before replacing a corrupt save", async () => {
     const saves = new MemorySaveStore({ ok: false, message: "损坏" });
     const runner = new FakeRunner(completed(null));
