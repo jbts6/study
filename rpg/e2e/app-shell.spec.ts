@@ -217,3 +217,13 @@ test("runs, restores, and completes the complete six-level campaign", async ({ p
     await expectSkills(page, level.skills);
   }
 });
+
+test("renders the tactical workspace with the light theme", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(243, 244, 246)");
+  await expect(page.locator(".status-rail")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.locator(".battle-panel")).toHaveCSS("background-image", "none");
+  await expect(page.locator(".cm-content")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.locator(".cm-gutters")).toHaveCSS("background-color", "rgb(246, 248, 250)");
+});

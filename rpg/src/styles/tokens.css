@@ -1,21 +1,27 @@
 :root {
-  color-scheme: dark;
-  --background: #081018;
-  --surface: #111f29;
-  --surface-deep: #071115;
-  --border: #304d59;
-  --text: #d9e7eb;
-  --text-muted: #8da3aa;
-  --brass: #d2ac62;
-  --arcane: #6be4df;
-  --danger: #e17867;
-  --success: #72d8ae;
-  --warning: #d9b06c;
+  color-scheme: light;
+  --background: #f3f4f6;
+  --surface: #ffffff;
+  --surface-deep: #f6f8fa;
+  --surface-hover: #eef3f8;
+  --border: #d0d7de;
+  --border-strong: #afb8c1;
+  --text: #1f2328;
+  --text-muted: #57606a;
+  --brass: #8a6116;
+  --arcane: #0078d4;
+  --danger: #c9362b;
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --editor-selection: #add6ff;
+  --editor-line: #f6f8fa;
+  --editor-gutter: #f6f8fa;
+  --editor-gutter-text: #6e7781;
   --font-display: Georgia, "Times New Roman", serif;
   --font-body: "Trebuchet MS", "Segoe UI", sans-serif;
   --font-code: "Cascadia Code", Consolas, monospace;
-  --radius: 8px;
-  --shadow: 0 12px 32px rgb(0 0 0 / 28%);
+  --radius: 6px;
+  --shadow: 0 2px 8px rgb(31 35 40 / 8%);
   --space: 16px;
 }
 
@@ -43,6 +49,10 @@ button {
   cursor: pointer;
 }
 
+button:not(:disabled):hover {
+  background: var(--surface-hover);
+}
+
 button:focus-visible,
 input:focus-visible,
 .cm-editor:focus-within {
@@ -52,7 +62,9 @@ input:focus-visible,
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  border-color: #d8dee4;
+  color: #8c959f;
+  background: var(--surface-deep);
 }
 
 @media (prefers-reduced-motion: reduce) {

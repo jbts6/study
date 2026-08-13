@@ -39,11 +39,15 @@
   color: var(--arcane);
 }
 
+.active-unit {
+  color: var(--arcane);
+}
+
 .battle-panel,
 .editor-panel {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: linear-gradient(135deg, rgb(17 31 41 / 95%), rgb(7 17 21 / 95%));
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -52,7 +56,7 @@
   gap: 10px;
   border-bottom: 1px solid var(--border);
   padding: 14px 16px;
-  background: rgb(7 17 21 / 72%);
+  background: var(--surface-deep);
 }
 
 .mission-heading {
@@ -139,16 +143,16 @@
 }
 
 .battlefield {
-  background-color: #0b1a22;
+  background-color: #eef2f5;
   background-image:
-    linear-gradient(rgb(107 228 223 / 9%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(107 228 223 / 9%) 1px, transparent 1px);
+    linear-gradient(rgb(87 113 135 / 10%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(87 113 135 / 10%) 1px, transparent 1px);
   background-size: 18px 18px;
 }
 
 .battle-cell {
-  border: 1px solid rgb(48 77 89 / 85%);
-  background: rgb(8 16 24 / 76%);
+  border: 1px solid #c8d1da;
+  background: var(--surface);
 }
 
 .battle-cell.is-cover {
@@ -156,12 +160,12 @@
 }
 
 .battle-cell.is-hazard {
-  background-image: repeating-linear-gradient(135deg, rgb(225 120 103 / 18%) 0 7px, transparent 7px 14px);
+  background-image: repeating-linear-gradient(135deg, rgb(201 54 43 / 8%) 0 7px, transparent 7px 14px);
   border-color: var(--danger);
 }
 
 .battle-cell.is-blocked {
-  background-color: rgb(48 77 89 / 55%);
+  background-color: #d8dee4;
 }
 
 .cell-coordinate {
@@ -183,40 +187,47 @@
   border-inline-start: 3px solid var(--brass);
   padding: 7px 8px;
   color: var(--text);
-  background: rgb(7 17 21 / 88%);
+  background: var(--surface);
   font-family: var(--font-code);
   font-size: 12px;
   line-height: 1.35;
 }
 
 .battle-unit.is-active {
-  border-color: var(--arcane);
-  box-shadow: 0 0 0 1px rgb(107 228 223 / 34%), 0 0 18px rgb(107 228 223 / 26%);
+  border-inline-start-color: var(--arcane);
+  background: #e8f2ff;
+  box-shadow: none;
   animation: active-pulse 2.8s ease-in-out infinite;
 }
 
 .action-row {
   border-top: 1px solid var(--border);
-  background: rgb(7 17 21 / 72%);
+  background: var(--surface-deep);
 }
 
 .run-turn {
-  border-color: var(--brass);
-  color: #18130a;
+  border-color: var(--arcane);
+  color: #ffffff;
   font-weight: 800;
-  background: var(--brass);
+  background: var(--arcane);
+}
+
+.run-turn:not(:disabled):hover {
+  border-color: #106ebe;
+  background: #106ebe;
 }
 
 .interrupt-run {
   border-color: var(--arcane);
   color: var(--arcane);
+  background: var(--surface);
 }
 
 .reset-trigger {
   margin-inline-start: auto;
-  border-color: rgb(225 120 103 / 65%);
+  border-color: var(--danger);
   color: var(--danger);
-  background: transparent;
+  background: var(--surface);
 }
 
 .feedback-panel {
@@ -224,7 +235,7 @@
   border-inline-start: 4px solid var(--arcane);
   border-radius: var(--radius);
   padding: 10px 16px;
-  background: rgb(7 17 21 / 93%);
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -254,6 +265,9 @@
 
 .feedback-output {
   margin-top: 8px;
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  background: var(--surface-deep);
 }
 
 .feedback-output pre {
@@ -267,12 +281,23 @@
 
 .feedback-success {
   border-inline-start-color: var(--success);
-  animation: feedback-pulse 580ms ease-out;
+  animation: feedback-pulse 360ms ease-out;
+}
+
+.feedback-success h2,
+.settlement-victory h2,
+.settlement-complete h2 {
+  color: var(--success);
 }
 
 .feedback-error {
   border-inline-start-color: var(--danger);
-  animation: feedback-pulse 580ms ease-out;
+  animation: feedback-pulse 360ms ease-out;
+}
+
+.feedback-error h2,
+.settlement-failed h2 {
+  color: var(--danger);
 }
 
 .reset-dialog {
@@ -280,11 +305,11 @@
   border-radius: var(--radius);
   color: var(--text);
   background: var(--surface);
-  box-shadow: 0 24px 70px rgb(0 0 0 / 58%);
+  box-shadow: 0 8px 24px rgb(31 35 40 / 16%);
 }
 
 .reset-dialog::backdrop {
-  background: rgb(0 0 0 / 62%);
+  background: rgb(31 35 40 / 35%);
 }
 
 .reset-form h2,
@@ -307,7 +332,7 @@
   border-radius: 4px;
   padding: 0 10px;
   color: var(--text);
-  background: var(--surface-deep);
+  background: var(--surface);
 }
 
 .dialog-actions {
@@ -319,7 +344,7 @@
 .dialog-actions [data-reset-save],
 .recovery-panel [data-reset-save] {
   border-color: var(--danger);
-  color: #27110c;
+  color: #ffffff;
   background: var(--danger);
 }
 
@@ -363,7 +388,8 @@
 
 @keyframes active-pulse {
   50% {
-    box-shadow: 0 0 0 2px rgb(107 228 223 / 44%), 0 0 24px rgb(107 228 223 / 42%);
+    border-inline-start-color: #106ebe;
+    background: #eef6ff;
   }
 }
 
