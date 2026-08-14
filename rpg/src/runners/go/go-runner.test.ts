@@ -230,4 +230,40 @@ func ChooseTurn(world World) TurnCommand {
     expect(runner.state).toBe("ready");
     await rm(projectDirectory, { recursive: true, force: true });
   });
+
+  it("强制终止失败时返回可观察诊断", async () => {
+    vi.useFakeTimers();
+    const started = deferred<void>();
+    const childResult = deferred<GoProcessResult>();
+    const child: GoProcessHandle = {
+      result: childResult.promise,
+      interrupt: vi.fn(),
+      kill: vi.fn().mockRejectedValue(new Error("tree kill denied")),
+    };
+    const runner = await fixtureRunner(() => {
+      started.resolve();
+      return child;
+    });
+
+    const pending = runner.run(request("package main\nfunc ChooseTurn(world World) TurnCommand { return Wait(world) }"));
+    await started.promise;
+    runner.interrupt("run-go-1");
+    await vi.advanceTimersByTimeAsync(100);
+    childResult.resolve({
+      exitCode: null,
+      signal: "SIGINT",
+      stdout: "",
+      stderr: "",
+      truncated: false,
+      timedOut: false,
+      durationMs: 12,
+    });
+
+    await expect(pending).resolves.toMatchObject({
+      executionStatus: "interrupted",
+      diagnostics: expect.arrayContaining([
+        expect.objectContaining({ code: "GO_TERMINATION_FAILED", message: "tree kill denied" }),
+      ]),
+    });
+  });
 });

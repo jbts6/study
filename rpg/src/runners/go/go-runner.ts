@@ -33,7 +33,17 @@ interface ActiveRun {
   handle?: GoProcessHandle;
   interrupted: boolean;
   interruptTimer?: ReturnType<typeof setTimeout>;
+  termination?: Promise<void>;
+  terminationError?: unknown;
 }
+
+type PreparedRun =
+  | Readonly<{
+    ok: true;
+    request: CompiledRunRequest;
+    detection: Extract<GoDetection, { ok: true }>;
+  }>
+  | Readonly<{ ok: false; result: RunResult }>;
 
 interface ResultDetails {
   readonly status: ExecutionStatus;
@@ -156,30 +166,9 @@ export class GoRunner implements RunnerClient {
   }
 
   async run(input: RunRequest): Promise<RunResult> {
-    const validation = validateRunRequest(input);
-    if (!validation.ok) {
-      return result(input, { status: "invalid_request", diagnostics: validation.diagnostics });
-    }
-    const request = validation.value;
-    if (request.language !== "go") {
-      return result(request, {
-        status: "invalid_request",
-        diagnostics: [diagnostic("INVALID_GO_REQUEST", "Go 执行器只接受 Go 请求。")],
-      });
-    }
-    if (this.disposed || !this.detection) {
-      return result(request, {
-        status: "runner_error",
-        diagnostics: [diagnostic("GO_RUNNER_UNAVAILABLE", "Go 执行器尚未连接或已关闭。")],
-      });
-    }
-    if (this.active) {
-      return result(request, {
-        status: "runner_error",
-        diagnostics: [diagnostic("RUNNER_BUSY", "上一段 Go 代码仍在运行。")],
-      });
-    }
-
+    const prepared = this.prepareRun(input);
+    if (!prepared.ok) return prepared.result;
+    const { request, detection } = prepared;
     const active: ActiveRun = {
       runId: request.runId,
       interruptGraceMs: request.limits.interruptGraceMs,
@@ -187,12 +176,50 @@ export class GoRunner implements RunnerClient {
     };
     this.active = active;
     this.states.set("running");
+    return this.performRun(request, detection, active);
+  }
+
+  private prepareRun(input: RunRequest): PreparedRun {
+    const validation = validateRunRequest(input);
+    if (!validation.ok) {
+      return { ok: false, result: result(input, {
+        status: "invalid_request",
+        diagnostics: validation.diagnostics,
+      }) };
+    }
+    const request = validation.value;
+    if (request.language !== "go") {
+      return { ok: false, result: result(request, {
+        status: "invalid_request",
+        diagnostics: [diagnostic("INVALID_GO_REQUEST", "Go 执行器只接受 Go 请求。")],
+      }) };
+    }
+    if (this.disposed || !this.detection) {
+      return { ok: false, result: result(request, {
+        status: "runner_error",
+        diagnostics: [diagnostic("GO_RUNNER_UNAVAILABLE", "Go 执行器尚未连接或已关闭。")],
+      }) };
+    }
+    if (this.active) {
+      return { ok: false, result: result(request, {
+        status: "runner_error",
+        diagnostics: [diagnostic("RUNNER_BUSY", "上一段 Go 代码仍在运行。")],
+      }) };
+    }
+    return { ok: true, request, detection: this.detection };
+  }
+
+  private async performRun(
+    request: CompiledRunRequest,
+    detection: Extract<GoDetection, { ok: true }>,
+    active: ActiveRun,
+  ): Promise<RunResult> {
     let project: GoProject | undefined;
     let outcome: RunResult;
     try {
       project = await this.prepareProject({
         request,
-        goVersion: this.detection.version,
+        goVersion: detection.version,
         globalStoragePath: this.globalStoragePath,
         runtimeDirectory: this.runtimeDirectory,
       });
@@ -206,8 +233,17 @@ export class GoRunner implements RunnerClient {
         )],
       });
     }
+    return this.finishRun(outcome, project, active);
+  }
+
+  private async finishRun(
+    outcome: RunResult,
+    project: GoProject | undefined,
+    active: ActiveRun,
+  ): Promise<RunResult> {
     let cleanupError: unknown;
     try {
+      if (active.termination) await active.termination;
       if (project) await project.cleanup();
     } catch (error) {
       cleanupError = error;
@@ -216,6 +252,12 @@ export class GoRunner implements RunnerClient {
       active.handle = undefined;
       if (this.active === active) this.active = undefined;
       this.states.set(this.disposed ? "unavailable" : "ready");
+    }
+    if (active.terminationError !== undefined) {
+      outcome = appendDiagnostic(outcome, diagnostic(
+        "GO_TERMINATION_FAILED",
+        active.terminationError instanceof Error ? active.terminationError.message : String(active.terminationError),
+      ));
     }
     return cleanupError === undefined ? outcome : appendDiagnostic(outcome, cleanupDiagnostic(cleanupError));
   }
@@ -227,7 +269,7 @@ export class GoRunner implements RunnerClient {
     active.handle?.interrupt();
     active.interruptTimer = setTimeout(() => {
       const handle = active.handle;
-      if (handle) void handle.kill();
+      if (handle) this.terminate(active, handle);
     }, active.interruptGraceMs);
   }
 
@@ -237,9 +279,16 @@ export class GoRunner implements RunnerClient {
     const active = this.active;
     if (active) {
       active.interrupted = true;
-      void active.handle?.kill();
+      const handle = active.handle;
+      if (handle) this.terminate(active, handle);
     }
     this.states.set("unavailable");
+  }
+
+  private terminate(active: ActiveRun, handle: GoProcessHandle): void {
+    active.termination = handle.kill().catch((error: unknown) => {
+      active.terminationError = error;
+    });
   }
 
   private async runProject(
