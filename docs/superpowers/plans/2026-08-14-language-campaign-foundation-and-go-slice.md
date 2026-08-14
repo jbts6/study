@@ -56,6 +56,7 @@
 **Interfaces:**
 
 - Produces `Language = "python" | "go" | "rust"`、`CampaignId`、`CampaignDefinition` 和 `PlayerProgramDefinition`。
+- Produces `PYTHON_PROGRAM` 与 `GO_PROGRAM`。Go 玩家文件名为 `<levelId>.go`；`GO_PROGRAM.createRunFiles` 将其源码映射为临时构建入口 `strategy.go`。
 - Produces `getCampaign(campaignId)`、`getLevel(levelId)`、`getNextLevelId(levelId)`；后续控制器和工作区只调用这些函数。
 - Python 战役的关卡 ID 和初始关仍是 `python-marsh-01`，已有源码与存档语义不变。
 
@@ -109,6 +110,17 @@ export const PYTHON_PROGRAM: PlayerProgramDefinition = {
   sourceFileName: (levelId) => `${levelId}.py`,
   editorLanguageId: "python",
   createRunFiles: (_levelId, source) => ({ "main.py": source }),
+};
+```
+
+```ts
+// src/programs/go/index.ts
+export const GO_PROGRAM: PlayerProgramDefinition = {
+  language: "go",
+  workspaceDirectory: "go-rpg",
+  sourceFileName: (levelId) => `${levelId}.go`,
+  editorLanguageId: "go",
+  createRunFiles: (_levelId, source) => ({ "strategy.go": source }),
 };
 ```
 
@@ -237,7 +249,7 @@ git commit -m "refactor: 支持语言化运行请求"
 
 **Interfaces:**
 
-- Consumes `CampaignDefinition` 和 `PlayerProgramDefinition`。
+- Consumes `CampaignDefinition` 和 `PlayerProgramDefinition`；本任务的 Go 路径测试直接使用 `GO_PROGRAM` 构造最小战役，不依赖 Task 5 的 `GO_RPG_CAMPAIGN` 注册。
 - Produces `levelFilePath(workspaceRoot, campaign, levelId)` 与 `WorkspaceSaveStore(workspaceState, campaign.id)`。
 - 保留默认打开 Python 战役；Go 战役在 Task 6 注册后才出现在启动器。
 
@@ -245,7 +257,12 @@ git commit -m "refactor: 支持语言化运行请求"
 
 ```ts
 it("按战役程序约定生成玩家文件路径", () => {
-  expect(levelFilePath("C:/work", GO_RPG_CAMPAIGN, "go-marsh-01"))
+  expect(levelFilePath("C:/work", {
+    id: "go-rpg",
+    title: "Go RPG",
+    program: GO_PROGRAM,
+    levelOrder: [],
+  }, "go-marsh-01"))
     .toBe(join("C:/work", "go-rpg", "go-marsh-01.go"));
 });
 
