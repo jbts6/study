@@ -159,8 +159,9 @@ git commit -m "refactor: 提取语言战役模型"
 - Consumes `CampaignDefinition.program` 与 `PYTHON_PROGRAM`。
 - Produces `PythonRunRequest` 与 `CompiledRunRequest` 的 `RunRequest` 联合类型。
 - `AppController` 构造参数增加 `campaign: CampaignDefinition`；默认测试可显式传入 `PYTHON_RPG_CAMPAIGN`。
+- `AppController` 以只读 `campaign` 属性公开当前战役，供浏览器视图选择 CodeMirror 语法；不公开修改战役的 API。
 - 浏览器开发入口 `main.ts` 显式传入 `PYTHON_RPG_CAMPAIGN`；Go 第一关的可运行入口只在 VS Code 扩展中交付，浏览器版不提供战役选择。
-- `ExecutionStatus` 新增 `"compile_error"`；`feedbackFromRunResult` 根据 `result.language` 显示对应语言名称，而非固定“Python 运行失败”。
+- `ExecutionStatus` 新增 `"compile_error"`；`feedbackFromRunResult(result, language)` 由控制器传入战役语言，显示对应语言名称而非固定“Python 运行失败”。`RunResult` 不增加语言字段，既有 Python 运行时 JSON 保持兼容。
 
 - [ ] **Step 1: 写入协议分支与 Python 请求回归的失败测试**
 
@@ -186,24 +187,6 @@ it("拒绝 Go 请求携带 Python 模块白名单", () => {
   expect(result).toMatchObject({ ok: false, diagnostics: [{ code: "INVALID_GO_REQUEST" }] });
 });
 
-it("控制器生成的 Go 请求可通过协议校验", async () => {
-  const runner = capturingRunner(completedWaitResult);
-  const controller = new AppController({
-    campaign: GO_RPG_CAMPAIGN,
-    runner,
-    saveStore: memorySaveStore(),
-    createId: () => "run-1",
-  });
-  await controller.start();
-  await controller.runTurn();
-  const request = runner.requests[0];
-  expect(request).toMatchObject({
-    language: "go",
-    files: { "strategy.go": expect.any(String) },
-    entrypoint: { file: "strategy.go" },
-  });
-  expect(validateRunRequest(request).ok).toBe(true);
-});
 ```
 
 - [ ] **Step 2: 运行协议测试确认失败**
@@ -252,7 +235,7 @@ private createRunRequest(snapshot: GameSnapshot, runId: string): RunRequest {
 }
 ```
 
-将 `RUN_LIMITS` 移到控制器依赖或战役运行配置中；Python 数值维持 `5_000` 毫秒，Go 请求显式传入 `buildTimeoutMs: 15_000` 与 `executionTimeoutMs: 5_000`。在 `main.ts` 注入 `PYTHON_RPG_CAMPAIGN`；在 `app-feedback.ts` 为 `compile_error` 增加“Go 编译失败”反馈测试。
+将 `RUN_LIMITS` 移到控制器依赖或战役运行配置中；Python 数值维持 `5_000` 毫秒，Go 请求显式传入 `buildTimeoutMs: 15_000` 与 `executionTimeoutMs: 5_000`。在 `main.ts` 注入 `PYTHON_RPG_CAMPAIGN`；在 `app-feedback.ts` 为 `compile_error` 增加“Go 编译失败”反馈测试，并由控制器调用 `feedbackFromRunResult(result, this.campaign.program.language)`。
 
 - [ ] **Step 4: 运行控制器与协议测试确认通过**
 
@@ -278,6 +261,8 @@ git commit -m "refactor: 支持语言化运行请求"
 - Modify: `rpg/src/vscode/extension.ts`
 - Modify: `rpg/src/app/code-editor.ts`
 - Modify: `rpg/src/app/code-editor.test.ts`
+- Modify: `rpg/src/app/app-view.ts`
+- Modify: `rpg/src/app/app-view.test.ts`
 - Modify: `rpg/package.json`
 
 **Interfaces:**
@@ -327,7 +312,7 @@ export function workspaceSaveKey(campaignId: CampaignId): string {
 }
 ```
 
-让 `DocumentWorkspace` 接收 `campaign`；让 `GameSession` 只处理控制器当前战役。扩展中以 `campaign.program.editorLanguageId` 生成快捷键条件与诊断 source，并用 `program.sourceFileName(levelId)` 比较诊断文件名。将 manifest 标题和命令从 Python 专用名称调整为 “奥术战术 RPG”，但仍保留 `pythonRpg.*` 命令 ID 作为当前扩展兼容入口，不新建第二个扩展。
+让 `DocumentWorkspace` 接收 `campaign`；让 `GameSession` 只处理控制器当前战役。扩展中以 `campaign.program.editorLanguageId` 生成快捷键条件与诊断 source，并用 `program.sourceFileName(levelId)` 比较诊断文件名。将 manifest 标题和命令从 Python 专用名称调整为 “奥术战术 RPG”，但仍保留 `pythonRpg.*` 命令 ID 作为当前扩展兼容入口，不新建第二个扩展。将 `app-view.ts` 的唯一调用改为 `mountCodeEditor(..., controller.campaign.program.language, onChange)`，并在 `app-view.test.ts` 覆盖 Python 视图仍可创建编辑器。
 
 ```ts
 export function mountCodeEditor(
@@ -351,7 +336,7 @@ Expected: PASS。
 - [ ] **Step 5: 提交工作区和存档隔离**
 
 ```bash
-git add rpg/src/vscode rpg/package.json
+git add rpg/src/vscode rpg/src/app/code-editor.ts rpg/src/app/code-editor.test.ts rpg/src/app/app-view.ts rpg/src/app/app-view.test.ts rpg/package.json
 git commit -m "feat: 隔离语言战役工作区与存档"
 ```
 
@@ -417,21 +402,41 @@ package main
 type World struct {
     ActiveUnitID string \`json:"activeUnitId"\`
     Revision     int    \`json:"revision"\`
+    Units        []Unit \`json:"units"\`
 }
 
+type Cell struct { X int \`json:"x"\`; Y int \`json:"y"\` }
+type Unit struct {
+    ID string \`json:"id"\`
+    Cell Cell \`json:"cell"\`
+    Skills []Skill \`json:"skills"\`
+}
+type Skill struct { ID string \`json:"id"\`; Range int \`json:"range"\` }
 type Action struct {
     Type     string \`json:"type"\`
     TargetID string \`json:"targetId,omitempty"\`
+    SkillID  string \`json:"skillId,omitempty"\`
 }
 
 type TurnCommand struct {
     ActorID          string \`json:"actorId"\`
     ExpectedRevision int    \`json:"expectedRevision"\`
+    MovePath         []Cell \`json:"movePath,omitempty"\`
     Action           Action \`json:"action"\`
 }
 
 func Wait(world World) TurnCommand {
     return TurnCommand{ActorID: world.ActiveUnitID, ExpectedRevision: world.Revision, Action: Action{Type: "wait"}}
+}
+
+func Attack(world World, targetID string) TurnCommand {
+    return TurnCommand{ActorID: world.ActiveUnitID, ExpectedRevision: world.Revision, Action: Action{Type: "attack", TargetID: targetID}}
+}
+
+func MoveAndAttack(world World, path []Cell, targetID string) TurnCommand {
+    command := Attack(world, targetID)
+    command.MovePath = path
+    return command
 }
 ```
 
@@ -448,7 +453,7 @@ func main() {
 
 在 `go-project.ts` 用 `mkdtemp` 创建临时构建目录，写入 `go.mod`、`strategy.go`、`sdk.go`、`runner_main.go` 和空结果文件路径；用参数数组执行 `go build -o <binary> .`，运行二进制时把 `WorldView` JSON 写入 stdin，并以 `env: { ...process.env, RPG_RESULT_PATH: resultPath }` 注入结果文件路径。进程退出后读取结果文件：不存在、空文件或 JSON 解析失败返回 `runner_error/INVALID_TURN_RESULT`；有效 JSON 作为 `RunResult.returnValue`。玩家 stdout/stderr 按 `maxOutputBytes` 截断并写入 `RunResult.streams`，宿主不从 stdout 读取命令。只缓存由 `strategy.go`、SDK 版本、`go version` 和平台构成的 hash 对应二进制，保存于 `context.globalStorageUri/go-cache/`。清理临时目录始终由该目录创建者负责。
 
-在 `go-runner.ts` 解析编译器诊断时，把临时 `strategy.go` 路径映射为请求的 `questId + ".go"`，保证后续 VS Code 投影到 `go-rpg/go-marsh-01.go`。生成 `RunResult` 时设置 `language: "go"`、`metrics.buildDurationMs` 和 `metrics.executionDurationMs`。为 `RunResult` 增加 `language` 与两个可选阶段耗时字段，Python 结果仍使用既有 `durationMs`。
+在 `go-runner.ts` 解析编译器诊断时，把临时 `strategy.go` 路径映射为请求的 `questId + ".go"`，保证后续 VS Code 投影到 `go-rpg/go-marsh-01.go`。生成 `RunResult.metrics` 时保留总 `durationMs`，并增加可选的 `buildDurationMs` 与 `executionDurationMs`；不新增 `RunResult.language` 字段。
 
 保留当前 Python 的单次适配器和 5 秒语义，避免在 Go 切片中重写已验证 Python 进程路径。只提取不依赖单时限的状态切换与中断辅助函数；Go 运行器自行顺序管理构建与执行两个子进程，错误文案由各语言运行器提供，不在共享层写 Python 文案。
 
@@ -535,10 +540,13 @@ git commit -m "feat: 添加 Go 沼泽第一关"
 - Modify: `rpg/src/vscode/extension.ts`
 - Modify: `rpg/src/vscode/game-session.ts`
 - Modify: `rpg/src/vscode/direct-runner-client.ts`
+- Modify: `rpg/src/vscode/messages.ts`
+- Modify: `rpg/src/vscode/webview/render-game.ts`
+- Modify: `rpg/src/vscode/webview/render-game.test.ts`
 - Modify: `rpg/src/vscode/direct-runner-client.test.ts`
 - Modify: `rpg/src/vscode/game-launcher-model.test.ts`
 - Modify: `rpg/package.json`
-- Test: `rpg/src/runners/go/e2e.spec.ts`
+- Test: `rpg/src/runners/go/go-runner.test.ts`
 
 **Interfaces:**
 
@@ -546,6 +554,7 @@ git commit -m "feat: 添加 Go 沼泽第一关"
 - 扩展根据选中的 `CampaignDefinition` 创建对应运行器；Python 使用既有路径，Go 使用 `detectGo` 与 `GoRunner`。
 - Go 诊断投影到 `go-rpg/go-marsh-01.go`，不会写入 Python 诊断集合或 Python 存档。
 - `openCampaign(campaignId)` 在同一战役已打开时仅显示现有面板；切换到不同战役时先关闭旧 session、runner 与诊断集合，再创建新会话。
+- `GameViewSnapshot` 透传 `campaign.title`、`program.language` 和 `program.sourceFileName(levelId)`；Webview 头部、Runner 标签、教学分组与空反馈不得硬编码 Python 或 `.py`。
 
 - [ ] **Step 1: 写入启动器与 Go 工作区的失败测试**
 
@@ -597,6 +606,16 @@ function diagnosticFilePath(
 ```
 
 ```ts
+type GameViewSnapshot = Readonly<{
+  mode: "game";
+  campaignTitle: string;
+  languageLabel: "Python" | "Go";
+  playerFileName: string;
+  // 其余现有字段不变。
+}>;
+```
+
+```ts
 const openCampaign = async (campaignId: CampaignId): Promise<ActiveGame | undefined> => {
   if (activeGame?.campaignId === campaignId) {
     activeGame.reveal();
@@ -610,13 +629,15 @@ const openCampaign = async (campaignId: CampaignId): Promise<ActiveGame | undefi
 
 启动器点击任一已注册战役后调用 `openCampaign(campaignId)`，并创建独立 `WorkspaceSaveStore` 与 `DocumentWorkspace`。`package.json` 的 Ctrl/Cmd+Enter 条件改为 `editorLangId == python || editorLangId == go`；新增 `goRpg.goPath` 配置，说明为可选 Go stable 可执行文件路径。不要添加 Rust 配置项。
 
+在 `GameSession.toViewSnapshot` 填充 `campaignTitle`、`languageLabel`、`playerFileName`；在 `render-game.ts` 用这些字段替换 Python 专用标题、教学分组、固定扩展名空反馈和固定 Runner 标签。补渲染测试：Go 快照显示 Go RPG、Go 概念与 `go-marsh-01.go`。
+
 - [ ] **Step 4: 执行单元、真实 Go 和扩展验证**
 
 Run: `cd rpg && npx vitest run src/vscode/game-launcher-model.test.ts src/vscode/game-session.test.ts src/vscode/direct-runner-client.test.ts src/runners/go/go-detector.test.ts src/runners/go/go-runner.test.ts && npm run typecheck && npm run build`  
 Expected: PASS。
 
-Run: `cd rpg && npx vitest run src/runners/go/e2e.spec.ts`
-Expected: 当 `go version` 可用时，Go 运行器可执行 `Wait(world)` 并将编译错误映射为 `go-marsh-01.go`；工具链缺失时，断言安装提示且跳过真实 Go 执行断言。
+Run: `cd rpg && npx vitest run src/runners/go/go-runner.test.ts`
+Expected: 当 `go version` 可用时，Go 运行器可执行 `Wait(world)`、将编译错误映射为 `go-marsh-01.go`，并覆盖构建超时、策略超时、中断后的结果文件读取和临时目录清理；工具链缺失时，断言安装提示且跳过真实 Go 执行断言。
 
 Run: `cd rpg && npm run install:local`  
 Expected: 生成 `dist/python-rpg.vsix` 并以 `--force` 安装本地扩展。
