@@ -29,7 +29,7 @@ const lightEditorTheme = EditorView.theme({
     minHeight: "100%",
     boxSizing: "border-box",
     padding: "10px 12px 24px",
-    backgroundColor: "transparent",
+    backgroundColor: "#ffffff",
     color: "#1f2328",
     fontFamily: "var(--font-code)",
     fontSize: "14px",

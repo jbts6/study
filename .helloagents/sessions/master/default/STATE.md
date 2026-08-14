@@ -1,27 +1,26 @@
 # 恢复快照
 
 ## 主线目标
-Python RPG 在当前 VS Code 提供可发现、可点击的游戏入口，并统一关卡 Python 排版
+完成合并回 master 后的 RPG 全量验证，并修复验证中暴露的回归与并发阻断
 
 ## 正在做什么
-已完成本地安装入口、活动栏启动入口与关卡脚本 60 字符行宽整理
+验证已完成，准备提交本地检查点
 
 ## 关键上下文
-- F5 的 `extensionHost` 调试配置按 VS Code 机制启动独立 Extension Development Host 窗口
-- `rpg/src/vscode/extension.ts` 已在同一宿主窗口中创建第一、第二编辑器组；缺少的是安装到当前 VS Code 的入口
-- 使用 `@vscode/vsce` 打包 VSIX，再通过 `code --install-extension <VSIX> --force` 本地安装
-- 首次打包发现 VSIX 包含依赖与测试产物；将用 `.vscodeignore` 只保留扩展运行所需文件
-- 用户反馈只有 F5，无法发现命令面板入口；新增活动栏容器和可点击树视图作为首选入口
-- 本地扩展已重新打包并覆盖安装；重载当前 VS Code 后，左侧活动栏显示 `Python RPG` 图标
-- `python-rpg/python-marsh-01.py` 至 `06.py` 与扩展起始模板的最大行宽均不超过 60 字符
+- 当前 HEAD 是 `d453950`，合并提交 `feature/language-campaign-go-slice` 后的 `master`。
+- 恢复 `rpg/src/app/app-view.ts` 中被合并冲突遗漏的 `scout-skills` 列表与冷却文案。
+- 将 `rpg/src/app/code-editor.ts` 的 `.cm-content` 背景设为白色，匹配浅色主题 E2E 契约。
+- `rpg/vite.config.ts` 将 Vitest `maxWorkers` 限制为 4，避免真实 Python/Go 子进程在默认并行度下争用。
+- 最终默认验证：Vitest 33/33 文件、188/188 断言；build、test:extension、test:e2e 均退出码 0。
+- VS Code/Electron 输出既有非致命告警；测试端口 5174/5175 已清理。
 
 ## 下一步
-任务已完成
+执行 `git status`，提交源码与验证配置变更；保留 `.helloagents` 运行态文件。
 
 ## 阻塞项
 （无）
 
 ## 方案
-`docs/superpowers/plans/2026-08-14-python-rpg-current-window-launch.md` 已完成
+无方案包
 ## 已标记技能
-systematic-debugging、test-driven-development、verification-before-completion、qa-review
+using-superpowers、context-mode、hello-test、systematic-debugging、verification-before-completion、qa-review

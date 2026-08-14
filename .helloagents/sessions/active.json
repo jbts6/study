@@ -2,11 +2,11 @@
   "version": 1,
   "cwd": "C:\\git\\study",
   "workspace": "master",
-  "session": "host-0557fb08",
-  "sessionMode": "host-session",
-  "host": "codex",
-  "source": "startup",
-  "hostHint": "ppid:27360",
+  "session": "default",
+  "sessionMode": "default",
+  "host": "unknown",
+  "source": "qa-review",
+  "hostHint": "ppid:21840",
   "aliases": {
     "65870154": "host-65870154",
     "89553554": "host-89553554",
@@ -75,8 +75,10 @@
     "session:b1583d4f": "host-b1583d4f",
     "b1583d4f": "host-b1583d4f",
     "session:0557fb08": "host-0557fb08",
-    "0557fb08": "host-0557fb08"
+    "0557fb08": "host-0557fb08",
+    "session:015b59a6": "host-015b59a6",
+    "015b59a6": "host-015b59a6"
   },
-  "cleanupCheckedAt": "2026-08-13T17:08:42.632Z",
-  "updatedAt": "2026-08-13T17:08:42.618Z"
+  "cleanupCheckedAt": "2026-08-14T05:40:16.566Z",
+  "updatedAt": "2026-08-14T06:08:38.687Z"
 }

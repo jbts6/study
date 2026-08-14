@@ -78,6 +78,7 @@ const GAME_SHELL_MARKUP = `
         <div class="mission-heading"><p>任务简报</p><h2 id="mission-heading"></h2></div>
         <p data-testid="mission-summary" class="mission-summary"></p>
         <p class="mission-constraint"></p>
+        <div class="skill-readout"><h3>Scout 能力</h3><ul data-testid="scout-skills"></ul></div>
       </section>
       <div data-testid="code-editor" class="code-editor"></div>
       <details class="api-help">
@@ -310,6 +311,10 @@ function renderBriefing(container: HTMLElement, level: LevelDefinition, state: B
     ? `当前行动：${activeUnitId(state) ?? "无"} · 回合限制：${state.maxRounds}`
     : `当前行动：${activeUnitId(state) ?? "无"} · 回合限制：${state.maxRounds} · 保护${keyObjectives.map((objective) => objective.id).join("、")}`;
   requiredElement(container, ".mission-constraint").textContent = constraints;
+  const scout = state.units.find((unit) => unit.id === "scout");
+  renderTextList(requiredElement(container, "[data-testid='scout-skills']"), (scout?.skills ?? []).map((skill) => (
+    skill.remainingCooldown === 0 ? `${skill.id} · 可用` : `${skill.id} · 冷却 ${skill.remainingCooldown} 回合`
+  )));
 }
 
 function renderApiHelp(container: HTMLElement, level: LevelDefinition): void {
