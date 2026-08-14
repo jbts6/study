@@ -8,3 +8,4 @@ rpg/.vscode-test/
 rpg/node_modules/
 rpg/playwright-report/
 rpg/test-results/
+go-rpg/
