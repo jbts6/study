@@ -16,13 +16,14 @@
 - Go 第六关胜利后显示战役完成，不进入其他语言战役。
 - 教学从基础条件判断递进到切片遍历、组合决策、函数拆分和综合策略。
 - 每关有结构化提示、可运行起始代码和可通关的参考策略。
+- Go SDK 对齐现有 `WorldView` 和 `TurnCommand` JSON 协议，使玩家能够读取六关所需字段并构造全部既有动作。
 - 保持现有本地 Go 执行器、工作区、存档格式和 Webview 界面不变。
 
 ## 非目标
 
 - 不新增或修改 Python 六关玩法。
 - 不开发 Rust 战役。
-- 不扩展 `World`、`TurnCommand` 或 Go SDK 协议。
+- 不修改 TypeScript `WorldView`、`TurnCommand` 或战斗结算协议；Go SDK 只补齐现有 JSON 字段和动作构造器。
 - 不新增 UI 页面、控件或视觉样式。
 - 不为恶意本地代码建立安全隔离；项目继续采用信任本地代码模型。
 - 不增加多人、联网、遥测、跨版本存档迁移或其他六关主流程之外的能力。
@@ -62,6 +63,31 @@ Go 战役沿用 Python 战役的能力奖励顺序：
 | 第六关 | `campaign-complete` |
 
 每关的起始战斗通过现有能力注入流程获得此前关卡已经解锁的能力。关卡文件不手工复制存档状态。
+
+### 4. Go SDK 对齐现有战斗协议
+
+当前 Runner 已把完整 `WorldView` JSON 写入 Go 进程标准输入，但 `sdk.go` 只声明了单位 ID、位置和技能范围，并且只提供等待、攻击和移动攻击三个构造器。第二至第六关需要的字段已经存在于 JSON 中，不需要修改 TypeScript 协议。
+
+Go SDK 补齐以下只读 DTO：
+
+- `World`：战斗 ID、内容版本、回合、棋盘、目标和单位。
+- `Board`：尺寸、阻挡格、危险格和掩体格。
+- `Objective`：ID、位置、耐久和完成状态。
+- `Unit`：阵营、生命值、禁用状态、属性、状态和技能。
+- `Skill`：威力、剩余冷却、目标类型和效果类型。
+- `Status`：持续回合和防御加成。
+
+Go SDK 补齐以下动作构造器：
+
+- `Guard(world)`
+- `Cast(world, skillID, targetID)`
+- `MoveAndCast(world, path, skillID, targetID)`
+- `Interact(world, targetID)`
+- `MoveAndInteract(world, path, targetID)`
+
+现有 `Wait`、`Attack` 和 `MoveAndAttack` 保持兼容。`Action` 补齐现有 JSON 的技能和目标格字段，不增加新的动作类型。
+
+修改 SDK 后必须提升 `go-project.ts` 中的 `SDK_VERSION`，确保已经缓存的第一关策略二进制不会继续绑定旧 DTO。
 
 ## 关卡设计
 
@@ -138,11 +164,14 @@ Go 战役沿用 Python 战役的能力奖励顺序：
 
 - `rpg/src/game/content/go/levels.ts`：注册 Go 六关、固定顺序和奖励。
 - `rpg/src/game/content/levels.ts`：按所属战役解析下一关。
+- `rpg/src/runners/go/runtime/sdk.go`：对齐现有世界视图 DTO 和动作构造器。
+- `rpg/src/runners/go/go-project.ts`：提升 SDK 缓存版本。
+- `rpg/src/runners/go/go-runner.test.ts`：覆盖完整世界字段解码和新增动作构造器。
 - `rpg/src/game/content/levels.test.ts`：覆盖注册、顺序、教学递进和战役隔离。
 - `rpg/src/game/content/reference-solutions.test.ts`：覆盖 Go 六关可通关性。
 - `rpg/src/app/app-controller.test.ts`：覆盖 Go 第一关推进和终关结算。
 
-实现阶段可在不改变公共接口的前提下提取关卡文件内部的小型构造函数。不得建立跨语言关卡继承层或通用关卡 DSL。
+实现阶段可在不改变 TypeScript 公共接口的前提下提取关卡文件内部的小型构造函数。不得建立跨语言关卡继承层或通用关卡 DSL。
 
 ## 数据流
 
@@ -173,14 +202,17 @@ Go 战役沿用 Python 战役的能力奖励顺序：
 1. 在 `levels.test.ts` 中验证 Go 六关顺序、奖励、模板契约和关键教学递进。
 2. 在 `reference-solutions.test.ts` 中复用现有战斗模拟器，证明 Go 六关都有可完成策略。
 3. 在 `app-controller.test.ts` 中验证一个关键推进路径和终关不再推进。
-4. 复用 `go-runner.test.ts` 的真实工具链烟测，不为五关重复同一种 Runner 生命周期测试。
-5. 阶段完成后运行目标测试、TypeScript 构建和扩展测试；最终阶段才运行项目全量测试与 E2E。
-6. 所有验证通过后，在 `rpg/` 执行 `npm run install:local`，替换本机已安装扩展。
+4. 在 `go-runner.test.ts` 增加一个代表性真实工具链用例，同时验证完整世界字段解码与新增动作构造器；不为五关重复 Runner 生命周期测试。
+5. 验证 SDK 版本变化会产生新的构建缓存键。
+6. 阶段完成后运行目标测试、TypeScript 构建和扩展测试；最终阶段才运行项目全量测试与 E2E。
+7. 所有验证通过后，在 `rpg/` 执行 `npm run install:local`，替换本机已安装扩展。
 
 ## 完成定义
 
 - Go 战役注册六个且仅六个关卡，顺序固定。
 - 五个新增关卡拥有独立 Go 教学内容和合法战斗引用。
+- Go SDK 可以读取生命值、阵营、棋盘、目标、冷却和状态，并能构造守卫、施法和交互指令。
+- SDK 缓存版本已经提升，旧编译产物不会掩盖 SDK 变化。
 - `go-marsh-01` 可推进至 `go-marsh-02`，`go-marsh-06` 不再推进。
 - Go 六关参考策略均以 `won` 结束，并满足关键目标。
 - Python 六关顺序、奖励、模板和结算保持不变。
