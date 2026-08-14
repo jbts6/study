@@ -13,6 +13,14 @@ describe("campaign levels", () => {
     expect(getNextLevelId("python-marsh-06")).toBeUndefined();
   });
 
+  it("Go 第一关不复用 Python 模板或战役顺序", () => {
+    const level = getLevel("go-marsh-01");
+    expect(level.starterCode).toContain("func ChooseTurn(world World) TurnCommand");
+    expect(level.starterCode).not.toContain("def choose_turn");
+    expect(getCampaign("go-rpg").levelOrder).toEqual(["go-marsh-01"]);
+    expect(level.initialBattle.battleId).toBe("go-marsh-01");
+  });
+
   it("registers all six levels in their fixed campaign order", () => {
     expect(LEVEL_ORDER).toEqual([
       "python-marsh-01",

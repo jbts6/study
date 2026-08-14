@@ -1,10 +1,11 @@
 import { ABILITY_CATALOG } from "./ability-catalog";
+import { GO_LEVELS } from "./go/levels";
 import { PYTHON_LEVEL_ORDER, PYTHON_LEVELS } from "./python/levels";
 import type { LevelDefinition, LevelId } from "./shared/types";
 
 export const LEVEL_ORDER: readonly LevelId[] = PYTHON_LEVEL_ORDER;
 
-const LEVELS = PYTHON_LEVELS;
+const LEVELS: readonly LevelDefinition[] = [...PYTHON_LEVELS, ...GO_LEVELS];
 
 validateLevels(LEVELS);
 
