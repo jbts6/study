@@ -77,6 +77,7 @@ async function fixtureRunner(
   roots.push(root);
   const runner = new GoRunner({
     globalStoragePath: path.join(root, "storage"),
+    runtimeDirectory: path.resolve("src/runners/go/runtime"),
     detectGo: async () => ({ ok: true, goPath: "go", version: "1.24.3" }),
     startProcess,
     ...overrides,
@@ -234,9 +235,8 @@ func ChooseTurn(world World) TurnCommand {
   it("强制终止失败时返回可观察诊断", async () => {
     vi.useFakeTimers();
     const started = deferred<void>();
-    const childResult = deferred<GoProcessResult>();
     const child: GoProcessHandle = {
-      result: childResult.promise,
+      result: new Promise<GoProcessResult>(() => undefined),
       interrupt: vi.fn(),
       kill: vi.fn().mockRejectedValue(new Error("tree kill denied")),
     };
@@ -249,17 +249,14 @@ func ChooseTurn(world World) TurnCommand {
     await started.promise;
     runner.interrupt("run-go-1");
     await vi.advanceTimersByTimeAsync(100);
-    childResult.resolve({
-      exitCode: null,
-      signal: "SIGINT",
-      stdout: "",
-      stderr: "",
-      truncated: false,
-      timedOut: false,
-      durationMs: 12,
-    });
+    vi.useRealTimers();
+    const outcome = await Promise.race([
+      pending,
+      new Promise<"still-pending">((resolve) => setTimeout(() => resolve("still-pending"), 250)),
+    ]);
 
-    await expect(pending).resolves.toMatchObject({
+    expect(outcome).not.toBe("still-pending");
+    expect(outcome).toMatchObject({
       executionStatus: "interrupted",
       diagnostics: expect.arrayContaining([
         expect.objectContaining({ code: "GO_TERMINATION_FAILED", message: "tree kill denied" }),

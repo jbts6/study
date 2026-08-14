@@ -6,9 +6,8 @@ import { AppController } from "./app-controller";
 import { mountApp } from "./app-view";
 import { getLevel } from "../game/content/levels";
 import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
-import { GO_PROGRAM } from "../programs/go";
+import { GO_RPG_CAMPAIGN } from "../game/content/go/levels";
 import type { AppControllerRunLimits } from "./app-controller";
-import type { CampaignDefinition } from "../programs/types";
 
 class FakeRunner implements RunnerClient {
   readonly state: RunnerDisplayState = "ready";
@@ -115,13 +114,6 @@ function createController(runner: FakeRunner, saveStore: MemorySaveStore): AppCo
   }, PYTHON_RPG_CAMPAIGN);
 }
 
-const GO_TEST_CAMPAIGN: CampaignDefinition = {
-  ...PYTHON_RPG_CAMPAIGN,
-  id: "go-rpg",
-  title: "Go 沼泽战役",
-  program: GO_PROGRAM,
-};
-
 function mountSettlement(controller: AppController): Readonly<{ root: HTMLDivElement; unmount: () => void }> {
   const root = document.createElement("div");
   document.body.append(root);
@@ -222,12 +214,12 @@ describe("AppController", () => {
       saveStore: new MemorySaveStore(null),
       createId: () => "go-run",
       runLimits: TEST_RUN_LIMITS,
-    }, GO_TEST_CAMPAIGN);
+    }, GO_RPG_CAMPAIGN);
     await controller.start();
 
     await controller.runCode("package main\nfunc ChooseTurn() {}\n");
 
-    expect(controller.campaign).toBe(GO_TEST_CAMPAIGN);
+    expect(controller.campaign).toBe(GO_RPG_CAMPAIGN);
     expect(runner.lastRequest).toMatchObject({
       language: "go",
       files: { "strategy.go": "package main\nfunc ChooseTurn() {}\n" },
@@ -240,6 +232,25 @@ describe("AppController", () => {
       },
     });
     expect(runner.lastRequest && "allowedModules" in runner.lastRequest).toBe(false);
+  });
+
+  it("从 Go 战役的首关创建和重置存档", async () => {
+    const saves = new MemorySaveStore(null);
+    const controller = new AppController({
+      runner: new FakeRunner(completed(null)),
+      saveStore: saves,
+      runLimits: TEST_RUN_LIMITS,
+    }, GO_RPG_CAMPAIGN);
+
+    await controller.start();
+
+    expect(controller.getSnapshot()).toMatchObject({ mode: "game", currentLevelId: "go-marsh-01" });
+    expect(saves.saved?.currentLevelId).toBe("go-marsh-01");
+
+    controller.resetSave("重置存档");
+
+    expect(controller.getSnapshot()).toMatchObject({ mode: "game", currentLevelId: "go-marsh-01" });
+    expect(saves.saved?.currentLevelId).toBe("go-marsh-01");
   });
 
   it("requires the exact reset phrase before replacing a corrupt save", async () => {

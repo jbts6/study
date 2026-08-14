@@ -2,12 +2,9 @@ import { createHash } from "node:crypto";
 import { access, chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { CompiledRunRequest, JsonValue } from "../protocol/types";
 
 const SDK_VERSION = "1";
-const MODULE_FILE = import.meta.url.startsWith("file:") ? fileURLToPath(import.meta.url) : import.meta.url;
-const RUNTIME_DIRECTORY = path.join(path.dirname(MODULE_FILE), "runtime");
 
 export interface GoProject {
   readonly directory: string;
@@ -37,7 +34,8 @@ async function exists(file: string): Promise<boolean> {
 
 export async function createGoProject(options: CreateGoProjectOptions): Promise<GoProject> {
   const source = options.request.files[options.request.entrypoint.file];
-  const runtimeDirectory = options.runtimeDirectory ?? RUNTIME_DIRECTORY;
+  const runtimeDirectory = options.runtimeDirectory;
+  if (runtimeDirectory === undefined) throw new Error("Go runtime 目录未配置。");
   const [sdk, runnerMain] = await Promise.all([
     readFile(path.join(runtimeDirectory, "sdk.go"), "utf8"),
     readFile(path.join(runtimeDirectory, "runner_main.go"), "utf8"),

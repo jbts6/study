@@ -2,11 +2,7 @@ import type { RunnerClient, RunnerDisplayState } from "../../app/runner-client";
 import { validateRunRequest } from "../protocol/validate-request";
 import type {
   CompiledRunRequest,
-  ExecutionStatus,
-  JsonValue,
   RunRequest,
-  RunnerDiagnostic,
-  RunnerMetrics,
   RunResult,
 } from "../protocol/types";
 import { clearTimer, RunnerStateStore } from "../shared/adapter";
@@ -18,6 +14,13 @@ import {
   type GoProcessResult,
   type StartGoProcess,
 } from "./go-process";
+import {
+  appendDiagnostic,
+  cleanupDiagnostic,
+  createGoResult,
+  goDiagnostic,
+  parseGoCompileDiagnostics,
+} from "./go-result";
 
 export interface GoRunnerOptions {
   readonly globalStoragePath: string;
@@ -35,6 +38,7 @@ interface ActiveRun {
   interruptTimer?: ReturnType<typeof setTimeout>;
   termination?: Promise<void>;
   terminationError?: unknown;
+  releaseStage?: () => void;
 }
 
 type PreparedRun =
@@ -44,84 +48,6 @@ type PreparedRun =
     detection: Extract<GoDetection, { ok: true }>;
   }>
   | Readonly<{ ok: false; result: RunResult }>;
-
-interface ResultDetails {
-  readonly status: ExecutionStatus;
-  readonly diagnostics?: readonly RunnerDiagnostic[];
-  readonly returnValue?: JsonValue;
-  readonly stdout?: string;
-  readonly stderr?: string;
-  readonly truncated?: boolean;
-  readonly buildDurationMs?: number;
-  readonly executionDurationMs?: number;
-}
-
-const RECOVERY_ACTION = "修改 Go 代码后重新运行。";
-
-function diagnostic(code: string, message: string): RunnerDiagnostic {
-  return { code, severity: "error", message, recoveryAction: RECOVERY_ACTION };
-}
-
-function cleanupDiagnostic(error: unknown): RunnerDiagnostic {
-  return {
-    code: "GO_CLEANUP_FAILED",
-    severity: "warning",
-    message: error instanceof Error ? error.message : String(error),
-    recoveryAction: "关闭 Runner 后重试；临时目录可能需要手动清理。",
-  };
-}
-
-function appendDiagnostic(result: RunResult, extra: RunnerDiagnostic): RunResult {
-  return { ...result, diagnostics: [...result.diagnostics, extra] };
-}
-
-function result(request: Pick<RunRequest, "runId" | "attemptId">, details: ResultDetails): RunResult {
-  const buildDurationMs = details.buildDurationMs ?? 0;
-  const executionDurationMs = details.executionDurationMs ?? 0;
-  const metrics: RunnerMetrics = {
-    durationMs: buildDurationMs + executionDurationMs,
-    buildDurationMs,
-    executionDurationMs,
-    traceEvents: 0,
-  };
-  return {
-    protocolVersion: 1,
-    runId: request.runId,
-    attemptId: request.attemptId,
-    executionStatus: details.status,
-    ...(details.returnValue === undefined ? {} : { returnValue: details.returnValue }),
-    trace: [],
-    diagnostics: details.diagnostics ?? [],
-    streams: {
-      stdout: details.stdout ?? "",
-      stderr: details.stderr ?? "",
-      truncated: details.truncated ?? false,
-    },
-    metrics,
-  };
-}
-
-function parseCompileDiagnostics(stderr: string, questId: string): readonly RunnerDiagnostic[] {
-  const diagnostics: RunnerDiagnostic[] = [];
-  for (const line of stderr.split(/\r?\n/)) {
-    const match = line.match(/(?:^|[\\/])strategy\.go:(\d+)(?::(\d+))?:\s*(.+)$/);
-    if (!match) continue;
-    diagnostics.push({
-      code: "GO_COMPILE_ERROR",
-      severity: "error",
-      message: match[3],
-      location: {
-        file: `${questId}.go`,
-        line: Number(match[1]),
-        ...(match[2] === undefined ? {} : { column: Number(match[2]) }),
-      },
-      recoveryAction: RECOVERY_ACTION,
-    });
-  }
-  return diagnostics.length > 0
-    ? diagnostics
-    : [diagnostic("GO_COMPILE_ERROR", stderr || "Go 编译失败。")];
-}
 
 export class GoRunner implements RunnerClient {
   private readonly globalStoragePath: string;
@@ -182,28 +108,28 @@ export class GoRunner implements RunnerClient {
   private prepareRun(input: RunRequest): PreparedRun {
     const validation = validateRunRequest(input);
     if (!validation.ok) {
-      return { ok: false, result: result(input, {
+      return { ok: false, result: createGoResult(input, {
         status: "invalid_request",
         diagnostics: validation.diagnostics,
       }) };
     }
     const request = validation.value;
     if (request.language !== "go") {
-      return { ok: false, result: result(request, {
+      return { ok: false, result: createGoResult(request, {
         status: "invalid_request",
-        diagnostics: [diagnostic("INVALID_GO_REQUEST", "Go 执行器只接受 Go 请求。")],
+        diagnostics: [goDiagnostic("INVALID_GO_REQUEST", "Go 执行器只接受 Go 请求。")],
       }) };
     }
     if (this.disposed || !this.detection) {
-      return { ok: false, result: result(request, {
+      return { ok: false, result: createGoResult(request, {
         status: "runner_error",
-        diagnostics: [diagnostic("GO_RUNNER_UNAVAILABLE", "Go 执行器尚未连接或已关闭。")],
+        diagnostics: [goDiagnostic("GO_RUNNER_UNAVAILABLE", "Go 执行器尚未连接或已关闭。")],
       }) };
     }
     if (this.active) {
-      return { ok: false, result: result(request, {
+      return { ok: false, result: createGoResult(request, {
         status: "runner_error",
-        diagnostics: [diagnostic("RUNNER_BUSY", "上一段 Go 代码仍在运行。")],
+        diagnostics: [goDiagnostic("RUNNER_BUSY", "上一段 Go 代码仍在运行。")],
       }) };
     }
     return { ok: true, request, detection: this.detection };
@@ -225,9 +151,9 @@ export class GoRunner implements RunnerClient {
       });
       outcome = await this.runProject(request, project, active);
     } catch (error) {
-      outcome = result(request, {
+      outcome = createGoResult(request, {
         status: active.interrupted ? "interrupted" : "runner_error",
-        diagnostics: [diagnostic(
+        diagnostics: [goDiagnostic(
           active.interrupted ? "RUNNER_INTERRUPTED" : "GO_RUNNER_FAILED",
           active.interrupted ? "Go 代码运行已中断。" : error instanceof Error ? error.message : String(error),
         )],
@@ -254,7 +180,7 @@ export class GoRunner implements RunnerClient {
       this.states.set(this.disposed ? "unavailable" : "ready");
     }
     if (active.terminationError !== undefined) {
-      outcome = appendDiagnostic(outcome, diagnostic(
+      outcome = appendDiagnostic(outcome, goDiagnostic(
         "GO_TERMINATION_FAILED",
         active.terminationError instanceof Error ? active.terminationError.message : String(active.terminationError),
       ));
@@ -288,6 +214,7 @@ export class GoRunner implements RunnerClient {
   private terminate(active: ActiveRun, handle: GoProcessHandle): void {
     active.termination = handle.kill().catch((error: unknown) => {
       active.terminationError = error;
+      active.releaseStage?.();
     });
   }
 
@@ -316,18 +243,18 @@ export class GoRunner implements RunnerClient {
     });
     if (active.interrupted) return { ok: false, result: this.interruptedResult(request, build.durationMs, 0, build) };
     if (build.timedOut) {
-      return { ok: false, result: result(request, {
+      return { ok: false, result: createGoResult(request, {
         status: "timeout",
-        diagnostics: [diagnostic("GO_BUILD_TIMEOUT", `Go 构建超过 ${request.limits.buildTimeoutMs}ms，已停止。`)],
+        diagnostics: [goDiagnostic("GO_BUILD_TIMEOUT", `Go 构建超过 ${request.limits.buildTimeoutMs}ms，已停止。`)],
         stderr: build.stderr,
         truncated: build.truncated,
         buildDurationMs: build.durationMs,
       }) };
     }
     if (build.exitCode !== 0) {
-      return { ok: false, result: result(request, {
+      return { ok: false, result: createGoResult(request, {
         status: "compile_error",
-        diagnostics: parseCompileDiagnostics(build.stderr, request.questId),
+        diagnostics: parseGoCompileDiagnostics(build.stderr, request.questId),
         stdout: build.stdout,
         stderr: build.stderr,
         truncated: build.truncated,
@@ -356,9 +283,9 @@ export class GoRunner implements RunnerClient {
     const executionDurationMs = execution.durationMs;
     if (active.interrupted) return this.interruptedResult(request, buildDurationMs, executionDurationMs, execution);
     if (execution.timedOut) {
-      return result(request, {
+      return createGoResult(request, {
         status: "timeout",
-        diagnostics: [diagnostic("GO_EXECUTION_TIMEOUT", `Go 策略运行超过 ${request.limits.executionTimeoutMs}ms，已停止。`)],
+        diagnostics: [goDiagnostic("GO_EXECUTION_TIMEOUT", `Go 策略运行超过 ${request.limits.executionTimeoutMs}ms，已停止。`)],
         stdout: execution.stdout,
         stderr: execution.stderr,
         truncated: execution.truncated,
@@ -367,9 +294,9 @@ export class GoRunner implements RunnerClient {
       });
     }
     if (execution.exitCode !== 0) {
-      return result(request, {
+      return createGoResult(request, {
         status: "runtime_error",
-        diagnostics: [diagnostic("GO_RUNTIME_ERROR", execution.stderr || "Go 策略进程异常退出。")],
+        diagnostics: [goDiagnostic("GO_RUNTIME_ERROR", execution.stderr || "Go 策略进程异常退出。")],
         stdout: execution.stdout,
         stderr: execution.stderr,
         truncated: execution.truncated,
@@ -389,9 +316,9 @@ export class GoRunner implements RunnerClient {
   ): Promise<RunResult> {
     const returnValue = await readTurnResult(resultPath);
     if (returnValue === undefined) {
-      return result(request, {
+      return createGoResult(request, {
         status: "runner_error",
-        diagnostics: [diagnostic("INVALID_TURN_RESULT", "Go 策略未写入有效的 TurnCommand JSON。")],
+        diagnostics: [goDiagnostic("INVALID_TURN_RESULT", "Go 策略未写入有效的 TurnCommand JSON。")],
         stdout: execution.stdout,
         stderr: execution.stderr,
         truncated: execution.truncated,
@@ -399,7 +326,7 @@ export class GoRunner implements RunnerClient {
         executionDurationMs,
       });
     }
-    return result(request, {
+    return createGoResult(request, {
       status: "completed",
       returnValue,
       stdout: execution.stdout,
@@ -417,9 +344,24 @@ export class GoRunner implements RunnerClient {
     if (active.interrupted) throw new Error("Go 代码运行已中断。");
     const handle = this.startProcess(options);
     active.handle = handle;
-    const outcome = await handle.result;
-    if (active.handle === handle) active.handle = undefined;
-    return outcome;
+    let releaseStage!: () => void;
+    const terminationFailed = new Promise<undefined>((resolve) => { releaseStage = () => resolve(undefined); });
+    active.releaseStage = releaseStage;
+    try {
+      const outcome = await Promise.race([handle.result, terminationFailed]);
+      return outcome ?? {
+        exitCode: null,
+        signal: null,
+        stdout: "",
+        stderr: "",
+        truncated: false,
+        timedOut: false,
+        durationMs: 0,
+      };
+    } finally {
+      if (active.handle === handle) active.handle = undefined;
+      if (active.releaseStage === releaseStage) active.releaseStage = undefined;
+    }
   }
 
   private interruptedResult(
@@ -428,9 +370,9 @@ export class GoRunner implements RunnerClient {
     executionDurationMs: number,
     processResult: GoProcessResult,
   ): RunResult {
-    return result(request, {
+    return createGoResult(request, {
       status: "interrupted",
-      diagnostics: [diagnostic("RUNNER_INTERRUPTED", "Go 代码运行已中断。")],
+      diagnostics: [goDiagnostic("RUNNER_INTERRUPTED", "Go 代码运行已中断。")],
       stdout: processResult.stdout,
       stderr: processResult.stderr,
       truncated: processResult.truncated,

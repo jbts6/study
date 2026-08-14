@@ -76,7 +76,7 @@ export class AppController {
     public readonly campaign: CampaignDefinition,
   ) {
     this.runLimits = dependencies.runLimits ?? createDefaultRunLimits();
-    const level = getLevel("python-marsh-01");
+    const level = this.firstLevel();
     this.snapshot = this.createGameSnapshot(level.id, createLevelBattle(level), level.starterCode, idleFeedback());
     dependencies.runner.onStateChange((state) => this.updateRunnerState(state));
   }
@@ -88,7 +88,7 @@ export class AppController {
       return;
     }
 
-    const firstLevel = getLevel("python-marsh-01");
+    const firstLevel = this.firstLevel();
     const save = loaded.save ?? this.createSave(firstLevel.id, createLevelBattle(firstLevel), firstLevel.starterCode);
     if (loaded.save === null) this.dependencies.saveStore.save(save);
     const level = getLevel(save.currentLevelId);
@@ -137,7 +137,7 @@ export class AppController {
   resetSave(confirmation: string): void {
     if (confirmation !== RESET_CONFIRMATION) return;
     this.dependencies.saveStore.remove();
-    const level = getLevel("python-marsh-01");
+    const level = this.firstLevel();
     const save = this.createSave(level.id, createLevelBattle(level), level.starterCode);
     this.dependencies.saveStore.save(save);
     this.replaceSnapshot(this.createGameSnapshot(level.id, save.battleState, save.codeDraft, idleFeedback()));
@@ -184,6 +184,12 @@ export class AppController {
       && snapshot.runnerState === "ready"
       && snapshot.battleState.phase === "in_progress"
       && snapshot.activeRunId === undefined;
+  }
+
+  private firstLevel(): LevelDefinition {
+    const levelId = this.campaign.levelOrder[0];
+    if (levelId === undefined) throw new Error(`战役没有可用关卡: ${this.campaign.id}`);
+    return getLevel(levelId);
   }
 
   private createRunRequest(snapshot: GameSnapshot, runId: string): RunRequest {

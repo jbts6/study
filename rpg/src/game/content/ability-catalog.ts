@@ -75,7 +75,7 @@ function injectIntoScout(unit: BattleUnit, unlockedAbilityIds: readonly AbilityI
 
 /** Adds the rewards earned before a level to scout without mutating the battle snapshot. */
 export function injectUnlockedAbilities(levelId: LevelId, battleState: BattleState): BattleState {
-  const unlockedAbilityIds = LEVEL_UNLOCKS[levelId];
+  const unlockedAbilityIds = LEVEL_UNLOCKS[levelId] ?? [];
   const scout = battleState.units.find((unit) => unit.id === "scout" && unit.team === "allies");
   if (scout === undefined || unlockedAbilityIds.length === 0) return battleState;
 
