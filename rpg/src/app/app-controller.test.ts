@@ -5,6 +5,9 @@ import type { ExecutionStatus, JsonValue, RunRequest, RunResult } from "../runne
 import { AppController } from "./app-controller";
 import { mountApp } from "./app-view";
 import { getLevel } from "../game/content/levels";
+import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
+import { GO_PROGRAM } from "../programs/go";
+import type { CampaignDefinition } from "../programs/types";
 
 class FakeRunner implements RunnerClient {
   readonly state: RunnerDisplayState = "ready";
@@ -82,8 +85,15 @@ function createController(runner: FakeRunner, saveStore: MemorySaveStore): AppCo
     runner,
     saveStore,
     createId: () => "test-run",
-  });
+  }, PYTHON_RPG_CAMPAIGN);
 }
+
+const GO_TEST_CAMPAIGN: CampaignDefinition = {
+  ...PYTHON_RPG_CAMPAIGN,
+  id: "go-rpg",
+  title: "Go 沼泽战役",
+  program: GO_PROGRAM,
+};
 
 function mountSettlement(controller: AppController): Readonly<{ root: HTMLDivElement; unmount: () => void }> {
   const root = document.createElement("div");
@@ -172,6 +182,31 @@ describe("AppController", () => {
     const snapshot = controller.getSnapshot();
     expect(snapshot.mode).toBe("game");
     expect(snapshot.mode === "game" && snapshot.battleState.revision).toBe(2);
+  });
+
+  it("creates a compiled Go request from the active campaign program", async () => {
+    const runner = new FakeRunner(completed({
+      actorId: "scout",
+      expectedRevision: 0,
+      action: { type: "wait" },
+    }));
+    const controller = new AppController({
+      runner,
+      saveStore: new MemorySaveStore(null),
+      createId: () => "go-run",
+    }, GO_TEST_CAMPAIGN);
+    await controller.start();
+
+    await controller.runCode("package main\nfunc ChooseTurn() {}\n");
+
+    expect(controller.campaign).toBe(GO_TEST_CAMPAIGN);
+    expect(runner.lastRequest).toMatchObject({
+      language: "go",
+      files: { "strategy.go": "package main\nfunc ChooseTurn() {}\n" },
+      entrypoint: { file: "strategy.go" },
+      limits: { timeoutMs: 5_000, buildTimeoutMs: 15_000, executionTimeoutMs: 5_000 },
+    });
+    expect(runner.lastRequest && "allowedModules" in runner.lastRequest).toBe(false);
   });
 
   it("requires the exact reset phrase before replacing a corrupt save", async () => {

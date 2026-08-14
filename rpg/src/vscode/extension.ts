@@ -11,6 +11,7 @@ import { GameSession, type SessionDiagnostics } from "./game-session";
 import { DocumentWorkspace, levelFilePath, type WorkspaceDocument, type WorkspaceHost } from "./level-workspace";
 import type { ThemePreference, WebviewCommand } from "./messages";
 import { WorkspaceSaveStore } from "./workspace-save-store";
+import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
 
 const THEME_KEY = "python-rpg.theme";
 const PANEL_TYPE = "pythonRpg.game";
@@ -119,7 +120,7 @@ async function createActiveGame(context: vscode.ExtensionContext): Promise<Activ
   const diagnostics = vscode.languages.createDiagnosticCollection("python-rpg");
   panel.webview.html = loadingHtml(panel.webview, context.extensionUri);
   const runner = createRunner(context);
-  const controller = new AppController({ runner, saveStore });
+  const controller = new AppController({ runner, saveStore }, PYTHON_RPG_CAMPAIGN);
   const session = new GameSession({
     controller,
     workspace,

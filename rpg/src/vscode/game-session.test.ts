@@ -6,6 +6,7 @@ import { AppController } from "../app/app-controller";
 import { GameSession } from "./game-session";
 import type { ExtensionMessage, ThemePreference } from "./messages";
 import { getLevel } from "../game/content/levels";
+import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
 
 class FakeRunner implements RunnerClient {
   readonly state: RunnerDisplayState = "ready";
@@ -61,7 +62,7 @@ class MemorySaveStore implements SaveStore {
 describe("GameSession", () => {
   it("runs unsaved level code and republishes a complete snapshot when the Webview is ready", async () => {
     const runner = new FakeRunner();
-    const controller = new AppController({ runner, saveStore: new MemorySaveStore(), createId: () => "session-run" });
+    const controller = new AppController({ runner, saveStore: new MemorySaveStore(), createId: () => "session-run" }, PYTHON_RPG_CAMPAIGN);
     const messages: ExtensionMessage[] = [];
     const unsavedCode = "def choose_turn(world):\n    return {'unsaved': True}\n";
     const opened: string[] = [];
@@ -108,7 +109,7 @@ describe("GameSession", () => {
       runner: new FakeRunner(true),
       saveStore: new MemorySaveStore(),
       createId: () => "syntax-run",
-    });
+    }, PYTHON_RPG_CAMPAIGN);
     const projected: { levelId: string; diagnostics: readonly RunnerDiagnostic[] }[] = [];
     let clearCount = 0;
     const session = new GameSession({
@@ -153,7 +154,7 @@ describe("GameSession", () => {
         ok: true,
         save: { version: 2, currentLevelId: first.id, battleState: victory, codeDraft: "" },
       }),
-    });
+    }, PYTHON_RPG_CAMPAIGN);
     const opened: string[] = [];
     const session = new GameSession({
       controller,

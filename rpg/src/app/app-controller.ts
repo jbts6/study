@@ -7,6 +7,7 @@ import { getLevel, getNextLevelId } from "../game/content/levels";
 import type { LevelDefinition, LevelId } from "../game/content/types";
 import { projectWorldView } from "../game/world/project-world-view";
 import type { RunRequest, RunResult, RunnerDiagnostic } from "../runners/protocol/types";
+import type { CampaignDefinition, ImplementedLanguage } from "../programs/types";
 import type { RunnerClient, RunnerDisplayState } from "./runner-client";
 import {
   combatErrorFeedback,
@@ -21,7 +22,7 @@ import {
 } from "./app-feedback";
 import { RESET_CONFIRMATION } from "./save-store";
 import type { SaveDataV2, SaveStore } from "./save-store";
-const RUN_LIMITS = {
+const PYTHON_LIMITS = {
   timeoutMs: 5_000,
   interruptGraceMs: 500,
   maxFiles: 10,
@@ -32,7 +33,16 @@ const RUN_LIMITS = {
   maxValueDepth: 4,
 } as const;
 
-const RUNNER_UNAVAILABLE_MESSAGE = "本地 Python Runner 不可用。启动 Runner 后刷新页面。";
+const GO_LIMITS = {
+  ...PYTHON_LIMITS,
+  buildTimeoutMs: 15_000,
+  executionTimeoutMs: 5_000,
+} as const;
+
+const RUNNER_UNAVAILABLE_MESSAGE: Readonly<Record<ImplementedLanguage, string>> = {
+  python: "本地 Python Runner 不可用。启动 Runner 后刷新页面。",
+  go: "本地 Go Runner 不可用。安装 Go 后重试。",
+};
 
 export type { AppFeedback } from "./app-feedback";
 
@@ -64,7 +74,10 @@ export class AppController {
   private readonly listeners = new Set<(snapshot: AppSnapshot) => void>();
   private snapshot: AppSnapshot;
 
-  constructor(private readonly dependencies: AppControllerDependencies) {
+  constructor(
+    private readonly dependencies: AppControllerDependencies,
+    public readonly campaign: CampaignDefinition,
+  ) {
     const level = getLevel("python-marsh-01");
     this.snapshot = this.createGameSnapshot(level.id, createLevelBattle(level), level.starterCode, idleFeedback());
     dependencies.runner.onStateChange((state) => this.updateRunnerState(state));
@@ -176,17 +189,30 @@ export class AppController {
   }
 
   private createRunRequest(snapshot: GameSnapshot, runId: string): RunRequest {
-    return {
-      protocolVersion: 1,
+    const program = this.campaign.program;
+    const runEntrypointFile = program.runEntrypointFileName(snapshot.currentLevelId);
+    const base = {
+      protocolVersion: 1 as const,
       runId,
       attemptId: `${runId}:1`,
       questId: snapshot.currentLevelId,
-      language: "python",
-      files: { "main.py": snapshot.codeDraft },
-      entrypoint: { file: "main.py", callable: "choose_turn" },
+      files: program.createRunFiles(snapshot.currentLevelId, snapshot.codeDraft),
       worldView: projectWorldView(snapshot.battleState),
-      allowedModules: ["math"],
-      limits: RUN_LIMITS,
+    };
+    if (program.language === "python") {
+      return {
+        ...base,
+        language: "python",
+        entrypoint: { file: runEntrypointFile, callable: "choose_turn" },
+        allowedModules: ["math"],
+        limits: PYTHON_LIMITS,
+      };
+    }
+    return {
+      ...base,
+      language: "go",
+      entrypoint: { file: runEntrypointFile },
+      limits: GO_LIMITS,
     };
   }
 
@@ -197,7 +223,7 @@ export class AppController {
       this.replaceSnapshot({
         ...snapshot,
         activeRunId: undefined,
-        feedback: feedbackFromRunResult(result),
+        feedback: feedbackFromRunResult(result, this.campaign.program.language),
         diagnostics: result.diagnostics,
       });
       return;
@@ -271,11 +297,13 @@ export class AppController {
       this.updateRunnerState(this.dependencies.runner.state);
     } catch (error) {
       if (this.snapshot.mode !== "game") return;
-      const message = error instanceof Error ? error.message : RUNNER_UNAVAILABLE_MESSAGE;
+      const language = this.campaign.program.language;
       this.replaceSnapshot({
         ...this.snapshot,
         runnerState: "unavailable",
-        feedback: errorFeedback("Python Runner 不可用", [message]),
+        feedback: errorFeedback(`${languageLabel(language)} Runner 不可用`, [
+          error instanceof Error ? error.message : RUNNER_UNAVAILABLE_MESSAGE[language],
+        ]),
         diagnostics: [],
       });
     }
@@ -288,7 +316,10 @@ export class AppController {
       ...snapshot,
       activeRunId: undefined,
       runnerState: "unavailable",
-      feedback: errorFeedback("Python Runner 不可用", [RUNNER_UNAVAILABLE_MESSAGE]),
+      feedback: errorFeedback(
+        `${languageLabel(this.campaign.program.language)} Runner 不可用`,
+        [RUNNER_UNAVAILABLE_MESSAGE[this.campaign.program.language]],
+      ),
       diagnostics: [],
     });
   }
@@ -332,4 +363,8 @@ function isTurnCommand(value: unknown): value is TurnCommand {
 
 function createId(): string {
   return globalThis.crypto.randomUUID();
+}
+
+function languageLabel(language: ImplementedLanguage): string {
+  return language === "python" ? "Python" : "Go";
 }
