@@ -1,4 +1,5 @@
 import type { PlayerProgramDefinition } from "../types";
+import { GO_REFERENCE } from "./reference";
 
 export const GO_PROGRAM: PlayerProgramDefinition = {
   language: "go",
@@ -7,4 +8,5 @@ export const GO_PROGRAM: PlayerProgramDefinition = {
   runEntrypointFileName: () => "strategy.go",
   editorLanguageId: "go",
   createRunFiles: (_levelId, source) => ({ "strategy.go": source }),
+  reference: GO_REFERENCE,
 };
