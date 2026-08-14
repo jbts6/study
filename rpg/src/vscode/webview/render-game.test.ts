@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import "./styles.css";
 import { getLevel, LEVEL_ORDER } from "../../game/content/levels";
 import type { LevelId } from "../../game/content/types";
+import { GO_PROGRAM } from "../../programs/go";
 import { calculateCellSize, renderGame } from "./render-game";
 import type { GameViewSnapshot } from "../messages";
 
@@ -56,6 +57,7 @@ describe("game Webview renderer", () => {
     expect(root.textContent).toContain("保护 relay");
     expect(root.querySelector("details.guidance-drawer")?.hasAttribute("open")).toBe(false);
     expect(root.querySelector("[data-command='runTurn']")?.textContent).toContain("运行回合");
+    expect(root.querySelector("[data-view-tabs]")).toBeNull();
   });
 
   it("renders the 6 by 4 finale without changing component structure", () => {
@@ -140,6 +142,62 @@ describe("game Webview renderer", () => {
     expect(root.textContent).toContain("Go");
     expect(root.textContent).toContain("go-marsh-01.go");
     expect(root.textContent).not.toContain("Python RPG");
+  });
+
+  it("renders the Go tactical manual without changing the five-section layout", () => {
+    const root = document.createElement("div");
+    const level = getLevel("go-marsh-01");
+    const goSnapshot: GameViewSnapshot = {
+      ...snapshot("go-marsh-01"),
+      campaignTitle: "Go 沼泽战役",
+      languageLabel: "Go",
+      playerFileName: "go-marsh-01.go",
+      programReference: GO_PROGRAM.reference,
+    };
+
+    renderGame(root, goSnapshot, { view: "manual", sectionId: "focus" });
+
+    expect(root.children).toHaveLength(5);
+    expect(root.querySelector("[role='tablist'][data-view-tabs]")).not.toBeNull();
+    expect(root.querySelector("[role='tabpanel'][data-view='manual']")).not.toBeNull();
+    expect(root.querySelector("[role='tab'][aria-selected='true']")?.textContent).toContain("本关重点");
+    expect(root.textContent).toContain("MoveAndAttack");
+    expect(root.textContent).toContain("func ChooseTurn(world World) TurnCommand");
+    expect(root.querySelector("[data-reference-id='action.move-and-attack']")).not.toBeNull();
+    expect(root.textContent).toContain(level.guidance.apiFocus?.summary);
+  });
+
+  it("offers a stable local API navigation button for combat reference feedback", () => {
+    const level = getLevel("go-marsh-01");
+    const goSnapshot: GameViewSnapshot = {
+      ...snapshot("go-marsh-01"),
+      campaignTitle: "Go 沼泽战役",
+      languageLabel: "Go",
+      playerFileName: "go-marsh-01.go",
+      level,
+      programReference: GO_PROGRAM.reference,
+      feedback: {
+        kind: "error",
+        title: "指令无效",
+        messages: ["[INVALID_MOVE_PATH] $.movePath 路径无效"],
+        stdout: "",
+        stderr: "",
+        relatedReferenceIds: ["action.move-and-attack"],
+      },
+    };
+    const root = document.createElement("div");
+    renderGame(root, goSnapshot);
+
+    const button = root.querySelector<HTMLButtonElement>("[data-local-command='openManualReference']");
+    expect(button?.textContent).toContain("查看相关 API");
+    expect(button?.dataset.referenceId).toBe("action.move-and-attack");
+
+    const compileRoot = document.createElement("div");
+    renderGame(compileRoot, {
+      ...goSnapshot,
+      feedback: { ...goSnapshot.feedback, title: "Go 编译失败", relatedReferenceIds: undefined },
+    });
+    expect(compileRoot.querySelector("[data-local-command='openManualReference']")).toBeNull();
   });
 
   it("renders every level with its own complete guidance and board dimensions", () => {
