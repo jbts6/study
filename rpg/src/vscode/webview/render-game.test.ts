@@ -65,6 +65,63 @@ describe("game Webview renderer", () => {
     expect(root.querySelector("[role='grid']")?.getAttribute("aria-colcount")).toBe("6");
   });
 
+  it("shows retry-only actions when a won battle still has unmet non-key objectives", () => {
+    const level = getLevel("python-marsh-06");
+    const state = {
+      ...structuredClone(level.initialBattle),
+      phase: "won" as const,
+      objectives: level.initialBattle.objectives.map((objective) => objective.key
+        ? { ...objective, completed: true, durability: 0 }
+        : objective),
+    };
+    const root = document.createElement("div");
+    renderGame(root, { ...snapshot("python-marsh-06"), battleState: state });
+
+    expect(root.querySelector("[data-command='retryLevel']")?.textContent).toContain("重试本关");
+    expect(root.querySelector("[data-command='advanceLevel']")).toBeNull();
+  });
+
+  it("shows advance and retry for a won ability level, and retry only for a lost battle", () => {
+    const ability = getLevel("python-marsh-01");
+    const won = {
+      ...structuredClone(ability.initialBattle),
+      phase: "won" as const,
+      objectives: ability.initialBattle.objectives.map((objective) => objective.key
+        ? objective
+        : { ...objective, completed: true, durability: 0 }),
+    };
+    const wonRoot = document.createElement("div");
+    renderGame(wonRoot, { ...snapshot("python-marsh-01"), battleState: won });
+    expect(wonRoot.querySelector("[data-command='advanceLevel']")?.textContent).toContain("进入下一关");
+    expect(wonRoot.querySelector("[data-command='retryLevel']")?.textContent).toContain("重试本关");
+
+    const lostRoot = document.createElement("div");
+    renderGame(lostRoot, {
+      ...snapshot("python-marsh-01"),
+      battleState: { ...structuredClone(ability.initialBattle), phase: "lost" },
+    });
+    expect(lostRoot.querySelector("[data-command='retryLevel']")?.textContent).toContain("重试本关");
+    expect(lostRoot.querySelector("[data-command='advanceLevel']")).toBeNull();
+  });
+
+  it("locks a completed campaign battle without retry or advance actions", () => {
+    const level = getLevel("python-marsh-06");
+    const state = {
+      ...structuredClone(level.initialBattle),
+      phase: "won" as const,
+      objectives: level.initialBattle.objectives.map((objective) => ({
+        ...objective,
+        completed: true,
+        durability: 0,
+      })),
+    };
+    const root = document.createElement("div");
+    renderGame(root, { ...snapshot("python-marsh-06"), battleState: state });
+
+    expect(root.querySelector("[data-command='retryLevel']")).toBeNull();
+    expect(root.querySelector("[data-command='advanceLevel']")).toBeNull();
+  });
+
   it("renders every level with its own complete guidance and board dimensions", () => {
     for (const levelId of LEVEL_ORDER) {
       const root = document.createElement("div");

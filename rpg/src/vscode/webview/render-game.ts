@@ -167,13 +167,28 @@ function renderGuidance(guidance: LevelGuidance): HTMLElement {
 function renderActions(snapshot: GameViewSnapshot): HTMLElement {
   const actions = element("footer", "action-bar");
   const running = snapshot.runnerState === "running" || snapshot.activeRunId !== undefined;
-  if (running) actions.append(commandButton("interruptRun", "中断运行"));
-  else if (snapshot.battleState.phase === "in_progress") actions.append(commandButton("runTurn", "运行回合"));
-  else if (snapshot.battleState.phase === "won" && snapshot.level.reward.type === "ability") {
-    actions.append(commandButton("advanceLevel", "进入下一关"), commandButton("retryLevel", "重试本关"));
-  } else if (snapshot.battleState.phase === "lost") actions.append(commandButton("retryLevel", "重试本关"));
+  if (running) {
+    actions.append(commandButton("interruptRun", "中断运行"));
+  } else if (snapshot.battleState.phase === "in_progress") {
+    actions.append(commandButton("runTurn", "运行回合"));
+  } else {
+    const kind = settlementKind(snapshot);
+    if (kind === "victory") {
+      actions.append(commandButton("advanceLevel", "进入下一关"), commandButton("retryLevel", "重试本关"));
+    } else if (kind === "retriable") {
+      actions.append(commandButton("retryLevel", "重试本关"));
+    }
+  }
   actions.append(textElement("span", "keyboard-hint", "Ctrl+Enter"));
   return actions;
+}
+
+function settlementKind(snapshot: GameViewSnapshot): "victory" | "retriable" | "locked" {
+  const unmet = snapshot.battleState.objectives.filter((objective) => !objective.key && !objective.completed).length;
+  if (snapshot.battleState.phase === "lost") return "retriable";
+  if (snapshot.battleState.phase !== "won") return "locked";
+  if (unmet > 0) return "retriable";
+  return snapshot.level.reward.type === "ability" ? "victory" : "locked";
 }
 
 function statusItem(label: string, value: string): HTMLElement {
