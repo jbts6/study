@@ -112,6 +112,9 @@ function gameViewSnapshot(snapshot: GameSnapshot, theme: ThemePreference, campai
   return {
     mode: "game",
     theme,
+    campaignTitle: campaign.title,
+    languageLabel: campaign.program.language === "python" ? "Python" : "Go",
+    playerFileName: campaign.program.sourceFileName(snapshot.currentLevelId),
     level: campaignLevel(campaign, snapshot.currentLevelId),
     battleState: snapshot.battleState,
     runnerState: snapshot.runnerState,

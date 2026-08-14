@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { worldViewFixture } from "../../game/testing/fixture";
 import type { CompiledRunRequest } from "../protocol/types";
 import type { GoProcessHandle, GoProcessResult, StartGoProcessOptions } from "./go-process";
+import { detectGo } from "./go-detector";
 import { createGoProject } from "./go-project";
 import { GoRunner } from "./go-runner";
 
@@ -262,5 +263,30 @@ func ChooseTurn(world World) TurnCommand {
         expect.objectContaining({ code: "GO_TERMINATION_FAILED", message: "tree kill denied" }),
       ]),
     });
+  });
+
+  it("使用本机 Go 执行 Wait(world)，或返回明确的工具链恢复信息", async () => {
+    const detection = await detectGo();
+    if (!detection.ok) {
+      expect(detection).toMatchObject({ code: "GO_NOT_FOUND", recoveryAction: expect.stringContaining("go.dev") });
+      return;
+    }
+    const root = await mkdtemp(path.join(tmpdir(), "go-runner-real-test-"));
+    roots.push(root);
+    const runner = new GoRunner({
+      globalStoragePath: path.join(root, "storage"),
+      runtimeDirectory: path.resolve("src/runners/go/runtime"),
+      detectGo: async () => detection,
+    });
+    await runner.connect();
+
+    await expect(runner.run(request(
+      "package main\nfunc ChooseTurn(world World) TurnCommand { return Wait(world) }\n",
+      { buildTimeoutMs: 15_000, executionTimeoutMs: 5_000 },
+    ))).resolves.toMatchObject({
+      executionStatus: "completed",
+      returnValue: { actorId: "scout", expectedRevision: 0, action: { type: "wait" } },
+    });
+    runner.close();
   });
 });

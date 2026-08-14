@@ -10,6 +10,9 @@ function snapshot(levelId: LevelId, theme: GameViewSnapshot["theme"] = "dark"): 
   return {
     mode: "game",
     theme,
+    campaignTitle: "Python 沼泽战役",
+    languageLabel: "Python",
+    playerFileName: `${levelId}.py`,
     level,
     battleState: structuredClone(level.initialBattle),
     runnerState: "ready",
@@ -63,6 +66,23 @@ describe("game Webview renderer", () => {
     expect(root.querySelectorAll("[role='gridcell']")).toHaveLength(24);
     expect(root.querySelector("[role='grid']")?.getAttribute("aria-rowcount")).toBe("4");
     expect(root.querySelector("[role='grid']")?.getAttribute("aria-colcount")).toBe("6");
+  });
+
+  it("renders the active Go campaign identity and source file", () => {
+    const root = document.createElement("div");
+    const goSnapshot = {
+      ...snapshot("go-marsh-01"),
+      campaignTitle: "Go 沼泽战役",
+      languageLabel: "Go",
+      playerFileName: "go-marsh-01.go",
+    } as GameViewSnapshot;
+
+    renderGame(root, goSnapshot);
+
+    expect(root.textContent).toContain("Go 沼泽战役");
+    expect(root.textContent).toContain("Go");
+    expect(root.textContent).toContain("go-marsh-01.go");
+    expect(root.textContent).not.toContain("Python RPG");
   });
 
   it("renders every level with its own complete guidance and board dimensions", () => {

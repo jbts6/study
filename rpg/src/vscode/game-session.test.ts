@@ -225,6 +225,11 @@ describe("GameSession", () => {
     expect(message?.type === "snapshot" && message.snapshot.mode === "game"
       ? message.snapshot.level.id
       : undefined).toBe("go-marsh-01");
+    expect(message?.type === "snapshot" ? message.snapshot : undefined).toMatchObject({
+      campaignTitle: "Go 沼泽战役",
+      languageLabel: "Go",
+      playerFileName: "go-marsh-01.go",
+    });
     session.dispose();
   });
 

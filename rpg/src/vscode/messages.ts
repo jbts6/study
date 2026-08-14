@@ -17,6 +17,9 @@ export type WebviewCommand =
 export type GameViewSnapshot = Readonly<{
   mode: "game";
   theme: ThemePreference;
+  campaignTitle: string;
+  languageLabel: "Python" | "Go";
+  playerFileName: string;
   level: LevelDefinition;
   battleState: BattleState;
   runnerState: RunnerDisplayState;
