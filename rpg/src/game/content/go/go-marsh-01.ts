@@ -37,6 +37,18 @@ export const GO_MARSH_01: LevelDefinition = {
       "ChooseTurn 必须返回当前回合的一条指令。",
       "本关先验证等待，再逐步尝试移动和攻击。",
     ],
+    apiFocus: {
+      summary: "掌握 ChooseTurn 的回合入口，以及 World、TurnCommand、Cell 和基础动作构造器。",
+      steps: [
+        "从 World 读取当前单位和修订号，先用 Wait(world) 返回合法命令。",
+        "用绝对坐标组成 Cell 路径，再选择 Attack 或 MoveAndAttack。",
+      ],
+      referenceIds: [
+        "entrypoint.choose-turn", "type.world", "type.turn-command", "type.cell",
+        "action.wait", "action.attack", "action.move-and-attack",
+      ],
+      example: "先读取当前单位，沿绝对路径到 `(2, 0)` 后攻击 `golem`。",
+    },
   },
   initialBattle: MARSH_SLICE.initialBattle,
   enemyBehaviors: MARSH_SLICE.enemyBehaviors,

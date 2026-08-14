@@ -38,6 +38,17 @@ export const GO_MARSH_02: LevelDefinition = {
     worldFields: ["unit.HP 和 unit.MaxHP 表示生命值。", "world.Board.HazardCells 标出会造成伤害的危险格。"],
     commandExamples: ["使用 Cast(world, \"mend\", unit.ID) 自疗，或用 Guard(world) 防御。"],
     levelRules: ["危险格会造成 2 点伤害；corruptor 会持续接近 relay。"],
+    apiFocus: {
+      summary: "用 Unit、Skill 和 Board 状态，在危险格、生命值和技能冷却之间选择安全行动。",
+      steps: [
+        "遍历 Unit，检查 HP、目标关系与 Skill.RemainingCooldown，再判断是否自疗。",
+        "根据位置选择 Cast、MoveAndCast 或 Guard，避免把 scout 留在危险格。",
+      ],
+      referenceIds: [
+        "type.unit", "type.skill", "type.board", "action.cast", "action.move-and-cast", "action.guard",
+      ],
+      example: "当 Unit 生命值偏低且 mend 可用时使用 Cast；需要靠近目标时使用 MoveAndCast，否则 Guard。",
+    },
   },
   initialBattle: createGoMarsh02(),
   enemyBehaviors: { corruptor: { type: "corrupt" } },

@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { getCampaign } from "./campaigns";
+import { GO_LEVEL_ORDER, validateGoApiFocus } from "./go/levels";
 import { getLevel, getNextLevelId, LEVEL_ORDER, validateLevels } from "./levels";
+import { GO_PROGRAM } from "../../programs/go";
+
+const EXPECTED_GO_API_FOCUS: Readonly<Record<string, readonly string[]>> = {
+  "go-marsh-01": ["entrypoint.choose-turn", "type.world", "type.turn-command", "type.cell", "action.wait", "action.attack", "action.move-and-attack"],
+  "go-marsh-02": ["type.unit", "type.skill", "type.board", "action.cast", "action.move-and-cast", "action.guard"],
+  "go-marsh-03": ["type.objective", "action.attack", "action.interact", "action.move-and-interact"],
+  "go-marsh-04": ["type.skill", "type.objective", "action.cast", "action.move-and-cast", "action.interact"],
+  "go-marsh-05": ["type.unit", "type.objective", "action.cast", "action.interact", "action.move-and-attack", "action.move-and-cast", "action.move-and-interact"],
+  "go-marsh-06": ["type.world", "type.cell", "type.board", "type.objective", "type.status", "type.unit", "type.skill", "type.action", "type.turn-command", "action.wait", "action.attack", "action.move-and-attack", "action.guard", "action.cast", "action.move-and-cast", "action.interact", "action.move-and-interact"],
+};
+
+const GO_REFERENCE = GO_PROGRAM.reference;
+if (GO_REFERENCE === undefined) throw new Error("GO_PROGRAM.reference 未定义");
 
 describe("campaign levels", () => {
   it("按战役隔离关卡顺序与玩家程序约定", () => {
@@ -11,6 +25,28 @@ describe("campaign levels", () => {
       "python-marsh-04", "python-marsh-05", "python-marsh-06",
     ]);
     expect(getNextLevelId("python-marsh-06")).toBeUndefined();
+  });
+
+  it("为 Go 六关提供完整的 API 重点并引用已登记的参考条目", () => {
+    const referenceIds = new Set([
+      "entrypoint.choose-turn",
+      ...GO_REFERENCE.sections.flatMap((section) => section.entries.map((entry) => entry.id)),
+    ]);
+
+    for (const levelId of GO_LEVEL_ORDER) {
+      const apiFocus = getLevel(levelId).guidance.apiFocus;
+      expect(apiFocus, levelId).toBeDefined();
+      expect(apiFocus?.summary.trim(), levelId).not.toBe("");
+      expect(apiFocus?.steps.length, levelId).toBeGreaterThanOrEqual(2);
+      expect(apiFocus?.example.trim(), levelId).not.toBe("");
+      expect(apiFocus?.referenceIds, levelId).toEqual(EXPECTED_GO_API_FOCUS[levelId]);
+      expect(apiFocus?.referenceIds.every((referenceId) => referenceIds.has(referenceId)), levelId).toBe(true);
+    }
+
+    expect(getLevel("go-marsh-01").guidance.apiFocus?.example).toContain("绝对路径到 `(2, 0)` 后攻击 `golem`");
+    for (const levelId of ["go-marsh-04", "go-marsh-05", "go-marsh-06"]) {
+      expect(getLevel(levelId).guidance.apiFocus?.example, levelId).not.toMatch(/先.*再.*最后|逐回合/);
+    }
   });
 
   it("Go 第一关不复用 Python 模板或战役顺序", () => {
@@ -258,5 +294,27 @@ describe("campaign levels", () => {
     expect(() => validateLevels([missingUnit])).toThrow("引用不存在的单位");
     expect(() => validateLevels([missingTarget])).toThrow("引用不存在的目标");
     expect(() => validateLevels([missingAbility])).toThrow("引用不存在的能力");
+  });
+
+  it("reports the level and id for dangling Go API references", () => {
+    const first = getLevel("go-marsh-01");
+    const apiFocus = first.guidance.apiFocus;
+    if (apiFocus === undefined) throw new Error("测试夹具缺少 apiFocus");
+    const danglingReference = {
+      ...first,
+      guidance: {
+        ...first.guidance,
+        apiFocus: { ...apiFocus, referenceIds: [...apiFocus.referenceIds, "missing.reference"] },
+      },
+    };
+    const malformedFocus = {
+      ...first,
+      guidance: { ...first.guidance, apiFocus: { ...apiFocus, steps: [""] } },
+    };
+
+    expect(() => validateGoApiFocus([danglingReference], GO_REFERENCE)).toThrow(
+      "关卡 go-marsh-01 引用不存在的 API 条目: missing.reference",
+    );
+    expect(() => validateLevels([malformedFocus])).toThrow("关卡 apiFocus 字段无效");
   });
 });

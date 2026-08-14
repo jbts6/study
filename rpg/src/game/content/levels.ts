@@ -33,6 +33,17 @@ export function validateLevels(levels: readonly LevelDefinition[]): void {
       || guidanceGroups.some((group) => group.length === 0 || group.some((entry) => entry.trim().length === 0))) {
       throw new Error("关卡缺少必填字段");
     }
+    const apiFocus = guidance.apiFocus;
+    if (apiFocus !== undefined && (
+      typeof apiFocus.summary !== "string" || apiFocus.summary.trim().length === 0
+      || !Array.isArray(apiFocus.steps) || apiFocus.steps.length < 2
+      || apiFocus.steps.some((entry) => typeof entry !== "string" || entry.trim().length === 0)
+      || !Array.isArray(apiFocus.referenceIds) || apiFocus.referenceIds.length === 0
+      || apiFocus.referenceIds.some((entry) => typeof entry !== "string" || entry.trim().length === 0)
+      || typeof apiFocus.example !== "string" || apiFocus.example.trim().length === 0
+    )) {
+      throw new Error("关卡 apiFocus 字段无效");
+    }
     if (ids.has(level.id)) throw new Error("关卡 ID 重复");
     ids.add(level.id);
     const units = new Set(level.initialBattle.units.map((unit) => unit.id));

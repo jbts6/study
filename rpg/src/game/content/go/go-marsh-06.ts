@@ -75,6 +75,18 @@ export const GO_MARSH_06: LevelDefinition = {
     worldFields: ["world.Units 提供单位状态与技能冷却；world.Objectives 提供 relay 和 final-seal。", "world.Board 提供 HazardCells、CoverCells 与地图边界。"],
     commandExamples: ["可使用 ward、pierce、renew、fracture 和 aegis；通过 Interact(world, \"final-seal\") 激活最终封印。"],
     levelRules: ["corruptor 腐化 relay，hunter 追击 scout，guard 保护关键位置；危险格造成 1 点伤害。", "final-seal 必须激活且全部敌人失能；relay 被毁、scout 失能或超过 18 回合都会失败。"],
+    apiFocus: {
+      summary: "提供完整 Go SDK 索引，速查 World、Board、Objective、Unit、Skill、Action 与战役约束。",
+      steps: [
+        "从地图、目标和单位字段读取当前状态，结合已解锁的 ward、pierce、renew、fracture、aegis。",
+        "用动作签名构造本回合契约，逐项检查 relay、final-seal、危险格和回合上限。",
+      ],
+      referenceIds: [
+        "type.world", "type.cell", "type.board", "type.objective", "type.status", "type.unit", "type.skill", "type.action", "type.turn-command",
+        "action.wait", "action.attack", "action.move-and-attack", "action.guard", "action.cast", "action.move-and-cast", "action.interact", "action.move-and-interact",
+      ],
+      example: "按契约速查地图与目标字段和已解锁能力；本关只给索引与战役约束，不提供完整通关策略。",
+    },
   },
   initialBattle: createGoMarsh06(),
   enemyBehaviors: {

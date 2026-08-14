@@ -13,12 +13,20 @@ export type LevelReward =
   | Readonly<{ type: "ability"; abilityId: AbilityId }>
   | Readonly<{ type: "campaign-complete" }>;
 
+export type LevelApiFocus = Readonly<{
+  summary: string;
+  steps: readonly string[];
+  referenceIds: readonly string[];
+  example: string;
+}>;
+
 export type LevelGuidance = Readonly<{
   objective: readonly string[];
   concepts: readonly string[];
   worldFields: readonly string[];
   commandExamples: readonly string[];
   levelRules: readonly string[];
+  apiFocus?: LevelApiFocus;
 }>;
 
 export type LevelDefinition = Readonly<{

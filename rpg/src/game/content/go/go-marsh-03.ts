@@ -44,6 +44,15 @@ export const GO_MARSH_03: LevelDefinition = {
     worldFields: ["world.Units 提供单位状态。", "world.Objectives 提供 scout-mark 的 Cell 和 Completed。"],
     commandExamples: ["使用 Interact(world, \"scout-mark\") 激活印记，使用 Attack(world, targetID) 攻击。"],
     levelRules: ["scout 必须移动到印记相邻格才能交互；未激活印记就清除全部敌人会失败。"],
+    apiFocus: {
+      summary: "按 Objective 与 Unit 状态筛选敌人，先完成 scout-mark，再处理攻击和相邻交互。",
+      steps: [
+        "读取 Objective.Completed，确认 scout-mark 尚未完成时优先靠近目标。",
+        "相邻时使用 Interact；需要移动时使用 MoveAndInteract，否则用 Attack 处理敌人。",
+      ],
+      referenceIds: ["type.objective", "action.attack", "action.interact", "action.move-and-interact"],
+      example: "先让 scout 到 scout-mark 相邻格并完成交互，再按 Unit.Team 和 Disabled 筛选目标攻击。",
+    },
   },
   initialBattle: createGoMarsh03(),
   enemyBehaviors: { "hunter-a": { type: "hunt-player" }, "hunter-b": { type: "hunt-player" } },

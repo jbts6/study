@@ -82,6 +82,18 @@ export const GO_MARSH_05: LevelDefinition = {
     worldFields: ["world.ActiveUnitID 和 world.Revision 构成命令上下文。", "world.Units 与 world.Objectives 提供单位、node-a 和 node-b 的当前状态。"],
     commandExamples: ["使用 Interact(world, \"node-a\") 与 Interact(world, \"node-b\") 激活节点。", "使用 Cast(world, \"fracture\", \"guard\") 削弱高防守卫。"],
     levelRules: ["两个节点都必须激活；relay 被毁、scout 失能或超过 14 回合都会失败。"],
+    apiFocus: {
+      summary: "在多个敌人和多个节点之间维护 Unit、Objective 状态，并拆分辅助函数职责。",
+      steps: [
+        "按 node-a、node-b 的顺序检查 Objective，区分选单位、选目标和选行动的职责。",
+        "用 Cast 或 Interact 处理当前目标，必要时组合 MoveAndAttack、MoveAndCast、MoveAndInteract。",
+      ],
+      referenceIds: [
+        "type.unit", "type.objective", "action.cast", "action.interact",
+        "action.move-and-attack", "action.move-and-cast", "action.move-and-interact",
+      ],
+      example: "先由辅助函数选出存活敌人和未完成节点，再按距离选择移动组合动作，不给出固定通关顺序。",
+    },
   },
   initialBattle: createGoMarsh05(),
   enemyBehaviors: { hunter: { type: "hunt-player" }, guard: { type: "guard" } },

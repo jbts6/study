@@ -78,6 +78,15 @@ export const GO_MARSH_04: LevelDefinition = {
     worldFields: ["Skill.RemainingCooldown 表示技能还需等待的回合数。", "Objective.Completed 表示 seal 是否激活。"],
     commandExamples: ["对 guard 使用 pierce；需要恢复时对 scout 使用 renew；靠近 seal 后使用 Interact。"],
     levelRules: ["seal 完成且全部敌人失能后才获胜；危险格造成 2 点伤害。"],
+    apiFocus: {
+      summary: "组合 Skill.RemainingCooldown 与 Objective.Completed，按条件优先级选择技能、移动和交互。",
+      steps: [
+        "先判断目标完成状态和技能是否可用，再按生命值、敌人和位置安排行动。",
+        "根据距离选择 Cast 或 MoveAndCast；到达 seal 后用 Interact，并保留条件分支顺序。",
+      ],
+      referenceIds: ["type.skill", "type.objective", "action.cast", "action.move-and-cast", "action.interact"],
+      example: "示例只展示条件判断：优先处理可用技能与关键目标，不直接提供完整答案。",
+    },
   },
   initialBattle: createGoMarsh04(),
   enemyBehaviors: { corruptor: { type: "corrupt" }, guard: { type: "guard" } },
