@@ -7,6 +7,7 @@ import type {
   RunnerState,
   RunResult,
 } from "../protocol/types";
+import { clearTimer, RunnerStateStore } from "../shared/adapter";
 
 interface AdapterDependencies {
   startProcess(request: RunRequest): LocalPythonProcess;
@@ -58,20 +59,18 @@ export class PythonRunnerAdapter {
   private readonly startProcess: AdapterDependencies["startProcess"];
   private active?: ActiveRun;
   private disposed = false;
-  private _state: RunnerState = "ready";
-  private readonly listeners = new Set<(state: RunnerState) => void>();
+  private readonly states = new RunnerStateStore<RunnerState>("ready");
 
   constructor(dependencies: AdapterDependencies) {
     this.startProcess = dependencies.startProcess;
   }
 
   get state(): RunnerState {
-    return this._state;
+    return this.states.value;
   }
 
   onStateChange(listener: (state: RunnerState) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return this.states.subscribe(listener);
   }
 
   run(input: unknown): Promise<RunResult> {
@@ -139,7 +138,7 @@ export class PythonRunnerAdapter {
         },
         (error: unknown) => {
           if (active.ending) return;
-          if (this._state === "interrupting") {
+          if (this.state === "interrupting") {
             this.finish(active, failure(
               request,
               "interrupted",
@@ -216,13 +215,11 @@ export class PythonRunnerAdapter {
   }
 
   private clearTimers(active: ActiveRun): void {
-    if (active.timeoutTimer) clearTimeout(active.timeoutTimer);
-    if (active.interruptTimer) clearTimeout(active.interruptTimer);
+    clearTimer(active.timeoutTimer);
+    clearTimer(active.interruptTimer);
   }
 
   private setState(state: RunnerState): void {
-    if (state === this._state) return;
-    this._state = state;
-    for (const listener of this.listeners) listener(state);
+    this.states.set(state);
   }
 }

@@ -91,6 +91,8 @@ export interface OutputStreams {
 export interface RunnerMetrics {
   readonly durationMs: number;
   readonly traceEvents: number;
+  readonly buildDurationMs?: number;
+  readonly executionDurationMs?: number;
 }
 
 export interface RunResult {
