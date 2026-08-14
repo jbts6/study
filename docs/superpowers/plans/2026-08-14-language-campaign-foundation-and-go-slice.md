@@ -228,14 +228,28 @@ private createRunRequest(snapshot: GameSnapshot, runId: string): RunRequest {
     runId,
     attemptId: `${runId}:1`,
     questId: snapshot.currentLevelId,
-    language: program.language,
     files: program.createRunFiles(snapshot.currentLevelId, snapshot.codeDraft),
     worldView: projectWorldView(snapshot.battleState),
-    limits: this.runLimits,
   };
-  return program.language === "python"
-    ? { ...base, language: "python", entrypoint: { file: runEntrypointFile, callable: "choose_turn" }, allowedModules: ["math"] }
-    : { ...base, entrypoint: { file: runEntrypointFile } };
+  if (program.language === "python") {
+    return {
+      ...base,
+      language: "python",
+      entrypoint: { file: runEntrypointFile, callable: "choose_turn" },
+      allowedModules: ["math"],
+      limits: this.pythonLimits,
+    };
+  }
+  return {
+    ...base,
+    language: "go",
+    entrypoint: { file: runEntrypointFile },
+    limits: {
+      ...this.goLimits,
+      buildTimeoutMs: 15_000,
+      executionTimeoutMs: 5_000,
+    },
+  };
 }
 ```
 
@@ -446,6 +460,13 @@ func MoveAndAttack(world World, path []Cell, targetID string) TurnCommand {
 
 ```go
 // runner_main.go
+package main
+
+import (
+    "encoding/json"
+    "os"
+)
+
 func main() {
     var world World
     if err := json.NewDecoder(os.Stdin).Decode(&world); err != nil { panic(err) }
