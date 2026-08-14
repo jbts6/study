@@ -22,8 +22,10 @@ describe("campaign levels", () => {
     const third = getLevel("go-marsh-03");
     const fourth = getLevel("go-marsh-04");
     const fifth = getLevel("go-marsh-05");
+    const sixth = getLevel("go-marsh-06");
     expect(getCampaign("go-rpg").levelOrder).toEqual([
-      "go-marsh-01", "go-marsh-02", "go-marsh-03", "go-marsh-04", "go-marsh-05",
+      "go-marsh-01", "go-marsh-02", "go-marsh-03",
+      "go-marsh-04", "go-marsh-05", "go-marsh-06",
     ]);
     expect(first.initialBattle.battleId).toBe("go-marsh-01");
     expect(first.reward).toEqual({ type: "ability", abilityId: "ward" });
@@ -31,6 +33,7 @@ describe("campaign levels", () => {
     expect(third.reward).toEqual({ type: "ability", abilityId: "renew" });
     expect(fourth.reward).toEqual({ type: "ability", abilityId: "fracture" });
     expect(fifth.reward).toEqual({ type: "ability", abilityId: "aegis" });
+    expect(sixth.reward).toEqual({ type: "campaign-complete" });
     expect(third.starterCode).toContain("range world.Units");
     expect(third.guidance.objective.join(" ")).toContain("scout-mark");
     expect(fourth.starterCode).toContain("RemainingCooldown");
@@ -42,10 +45,17 @@ describe("campaign levels", () => {
     expect(fifth.guidance.commandExamples.join(" ")).toContain("node-a");
     expect(fifth.guidance.commandExamples.join(" ")).toContain("node-b");
     expect(fifth.guidance.commandExamples.join(" ")).toContain("fracture");
+    expect(sixth.starterCode).toContain("return Wait(world)");
+    expect(sixth.guidance.worldFields.join(" ")).toContain("world.Board");
+    expect(sixth.guidance.commandExamples.join(" ")).toContain("aegis");
+    expect(sixth.guidance.commandExamples.join(" ")).toContain("final-seal");
+    expect(sixth.guidance.levelRules.join(" ")).not.toMatch(/先.*再.*最后/);
     expect(getNextLevelId("go-marsh-01")).toBe("go-marsh-02");
     expect(getNextLevelId("go-marsh-02")).toBe("go-marsh-03");
     expect(getNextLevelId("go-marsh-03")).toBe("go-marsh-04");
     expect(getNextLevelId("go-marsh-04")).toBe("go-marsh-05");
+    expect(getNextLevelId("go-marsh-05")).toBe("go-marsh-06");
+    expect(getNextLevelId("go-marsh-06")).toBeUndefined();
     expect(getNextLevelId("python-marsh-06")).toBeUndefined();
   });
 
@@ -55,6 +65,7 @@ describe("campaign levels", () => {
       ["python-marsh-03", "go-marsh-03"],
       ["python-marsh-04", "go-marsh-04"],
       ["python-marsh-05", "go-marsh-05"],
+      ["python-marsh-06", "go-marsh-06"],
     ] as const;
     for (const [pythonId, goId] of pairs) {
       const python = getLevel(pythonId);

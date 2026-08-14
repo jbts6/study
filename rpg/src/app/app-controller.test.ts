@@ -125,7 +125,7 @@ function mountSettlement(controller: AppController): Readonly<{ root: HTMLDivEle
   return { root, unmount: mountApp(root, controller) };
 }
 
-function winningBattle(levelId: "python-marsh-01" | "python-marsh-06" | "go-marsh-01") {
+function winningBattle(levelId: "python-marsh-01" | "python-marsh-06" | "go-marsh-01" | "go-marsh-06") {
   const level = getLevel(levelId);
   return {
     ...level.initialBattle,
@@ -329,6 +329,29 @@ describe("AppController", () => {
       currentLevelId: "go-marsh-02",
       codeDraft: getLevel("go-marsh-02").starterCode,
     });
+  });
+
+  it("keeps a completed Go campaign on its final level", async () => {
+    const saves = new MemorySaveStore({ ok: true, save: {
+      version: 2,
+      currentLevelId: "go-marsh-06",
+      battleState: winningBattle("go-marsh-06"),
+      codeDraft: "package main",
+    } });
+    const controller = createController(new FakeRunner(completed(null)), saves, GO_RPG_CAMPAIGN);
+    await controller.start();
+    const completedSnapshot = controller.getSnapshot();
+
+    expect(completedSnapshot).toMatchObject({
+      mode: "game",
+      currentLevelId: "go-marsh-06",
+      battleState: { phase: "won" },
+      feedback: { title: "战役完成", messages: ["沼心封印已经稳定。"] },
+    });
+
+    controller.advanceLevel();
+
+    expect(controller.getSnapshot()).toEqual(completedSnapshot);
   });
 
   it("blocks an incomplete scout-mark victory without a reward or next level and retries with the current code", async () => {

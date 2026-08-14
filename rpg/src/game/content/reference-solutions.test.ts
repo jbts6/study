@@ -137,42 +137,45 @@ const marsh05Solution: ReferenceSolution = (world) => {
   return castOrAttack(world, "guard", ["spark", "pierce"]);
 };
 
+const marsh06Solution: ReferenceSolution = (world) => {
+  const scout = findUnit(world, "scout");
+  const corruptor = findUnit(world, "corruptor");
+  if (!corruptor.disabled) {
+    if (corruptor.hp === 6 && skillReady(world, "ward")) return selfCastOrGuard(world, ["ward"]);
+    return castOrAttack(world, "corruptor", ["spark"]);
+  }
+  const hunter = findUnit(world, "hunter");
+  if (!hunter.disabled) {
+    if (hunter.hp === 5 && skillReady(world, "renew")) return selfCastOrGuard(world, ["renew"]);
+    return castOrAttack(world, "hunter", ["pierce", "spark"]);
+  }
+  if (!findObjective(world, "final-seal").completed) {
+    if (scout.cell.x === 1 && scout.cell.y === 0 && skillReady(world, "aegis") && !scout.statuses.some((status) => status.id === "aegis")) {
+      return selfCastOrGuard(world, ["aegis"]);
+    }
+    return interactWith(world, "final-seal");
+  }
+  const guard = findUnit(world, "guard");
+  if (!guard.disabled && skillReady(world, "fracture") && !guard.statuses.some((status) => status.id === "fracture")) {
+    return castOrAttack(world, "guard", ["fracture"]);
+  }
+  if (!guard.disabled) return castOrAttack(world, "guard", ["spark", "pierce"]);
+  return selfCastOrGuard(world, ["aegis", "renew", "ward"]);
+};
+
 const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
   "python-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
   "python-marsh-02": marsh02Solution,
   "python-marsh-03": marsh03Solution,
   "python-marsh-04": marsh04Solution,
   "python-marsh-05": marsh05Solution,
-  "python-marsh-06": (world) => {
-    const scout = findUnit(world, "scout");
-    const corruptor = findUnit(world, "corruptor");
-    if (!corruptor.disabled) {
-      if (corruptor.hp === 6 && skillReady(world, "ward")) return selfCastOrGuard(world, ["ward"]);
-      return castOrAttack(world, "corruptor", ["spark"]);
-    }
-    const hunter = findUnit(world, "hunter");
-    if (!hunter.disabled) {
-      if (hunter.hp === 5 && skillReady(world, "renew")) return selfCastOrGuard(world, ["renew"]);
-      return castOrAttack(world, "hunter", ["pierce", "spark"]);
-    }
-    if (!findObjective(world, "final-seal").completed) {
-      if (scout.cell.x === 1 && scout.cell.y === 0 && skillReady(world, "aegis") && !scout.statuses.some((status) => status.id === "aegis")) {
-        return selfCastOrGuard(world, ["aegis"]);
-      }
-      return interactWith(world, "final-seal");
-    }
-    const guard = findUnit(world, "guard");
-    if (!guard.disabled && skillReady(world, "fracture") && !guard.statuses.some((status) => status.id === "fracture")) {
-      return castOrAttack(world, "guard", ["fracture"]);
-    }
-    if (!guard.disabled) return castOrAttack(world, "guard", ["spark", "pierce"]);
-    return selfCastOrGuard(world, ["aegis", "renew", "ward"]);
-  },
+  "python-marsh-06": marsh06Solution,
   "go-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
   "go-marsh-02": marsh02Solution,
   "go-marsh-03": marsh03Solution,
   "go-marsh-04": marsh04Solution,
   "go-marsh-05": marsh05Solution,
+  "go-marsh-06": marsh06Solution,
 };
 
 const REFERENCE_LEVEL_IDS: readonly LevelId[] = [
@@ -182,6 +185,7 @@ const REFERENCE_LEVEL_IDS: readonly LevelId[] = [
   "go-marsh-03",
   "go-marsh-04",
   "go-marsh-05",
+  "go-marsh-06",
 ];
 
 function parseInstruction(input: TurnCommand): TurnCommand {
@@ -226,5 +230,10 @@ describe("campaign reference solutions", () => {
     expect(result.phase).toBe("won");
     expect(result.round).toBeLessThanOrEqual(level.initialBattle.maxRounds);
     expect(result.objectives.filter((objective) => !objective.key).every((objective) => objective.completed)).toBe(true);
+    if (levelId.endsWith("-06")) {
+      expect(result.objectives.find((objective) => objective.id === "relay")?.durability).toBeGreaterThan(0);
+      expect(result.objectives.find((objective) => objective.id === "final-seal")?.completed).toBe(true);
+      expect(result.units.filter((unit) => unit.team === "enemies").every((unit) => unit.disabled)).toBe(true);
+    }
   });
 });
