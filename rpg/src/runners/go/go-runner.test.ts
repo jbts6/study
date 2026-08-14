@@ -124,6 +124,7 @@ const GO_STARTER_LEVEL_IDS = [
   "go-marsh-02",
   "go-marsh-03",
   "go-marsh-04",
+  "go-marsh-05",
 ] as const;
 
 function completedProcess(overrides: Partial<GoProcessResult> = {}): GoProcessHandle {

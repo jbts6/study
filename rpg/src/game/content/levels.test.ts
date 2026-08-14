@@ -21,14 +21,16 @@ describe("campaign levels", () => {
     expect(second.starterCode).toContain("if ");
     const third = getLevel("go-marsh-03");
     const fourth = getLevel("go-marsh-04");
+    const fifth = getLevel("go-marsh-05");
     expect(getCampaign("go-rpg").levelOrder).toEqual([
-      "go-marsh-01", "go-marsh-02", "go-marsh-03", "go-marsh-04",
+      "go-marsh-01", "go-marsh-02", "go-marsh-03", "go-marsh-04", "go-marsh-05",
     ]);
     expect(first.initialBattle.battleId).toBe("go-marsh-01");
     expect(first.reward).toEqual({ type: "ability", abilityId: "ward" });
     expect(second.reward).toEqual({ type: "ability", abilityId: "pierce" });
     expect(third.reward).toEqual({ type: "ability", abilityId: "renew" });
     expect(fourth.reward).toEqual({ type: "ability", abilityId: "fracture" });
+    expect(fifth.reward).toEqual({ type: "ability", abilityId: "aegis" });
     expect(third.starterCode).toContain("range world.Units");
     expect(third.guidance.objective.join(" ")).toContain("scout-mark");
     expect(fourth.starterCode).toContain("RemainingCooldown");
@@ -36,9 +38,14 @@ describe("campaign levels", () => {
     expect(fourth.starterCode).toContain("||");
     expect(fourth.guidance.commandExamples.join(" ")).toContain("pierce");
     expect(fourth.guidance.commandExamples.join(" ")).toContain("renew");
+    expect(fifth.starterCode).toContain("func livingEnemy");
+    expect(fifth.guidance.commandExamples.join(" ")).toContain("node-a");
+    expect(fifth.guidance.commandExamples.join(" ")).toContain("node-b");
+    expect(fifth.guidance.commandExamples.join(" ")).toContain("fracture");
     expect(getNextLevelId("go-marsh-01")).toBe("go-marsh-02");
     expect(getNextLevelId("go-marsh-02")).toBe("go-marsh-03");
     expect(getNextLevelId("go-marsh-03")).toBe("go-marsh-04");
+    expect(getNextLevelId("go-marsh-04")).toBe("go-marsh-05");
     expect(getNextLevelId("python-marsh-06")).toBeUndefined();
   });
 
@@ -47,6 +54,7 @@ describe("campaign levels", () => {
       ["python-marsh-02", "go-marsh-02"],
       ["python-marsh-03", "go-marsh-03"],
       ["python-marsh-04", "go-marsh-04"],
+      ["python-marsh-05", "go-marsh-05"],
     ] as const;
     for (const [pythonId, goId] of pairs) {
       const python = getLevel(pythonId);

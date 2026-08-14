@@ -122,25 +122,27 @@ const marsh04Solution: ReferenceSolution = (world) => {
   return castOrAttack(world, "guard", ["pierce", "spark"]);
 };
 
+const marsh05Solution: ReferenceSolution = (world) => {
+  if (!findObjective(world, "node-a").completed) return interactWith(world, "node-a");
+  if (!findObjective(world, "node-b").completed) return interactWith(world, "node-b");
+  const hunter = findUnit(world, "hunter");
+  if (!hunter.disabled) return castOrAttack(world, "hunter", ["pierce", "spark"]);
+  const guard = findUnit(world, "guard");
+  if (!guard.disabled && skillReady(world, "fracture") && !guard.statuses.some((status) => status.id === "fracture")) {
+    const scout = findUnit(world, "scout");
+    if (scout.cell.x === 1 && scout.cell.y === 0) return command(world, { type: "guard" }, [{ x: 1, y: 1 }]);
+    if (scout.cell.x === 1 && scout.cell.y === 1) return command(world, { type: "guard" }, [{ x: 2, y: 1 }]);
+    return castOrAttack(world, "guard", ["fracture"]);
+  }
+  return castOrAttack(world, "guard", ["spark", "pierce"]);
+};
+
 const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
   "python-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
   "python-marsh-02": marsh02Solution,
   "python-marsh-03": marsh03Solution,
   "python-marsh-04": marsh04Solution,
-  "python-marsh-05": (world) => {
-    if (!findObjective(world, "node-a").completed) return interactWith(world, "node-a");
-    if (!findObjective(world, "node-b").completed) return interactWith(world, "node-b");
-    const hunter = findUnit(world, "hunter");
-    if (!hunter.disabled) return castOrAttack(world, "hunter", ["pierce", "spark"]);
-    const guard = findUnit(world, "guard");
-    if (!guard.disabled && skillReady(world, "fracture") && !guard.statuses.some((status) => status.id === "fracture")) {
-      const scout = findUnit(world, "scout");
-      if (scout.cell.x === 1 && scout.cell.y === 0) return command(world, { type: "guard" }, [{ x: 1, y: 1 }]);
-      if (scout.cell.x === 1 && scout.cell.y === 1) return command(world, { type: "guard" }, [{ x: 2, y: 1 }]);
-      return castOrAttack(world, "guard", ["fracture"]);
-    }
-    return castOrAttack(world, "guard", ["spark", "pierce"]);
-  },
+  "python-marsh-05": marsh05Solution,
   "python-marsh-06": (world) => {
     const scout = findUnit(world, "scout");
     const corruptor = findUnit(world, "corruptor");
@@ -170,6 +172,7 @@ const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
   "go-marsh-02": marsh02Solution,
   "go-marsh-03": marsh03Solution,
   "go-marsh-04": marsh04Solution,
+  "go-marsh-05": marsh05Solution,
 };
 
 const REFERENCE_LEVEL_IDS: readonly LevelId[] = [
@@ -178,6 +181,7 @@ const REFERENCE_LEVEL_IDS: readonly LevelId[] = [
   "go-marsh-02",
   "go-marsh-03",
   "go-marsh-04",
+  "go-marsh-05",
 ];
 
 function parseInstruction(input: TurnCommand): TurnCommand {
