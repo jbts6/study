@@ -14,11 +14,31 @@ describe("campaign levels", () => {
   });
 
   it("Go 第一关不复用 Python 模板或战役顺序", () => {
-    const level = getLevel("go-marsh-01");
-    expect(level.starterCode).toContain("func ChooseTurn(world World) TurnCommand");
-    expect(level.starterCode).not.toContain("def choose_turn");
-    expect(getCampaign("go-rpg").levelOrder).toEqual(["go-marsh-01"]);
-    expect(level.initialBattle.battleId).toBe("go-marsh-01");
+    const first = getLevel("go-marsh-01");
+    const second = getLevel("go-marsh-02");
+    expect(first.starterCode).toContain("func ChooseTurn(world World) TurnCommand");
+    expect(first.starterCode).not.toContain("def choose_turn");
+    expect(second.starterCode).toContain("if ");
+    expect(getCampaign("go-rpg").levelOrder).toEqual(["go-marsh-01", "go-marsh-02"]);
+    expect(first.initialBattle.battleId).toBe("go-marsh-01");
+    expect(first.reward).toEqual({ type: "ability", abilityId: "ward" });
+    expect(second.reward).toEqual({ type: "ability", abilityId: "pierce" });
+    expect(getNextLevelId("go-marsh-01")).toBe("go-marsh-02");
+    expect(getNextLevelId("python-marsh-06")).toBeUndefined();
+  });
+
+  it("keeps Go and Python battle data aligned apart from language metadata", () => {
+    const pairs = [["python-marsh-02", "go-marsh-02"]] as const;
+    for (const [pythonId, goId] of pairs) {
+      const python = getLevel(pythonId);
+      const go = getLevel(goId);
+      expect({ ...go.initialBattle, battleId: "<battle>", contentVersion: "<content>" }).toEqual({
+        ...python.initialBattle,
+        battleId: "<battle>",
+        contentVersion: "<content>",
+      });
+      expect(go.enemyBehaviors).toEqual(python.enemyBehaviors);
+    }
   });
 
   it("registers all six levels in their fixed campaign order", () => {

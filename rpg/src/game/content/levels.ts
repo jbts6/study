@@ -1,11 +1,12 @@
 import { ABILITY_CATALOG } from "./ability-catalog";
-import { GO_LEVELS } from "./go/levels";
+import { GO_LEVEL_ORDER, GO_LEVELS } from "./go/levels";
 import { PYTHON_LEVEL_ORDER, PYTHON_LEVELS } from "./python/levels";
 import type { LevelDefinition, LevelId } from "./shared/types";
 
 export const LEVEL_ORDER: readonly LevelId[] = PYTHON_LEVEL_ORDER;
 
 const LEVELS: readonly LevelDefinition[] = [...PYTHON_LEVELS, ...GO_LEVELS];
+const LEVEL_ORDERS: readonly (readonly LevelId[])[] = [PYTHON_LEVEL_ORDER, GO_LEVEL_ORDER];
 
 validateLevels(LEVELS);
 
@@ -16,8 +17,11 @@ export function getLevel(levelId: LevelId): LevelDefinition {
 }
 
 export function getNextLevelId(levelId: LevelId): LevelId | undefined {
-  const index = LEVEL_ORDER.indexOf(levelId);
-  return index < 0 ? undefined : LEVEL_ORDER[index + 1];
+  for (const order of LEVEL_ORDERS) {
+    const index = order.indexOf(levelId);
+    if (index >= 0) return order[index + 1];
+  }
+  return undefined;
 }
 
 export function validateLevels(levels: readonly LevelDefinition[]): void {

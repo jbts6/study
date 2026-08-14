@@ -40,5 +40,5 @@ export const GO_MARSH_01: LevelDefinition = {
   },
   initialBattle: MARSH_SLICE.initialBattle,
   enemyBehaviors: MARSH_SLICE.enemyBehaviors,
-  reward: { type: "campaign-complete" },
+  reward: { type: "ability", abilityId: "ward" },
 };

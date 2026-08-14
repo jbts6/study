@@ -98,17 +98,19 @@ function selfCastOrGuard(world: WorldView, skillIds: readonly string[]): TurnCom
   return command(world, { type: "guard" });
 }
 
+const marsh02Solution: ReferenceSolution = (world) => {
+  const scout = findUnit(world, "scout");
+  const corruptor = findUnit(world, "corruptor");
+  if (corruptor.hp === 8 && scout.cell.x === 0 && scout.cell.y === 0) return command(world, { type: "guard" }, [{ x: 1, y: 0 }, { x: 1, y: 1 }]);
+  if (corruptor.hp === 8 && scout.cell.x === 1 && scout.cell.y === 1) return command(world, { type: "guard" }, [{ x: 1, y: 2 }]);
+  if (corruptor.hp === 8 && scout.cell.x === 1 && scout.cell.y === 2) return castOrAttack(world, "corruptor", ["spark"]);
+  if (corruptor.hp === 5 && scout.cell.x === 1 && scout.cell.y === 2) return castOrAttack(world, "corruptor", []);
+  return castOrAttack(world, "corruptor", ["spark"]);
+};
+
 const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
   "python-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
-  "python-marsh-02": (world) => {
-    const scout = findUnit(world, "scout");
-    const corruptor = findUnit(world, "corruptor");
-    if (corruptor.hp === 8 && scout.cell.x === 0 && scout.cell.y === 0) return command(world, { type: "guard" }, [{ x: 1, y: 0 }, { x: 1, y: 1 }]);
-    if (corruptor.hp === 8 && scout.cell.x === 1 && scout.cell.y === 1) return command(world, { type: "guard" }, [{ x: 1, y: 2 }]);
-    if (corruptor.hp === 8 && scout.cell.x === 1 && scout.cell.y === 2) return castOrAttack(world, "corruptor", ["spark"]);
-    if (corruptor.hp === 5 && scout.cell.x === 1 && scout.cell.y === 2) return castOrAttack(world, "corruptor", []);
-    return castOrAttack(world, "corruptor", ["spark"]);
-  },
+  "python-marsh-02": marsh02Solution,
   "python-marsh-03": (world) => {
     const hunterA = findUnit(world, "hunter-a");
     if (!hunterA.disabled) return castOrAttack(world, "hunter-a", ["spark"]);
@@ -161,9 +163,10 @@ const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
     return selfCastOrGuard(world, ["aegis", "renew", "ward"]);
   },
   "go-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
+  "go-marsh-02": marsh02Solution,
 };
 
-const REFERENCE_LEVEL_ORDER: readonly LevelId[] = [...LEVEL_ORDER, "go-marsh-01"];
+const REFERENCE_LEVEL_IDS: readonly LevelId[] = [...LEVEL_ORDER, "go-marsh-01", "go-marsh-02"];
 
 function parseInstruction(input: TurnCommand): TurnCommand {
   return JSON.parse(JSON.stringify(input)) as TurnCommand;
@@ -201,7 +204,7 @@ function runReferenceSolution(levelId: LevelId): BattleState {
 }
 
 describe("campaign reference solutions", () => {
-  it.each(REFERENCE_LEVEL_ORDER)("can complete %s through the production turn pipeline", (levelId) => {
+  it.each(REFERENCE_LEVEL_IDS)("can complete %s through the production turn pipeline", (levelId) => {
     const level = getLevel(levelId);
     const result = runReferenceSolution(levelId);
     expect(result.phase).toBe("won");

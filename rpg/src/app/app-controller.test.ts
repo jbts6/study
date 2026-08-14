@@ -8,6 +8,7 @@ import { getLevel } from "../game/content/levels";
 import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
 import { GO_RPG_CAMPAIGN } from "../game/content/go/levels";
 import type { AppControllerRunLimits } from "./app-controller";
+import type { CampaignDefinition } from "../programs/types";
 
 class FakeRunner implements RunnerClient {
   readonly state: RunnerDisplayState = "ready";
@@ -105,13 +106,17 @@ const TEST_RUN_LIMITS: AppControllerRunLimits = {
   },
 };
 
-function createController(runner: FakeRunner, saveStore: MemorySaveStore): AppController {
+function createController(
+  runner: FakeRunner,
+  saveStore: MemorySaveStore,
+  campaign: CampaignDefinition = PYTHON_RPG_CAMPAIGN,
+): AppController {
   return new AppController({
     runner,
     saveStore,
     createId: () => "test-run",
     runLimits: TEST_RUN_LIMITS,
-  }, PYTHON_RPG_CAMPAIGN);
+  }, campaign);
 }
 
 function mountSettlement(controller: AppController): Readonly<{ root: HTMLDivElement; unmount: () => void }> {
@@ -120,7 +125,7 @@ function mountSettlement(controller: AppController): Readonly<{ root: HTMLDivEle
   return { root, unmount: mountApp(root, controller) };
 }
 
-function winningBattle(levelId: "python-marsh-01" | "python-marsh-06") {
+function winningBattle(levelId: "python-marsh-01" | "python-marsh-06" | "go-marsh-01") {
   const level = getLevel(levelId);
   return {
     ...level.initialBattle,
@@ -301,6 +306,29 @@ describe("AppController", () => {
     if (next.mode !== "game") throw new Error("expected game mode");
     expect(next.currentLevelId).toBe("python-marsh-02");
     expect(next.codeDraft).toBe(getLevel("python-marsh-02").starterCode);
+  });
+
+  it("advances a completed Go first level to Go second level", async () => {
+    const saves = new MemorySaveStore({ ok: true, save: {
+      version: 2,
+      currentLevelId: "go-marsh-01",
+      battleState: winningBattle("go-marsh-01"),
+      codeDraft: "package main",
+    } });
+    const controller = createController(new FakeRunner(completed(null)), saves, GO_RPG_CAMPAIGN);
+    await controller.start();
+
+    controller.advanceLevel();
+
+    expect(controller.getSnapshot()).toMatchObject({
+      mode: "game",
+      currentLevelId: "go-marsh-02",
+      codeDraft: getLevel("go-marsh-02").starterCode,
+    });
+    expect(saves.saved).toMatchObject({
+      currentLevelId: "go-marsh-02",
+      codeDraft: getLevel("go-marsh-02").starterCode,
+    });
   });
 
   it("blocks an incomplete scout-mark victory without a reward or next level and retries with the current code", async () => {

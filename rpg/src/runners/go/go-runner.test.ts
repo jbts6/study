@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorldView } from "../../game/combat/types";
+import { getLevel } from "../../game/content/levels";
 import { worldViewFixture } from "../../game/testing/fixture";
 import type { CompiledRunRequest } from "../protocol/types";
 import type { GoProcessHandle, GoProcessResult, StartGoProcessOptions } from "./go-process";
@@ -117,6 +118,8 @@ const sdkExpectedTurns = [
   { round: 4, command: { actorId: "scout", expectedRevision: 0, action: { type: "interact", targetId: "relay" } } },
   { round: 5, command: { actorId: "scout", expectedRevision: 0, movePath: [{ x: 0, y: 1 }], action: { type: "interact", targetId: "relay" } } },
 ] as const;
+
+const GO_STARTER_LEVEL_IDS = ["go-marsh-01", "go-marsh-02"] as const;
 
 function completedProcess(overrides: Partial<GoProcessResult> = {}): GoProcessHandle {
   return {
@@ -363,6 +366,13 @@ func ChooseTurn(world World) TurnCommand {
       ));
       expect(result.executionStatus).toBe("completed");
       expect(result.returnValue).toEqual(expected.command);
+    }
+    for (const levelId of GO_STARTER_LEVEL_IDS) {
+      const result = await runner.run(request(
+        getLevel(levelId).starterCode,
+        { buildTimeoutMs: 15_000, executionTimeoutMs: 5_000 },
+      ));
+      expect(result.executionStatus, levelId).toBe("completed");
     }
     runner.close();
   });
