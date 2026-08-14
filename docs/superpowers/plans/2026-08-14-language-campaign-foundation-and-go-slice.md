@@ -345,7 +345,7 @@ export function mountCodeEditor(
 
 - [ ] **Step 4: 运行 VS Code 单元测试与类型检查**
 
-Run: `cd rpg && npx vitest run src/vscode/level-workspace.test.ts src/vscode/workspace-save-store.test.ts src/vscode/game-session.test.ts src/app/code-editor.test.ts && npm run typecheck`  
+Run: `cd rpg && npx vitest run src/vscode/level-workspace.test.ts src/vscode/workspace-save-store.test.ts src/vscode/game-session.test.ts src/app/code-editor.test.ts && npm run typecheck`
 Expected: PASS。
 
 - [ ] **Step 5: 提交工作区和存档隔离**
@@ -615,7 +615,7 @@ const openCampaign = async (campaignId: CampaignId): Promise<ActiveGame | undefi
 Run: `cd rpg && npx vitest run src/vscode/game-launcher-model.test.ts src/vscode/game-session.test.ts src/vscode/direct-runner-client.test.ts src/runners/go/go-detector.test.ts src/runners/go/go-runner.test.ts && npm run typecheck && npm run build`  
 Expected: PASS。
 
-Run: `cd rpg && npx vitest run src/runners/go/e2e.spec.ts`  
+Run: `cd rpg && npx vitest run src/runners/go/e2e.spec.ts`
 Expected: 当 `go version` 可用时，Go 运行器可执行 `Wait(world)` 并将编译错误映射为 `go-marsh-01.go`；工具链缺失时，断言安装提示且跳过真实 Go 执行断言。
 
 Run: `cd rpg && npm run install:local`  
