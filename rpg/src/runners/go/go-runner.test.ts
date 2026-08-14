@@ -119,7 +119,12 @@ const sdkExpectedTurns = [
   { round: 5, command: { actorId: "scout", expectedRevision: 0, movePath: [{ x: 0, y: 1 }], action: { type: "interact", targetId: "relay" } } },
 ] as const;
 
-const GO_STARTER_LEVEL_IDS = ["go-marsh-01", "go-marsh-02", "go-marsh-03"] as const;
+const GO_STARTER_LEVEL_IDS = [
+  "go-marsh-01",
+  "go-marsh-02",
+  "go-marsh-03",
+  "go-marsh-04",
+] as const;
 
 function completedProcess(overrides: Partial<GoProcessResult> = {}): GoProcessHandle {
   return {
