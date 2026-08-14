@@ -176,7 +176,7 @@ expect(getLevel("go-marsh-02").starterCode).toContain("if ");
 
 在 `levels.test.ts` 增加战斗数据对齐表，规范化 `battleId` 和 `contentVersion` 后逐字段比较 Python/Go 第二关的初始战斗状态与 `enemyBehaviors`。
 
-在 `reference-solutions.test.ts` 先把现有 Python 第二关参考策略提取为具名函数，并同时映射到 `python-marsh-02` 与尚未存在的 `go-marsh-02`；`REFERENCE_LEVEL_ORDER` 改为 `[..., ...GO_LEVEL_ORDER]`。
+在 `reference-solutions.test.ts` 先把现有 Python 第二关参考策略提取为具名函数，并同时映射到 `python-marsh-02` 与尚未存在的 `go-marsh-02`。把参数来源改成独立显式的 `REFERENCE_LEVEL_IDS`，本步先设为 `[...PYTHON_LEVEL_ORDER, "go-marsh-01", "go-marsh-02"]`；不得由生产 `GO_LEVEL_ORDER` 生成。这样 `it.each` 会在关卡尚未注册时实际调用 `getLevel("go-marsh-02")` 并进入 RED。最终另行断言 `REFERENCE_LEVEL_IDS` 与 `[...PYTHON_LEVEL_ORDER, ...GO_LEVEL_ORDER]` 相等。
 
 在 `app-controller.test.ts` 允许 `createController` 接收可选战役，并先写 Go 第一关胜利后 `advanceLevel()` 保存 `go-marsh-02` 及其起始代码的失败断言。
 
@@ -269,7 +269,7 @@ git commit -m "feat: 添加 Go 沼泽第二关"
 
 断言 Go 顺序追加 `go-marsh-03`，第二关下一关为第三关，第三关奖励为 `renew`，起始代码包含 `range world.Units`，教学包含 `scout-mark`。在能力测试中断言进入第三关已拥有 `ward` 和 `pierce`。
 
-同一 RED 步骤还必须：在数据对齐表追加 Python/Go 第三关；把第三关具名参考策略映射给尚未存在的 `go-marsh-03`；把 `go-marsh-03` 加入显式起始代码编译表。参考策略断言先完成 `scout-mark` 再清除最后一个敌人。
+同一 RED 步骤还必须：在数据对齐表追加 Python/Go 第三关；把第三关具名参考策略映射给尚未存在的 `go-marsh-03`；把 `go-marsh-03` 同时追加到独立 `REFERENCE_LEVEL_IDS` 和显式起始代码编译表。参考策略断言先完成 `scout-mark` 再清除最后一个敌人。
 
 - [ ] **Step 2: 运行测试确认失败**
 
@@ -336,7 +336,7 @@ git commit -m "feat: 添加 Go 沼泽第三关"
 
 断言顺序追加 `go-marsh-04`、第三关可推进、奖励为 `fracture`，教学同时出现 `RemainingCooldown`、`pierce`、`renew` 和 `&&` / `||`。断言进入第四关拥有前三个奖励能力。
 
-同一 RED 步骤在数据对齐表追加 Python/Go 第四关，在参考解法映射追加 `go-marsh-04`，在起始代码编译表追加 `go-marsh-04`。参考策略断言完成 `seal`、保住 `relay` 并清除两名敌人。
+同一 RED 步骤在数据对齐表追加 Python/Go 第四关，在参考解法映射和独立 `REFERENCE_LEVEL_IDS` 追加 `go-marsh-04`，在起始代码编译表追加 `go-marsh-04`。参考策略断言完成 `seal`、保住 `relay` 并清除两名敌人。
 
 - [ ] **Step 2: 运行测试确认失败**
 
@@ -407,7 +407,7 @@ git commit -m "feat: 添加 Go 沼泽第四关"
 
 断言顺序追加 `go-marsh-05`、第四关可推进、奖励为 `aegis`，起始代码声明一个 `func` 辅助函数，教学包含 `node-a`、`node-b` 和 `fracture`。断言进入第五关拥有前四个奖励能力。
 
-同一 RED 步骤在数据对齐表追加 Python/Go 第五关，在参考解法映射追加 `go-marsh-05`，在起始代码编译表追加 `go-marsh-05`。参考策略断言两个节点完成、`relay` 耐久大于 0、敌人全部失能。
+同一 RED 步骤在数据对齐表追加 Python/Go 第五关，在参考解法映射和独立 `REFERENCE_LEVEL_IDS` 追加 `go-marsh-05`，在起始代码编译表追加 `go-marsh-05`。参考策略断言两个节点完成、`relay` 耐久大于 0、敌人全部失能。
 
 - [ ] **Step 2: 运行测试确认失败**
 
@@ -478,7 +478,7 @@ git commit -m "feat: 添加 Go 沼泽第五关"
 
 断言 Go 战役顺序恰好为 `go-marsh-01` 至 `go-marsh-06`，第六关奖励为 `{ type: "campaign-complete" }`，`getNextLevelId("go-marsh-06")` 为 `undefined`。最终关提示必须包含完整 API 字段和能力名，但不得出现“先…再…最后”式答案步骤。
 
-同一 RED 步骤在数据对齐表追加 Python/Go 第六关，在参考解法映射追加 `go-marsh-06`，在起始代码编译表追加 `go-marsh-06`。终关参考策略必须断言 `relay` 耐久大于 0、`final-seal.completed === true`、所有敌人失能且回合数不超过 18。
+同一 RED 步骤在数据对齐表追加 Python/Go 第六关，在参考解法映射和独立 `REFERENCE_LEVEL_IDS` 追加 `go-marsh-06`，在起始代码编译表追加 `go-marsh-06`。同时断言 `REFERENCE_LEVEL_IDS` 与 `[...PYTHON_LEVEL_ORDER, ...GO_LEVEL_ORDER]` 相等。终关参考策略必须断言 `relay` 耐久大于 0、`final-seal.completed === true`、所有敌人失能且回合数不超过 18。
 
 在 `app-controller.test.ts` 以 `GO_RPG_CAMPAIGN` 加载已经获胜的 `go-marsh-06` 存档，断言结算只显示战役完成操作，调用 `advanceLevel()` 不改变当前关卡或代码。
 
@@ -554,7 +554,7 @@ Expected: 全部退出码 0。只修复由本次 Go 六关变更引起的失败�
 
 - [ ] **Step 3: 检查差异质量**
 
-Run: `git diff --check 35320bf47892bb4a62813c1e786cf6f947056a43..HEAD`
+Run: `git diff --check 3069dfb2002c9155e79cc089f550591ff52873a4..HEAD`
 
 检查 Go 关卡没有导入 Python 关卡文件，五个新文件均低于 400 行，函数均低于 60 行。
 

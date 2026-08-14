@@ -111,7 +111,7 @@ Go SDK 补齐以下六关实际需要的动作构造器：
 
 **Go 教学重点：**
 
-- 使用 `for _, enemy := range world.Enemies` 遍历切片。
+- 使用 `for _, unit := range world.Units` 遍历切片，并通过 `unit.Team == "enemies"` 筛选敌人。
 - 根据生命值、距离或单位 ID 选择优先目标。
 - 在清敌前检查并完成关键目标。
 
