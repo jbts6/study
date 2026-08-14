@@ -91,4 +91,31 @@ describe("DirectRunnerClient", () => {
     resolveResult(result);
     await running;
   });
+
+  it("projects Python diagnostics onto the player source file", async () => {
+    const process: LocalPythonProcess = {
+      result: Promise.resolve({
+        ...result,
+        executionStatus: "syntax_error",
+        diagnostics: [{
+          code: "PYTHON_SYNTAX_ERROR",
+          severity: "error",
+          message: "expected ':'",
+          location: { file: "main.py", line: 2, column: 18 },
+          recoveryAction: "修改代码后重新运行。",
+        }],
+      }),
+      interrupt: vi.fn(),
+      kill: vi.fn(async () => undefined),
+    };
+    const client = new DirectRunnerClient({
+      detect: async () => ({ ok: true as const, path: "python", version: "3.12.1" }),
+      createProcess: () => process,
+    });
+    await client.connect();
+
+    await expect(client.run(request)).resolves.toMatchObject({
+      diagnostics: [{ location: { file: "python-marsh-02.py", line: 2, column: 18 } }],
+    });
+  });
 });

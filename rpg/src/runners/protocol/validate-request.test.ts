@@ -53,6 +53,27 @@ describe("validateRunRequest", () => {
     expect(diagnosticCode({ ...validRequest(), language: "javascript" })).toBe("UNSUPPORTED_LANGUAGE");
   });
 
+  it("accepts Python callable and allowedModules requests", () => {
+    const result = validateRunRequest({
+      ...validRequest(),
+      language: "python",
+      entrypoint: { file: "main.py", callable: "choose_turn" },
+      allowedModules: ["math"],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects Go requests carrying a Python module allowlist", () => {
+    const result = validateRunRequest({
+      ...validRequest(),
+      language: "go",
+      files: { "strategy.go": "package main" },
+      entrypoint: { file: "strategy.go" },
+      allowedModules: ["math"],
+    });
+    expect(result).toMatchObject({ ok: false, diagnostics: [{ code: "INVALID_GO_REQUEST" }] });
+  });
+
   it("checks source containers, local paths and byte budgets", () => {
     expect(diagnosticCode({ ...validRequest(), files: {} })).toBe("INVALID_FILES");
     expect(diagnosticCode({ ...validRequest(), files: { "../main.py": "pass" } })).toBe("INVALID_FILE_PATH");

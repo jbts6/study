@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { join } from "node:path";
 import { DocumentWorkspace, levelFilePath } from "./level-workspace";
+import { GO_PROGRAM } from "../programs/go";
+import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
+import type { CampaignDefinition } from "../programs/types";
 import type {
   WorkspaceDocument,
   WorkspaceFileSystem,
@@ -54,18 +58,30 @@ class MemoryHost implements WorkspaceHost {
 }
 
 describe("DocumentWorkspace", () => {
+  it("按战役程序约定生成玩家文件路径", () => {
+    const campaign: CampaignDefinition = {
+      id: "go-rpg",
+      title: "Go RPG",
+      program: GO_PROGRAM,
+      levelOrder: [],
+    };
+
+    expect(levelFilePath("C:/work", campaign, "go-marsh-01"))
+      .toBe(join("C:/work", "go-rpg", "go-marsh-01.go"));
+  });
+
   it("creates only missing level files and reads unsaved open text first", async () => {
     const fileSystem = new MemoryFileSystem();
-    const existingPath = levelFilePath("/workspace", "python-marsh-01");
+    const existingPath = levelFilePath("/workspace", PYTHON_RPG_CAMPAIGN, "python-marsh-01");
     fileSystem.files.set(existingPath, "existing saved code");
     const host = new MemoryHost("/workspace", fileSystem);
-    const unsavedPath = levelFilePath("/workspace", "python-marsh-02");
+    const unsavedPath = levelFilePath("/workspace", PYTHON_RPG_CAMPAIGN, "python-marsh-02");
     fileSystem.files.set(unsavedPath, "starter on disk");
     host.openDocuments.set(unsavedPath, {
       path: unsavedPath,
       getText: () => "unsaved code",
     });
-    const workspace = new DocumentWorkspace(host);
+    const workspace = new DocumentWorkspace(host, PYTHON_RPG_CAMPAIGN);
 
     await workspace.ensureLevelFiles();
 
@@ -79,12 +95,12 @@ describe("DocumentWorkspace", () => {
   it("opens a level document in the first editor column", async () => {
     const fileSystem = new MemoryFileSystem();
     const host = new MemoryHost("/workspace", fileSystem);
-    const workspace = new DocumentWorkspace(host);
+    const workspace = new DocumentWorkspace(host, PYTHON_RPG_CAMPAIGN);
     await workspace.ensureLevelFiles();
 
     const document = await workspace.openLevel("python-marsh-01");
 
-    expect(document.path).toBe(levelFilePath("/workspace", "python-marsh-01"));
+    expect(document.path).toBe(levelFilePath("/workspace", PYTHON_RPG_CAMPAIGN, "python-marsh-01"));
     expect(host.shown).toEqual([{ document, viewColumn: 1 }]);
   });
 });

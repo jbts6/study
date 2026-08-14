@@ -4,7 +4,7 @@ export const PROTOCOL_VERSION = 1 as const;
 
 export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
-export type ExecutionStatus = "completed" | "syntax_error" | "runtime_error" | "timeout" | "interrupted" | "invalid_request" | "runner_error";
+export type ExecutionStatus = "completed" | "syntax_error" | "compile_error" | "runtime_error" | "timeout" | "interrupted" | "invalid_request" | "runner_error";
 export type RunnerState = "loading" | "ready" | "running" | "interrupting" | "unavailable";
 export type DiagnosticSeverity = "error" | "warning" | "info";
 
@@ -19,23 +19,43 @@ export interface ExecutionLimits {
   readonly maxValueDepth: number;
 }
 
-export interface Entrypoint {
+export type PythonEntrypoint = Readonly<{
   readonly file: string;
   readonly callable: string;
-}
+}>;
 
-export interface RunRequest {
+export type CompiledEntrypoint = Readonly<{
+  readonly file: string;
+}>;
+
+export type Entrypoint = PythonEntrypoint | CompiledEntrypoint;
+
+export type BaseRunRequest = Readonly<{
   readonly protocolVersion: typeof PROTOCOL_VERSION;
   readonly runId: string;
   readonly attemptId: string;
   readonly questId: string;
-  readonly language: "python";
   readonly files: Readonly<Record<string, string>>;
-  readonly entrypoint: Entrypoint;
   readonly worldView: WorldView;
-  readonly allowedModules: readonly string[];
   readonly limits: ExecutionLimits;
-}
+}>;
+
+export type PythonRunRequest = BaseRunRequest & Readonly<{
+  readonly language: "python";
+  readonly entrypoint: PythonEntrypoint;
+  readonly allowedModules: readonly string[];
+}>;
+
+export type CompiledRunRequest = BaseRunRequest & Readonly<{
+  readonly language: "go" | "rust";
+  readonly entrypoint: CompiledEntrypoint;
+  readonly limits: ExecutionLimits & Readonly<{
+    readonly buildTimeoutMs: number;
+    readonly executionTimeoutMs: number;
+  }>;
+}>;
+
+export type RunRequest = PythonRunRequest | CompiledRunRequest;
 
 export interface SourceLocation {
   readonly file: string;
@@ -71,6 +91,8 @@ export interface OutputStreams {
 export interface RunnerMetrics {
   readonly durationMs: number;
   readonly traceEvents: number;
+  readonly buildDurationMs?: number;
+  readonly executionDurationMs?: number;
 }
 
 export interface RunResult {

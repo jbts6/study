@@ -160,7 +160,10 @@ const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
     if (!guard.disabled) return castOrAttack(world, "guard", ["spark", "pierce"]);
     return selfCastOrGuard(world, ["aegis", "renew", "ward"]);
   },
+  "go-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
 };
+
+const REFERENCE_LEVEL_ORDER: readonly LevelId[] = [...LEVEL_ORDER, "go-marsh-01"];
 
 function parseInstruction(input: TurnCommand): TurnCommand {
   return JSON.parse(JSON.stringify(input)) as TurnCommand;
@@ -172,7 +175,9 @@ function activeUnit(state: BattleState): WorldUnit | undefined {
 
 function runReferenceSolution(levelId: LevelId): BattleState {
   const level = getLevel(levelId);
-  let state = injectUnlockedAbilities(levelId, structuredClone(level.initialBattle));
+  let state = levelId === "go-marsh-01"
+    ? structuredClone(level.initialBattle)
+    : injectUnlockedAbilities(levelId, structuredClone(level.initialBattle));
 
   for (let playerTurn = 0; state.phase === "in_progress" && playerTurn <= level.initialBattle.maxRounds; playerTurn += 1) {
     const beforeWorld = projectWorldView(state);
@@ -196,7 +201,7 @@ function runReferenceSolution(levelId: LevelId): BattleState {
 }
 
 describe("campaign reference solutions", () => {
-  it.each(LEVEL_ORDER)("can complete %s through the production turn pipeline", (levelId) => {
+  it.each(REFERENCE_LEVEL_ORDER)("can complete %s through the production turn pipeline", (levelId) => {
     const level = getLevel(levelId);
     const result = runReferenceSolution(levelId);
     expect(result.phase).toBe("won");

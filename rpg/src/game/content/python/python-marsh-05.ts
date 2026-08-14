@@ -1,5 +1,5 @@
-import type { BattleState } from "../combat/types";
-import type { LevelDefinition } from "./types";
+import type { BattleState } from "../../combat/types";
+import type { LevelDefinition } from "../shared/types";
 
 export const STARTER_CODE_05 = `# 可以把“选敌人”“选目标”“选行动”拆成辅助函数。
 # 本关不提供函数骨架，请从 world 视图开始组织代码。

@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
+import { getCampaign } from "./campaigns";
 import { getLevel, getNextLevelId, LEVEL_ORDER, validateLevels } from "./levels";
 
 describe("campaign levels", () => {
+  it("按战役隔离关卡顺序与玩家程序约定", () => {
+    const campaign = getCampaign("python-rpg");
+    expect(campaign.program.workspaceDirectory).toBe("python-rpg");
+    expect(campaign.levelOrder).toEqual([
+      "python-marsh-01", "python-marsh-02", "python-marsh-03",
+      "python-marsh-04", "python-marsh-05", "python-marsh-06",
+    ]);
+    expect(getNextLevelId("python-marsh-06")).toBeUndefined();
+  });
+
+  it("Go 第一关不复用 Python 模板或战役顺序", () => {
+    const level = getLevel("go-marsh-01");
+    expect(level.starterCode).toContain("func ChooseTurn(world World) TurnCommand");
+    expect(level.starterCode).not.toContain("def choose_turn");
+    expect(getCampaign("go-rpg").levelOrder).toEqual(["go-marsh-01"]);
+    expect(level.initialBattle.battleId).toBe("go-marsh-01");
+  });
+
   it("registers all six levels in their fixed campaign order", () => {
     expect(LEVEL_ORDER).toEqual([
       "python-marsh-01",

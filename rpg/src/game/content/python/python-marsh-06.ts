@@ -1,5 +1,5 @@
-import type { BattleState } from "../combat/types";
-import type { LevelDefinition } from "./types";
+import type { BattleState } from "../../combat/types";
+import type { LevelDefinition } from "../shared/types";
 
 export const STARTER_CODE_06 = `# 保护中继器、穿过危险地形、消灭敌人并激活最终封印。
 # 在最大回合数内完成战役。

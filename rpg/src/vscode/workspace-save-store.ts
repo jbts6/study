@@ -2,9 +2,14 @@ import type { BattleState } from "../game/combat/types";
 import { LocalSaveStore } from "../app/save-store";
 import type { SaveDataV2, SaveLoadResult, SaveStore } from "../app/save-store";
 import type { LevelId } from "../game/content/types";
+import type { CampaignId } from "../programs/types";
 import type { WorkspaceState } from "./platform-types";
 
-export const WORKSPACE_SAVE_KEY = "python-rpg.workspace-save";
+export function workspaceSaveKey(campaignId: CampaignId): string {
+  return `${campaignId}.workspace-save`;
+}
+
+export const WORKSPACE_SAVE_KEY = workspaceSaveKey("python-rpg");
 
 export type WorkspaceSaveDataV2 = Readonly<{
   version: 2;
@@ -15,10 +20,14 @@ export type WorkspaceSaveDataV2 = Readonly<{
 export type WorkspaceSaveInput = WorkspaceSaveDataV2 | SaveDataV2;
 
 export class WorkspaceSaveStore implements SaveStore {
+  private readonly key: string;
+
   constructor(
     private readonly workspaceState: WorkspaceState,
-    private readonly key = WORKSPACE_SAVE_KEY,
-  ) {}
+    campaignId: CampaignId = "python-rpg",
+  ) {
+    this.key = workspaceSaveKey(campaignId);
+  }
 
   load(): SaveLoadResult {
     let raw: unknown;

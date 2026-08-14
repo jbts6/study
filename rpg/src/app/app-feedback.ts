@@ -1,6 +1,7 @@
 import type { BattleEvent, BattleState } from "../game/combat/types";
 import { getLevel } from "../game/content/levels";
 import type { LevelDefinition, LevelId } from "../game/content/types";
+import type { ImplementedLanguage } from "../programs/types";
 import type { RunResult, RunnerDiagnostic } from "../runners/protocol/types";
 import { formatBattleFeedback } from "./battle-feedback";
 
@@ -53,13 +54,17 @@ export function combatErrorFeedback(errors: readonly Readonly<{ code: string; pa
   return errorFeedback("指令无效", errors.map((error) => `[${error.code}] ${error.path} ${error.message}`));
 }
 
-export function feedbackFromRunResult(result: RunResult): AppFeedback {
+export function feedbackFromRunResult(result: RunResult, language: ImplementedLanguage): AppFeedback {
   const interrupted = result.executionStatus === "interrupted";
   const messages = result.diagnostics.map(formatDiagnostic);
   if (interrupted) messages.unshift("运行已中断，回合未推进。");
+  const languageName = languageLabel(language);
+  const title = interrupted
+    ? "运行已中断"
+    : result.executionStatus === "compile_error" ? `${languageName} 编译失败` : `${languageName} 运行失败`;
   return {
     kind: interrupted ? "info" : "error",
-    title: interrupted ? "运行已中断" : "Python 运行失败",
+    title,
     messages,
     stdout: result.streams.stdout,
     stderr: result.streams.stderr,
@@ -81,4 +86,8 @@ function formatDiagnostic(diagnostic: RunnerDiagnostic): string {
   if (diagnostic.location === undefined) return `${prefix} ${diagnostic.message}`;
   const { file, line, column } = diagnostic.location;
   return `${prefix} ${file}:${line}${column === undefined ? "" : `:${column}`} ${diagnostic.message}`;
+}
+
+function languageLabel(language: ImplementedLanguage): string {
+  return language === "python" ? "Python" : "Go";
 }

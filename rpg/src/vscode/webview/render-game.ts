@@ -33,14 +33,14 @@ function renderHeader(snapshot: GameViewSnapshot): HTMLElement {
   const header = element("header", "game-header");
   const identity = element("div", "game-identity");
   identity.append(
-    textElement("p", "game-kicker", `Python RPG · ${snapshot.level.id}`),
+    textElement("p", "game-kicker", `${snapshot.campaignTitle} · ${snapshot.level.id}`),
     textElement("h1", "", snapshot.level.title),
   );
   const status = element("dl", "game-status");
   status.append(
     statusItem("回合", `${snapshot.battleState.round} / ${snapshot.battleState.maxRounds}`),
     statusItem("行动者", activeUnitId(snapshot.battleState) ?? "无"),
-    statusItem("Python", runnerLabel(snapshot)),
+    statusItem(snapshot.languageLabel, runnerLabel(snapshot)),
   );
   const themes = element("div", "theme-switch");
   themes.setAttribute("aria-label", "颜色主题");
@@ -130,12 +130,12 @@ function renderFeedback(snapshot: GameViewSnapshot): HTMLElement {
   const heading = element("div", "feedback-heading");
   heading.append(
     textElement("h2", "", snapshot.feedback.title || "运行反馈"),
-    renderGuidance(snapshot.level.guidance),
+    renderGuidance(snapshot.level.guidance, snapshot.languageLabel),
   );
   panel.append(heading);
   const messages = snapshot.feedback.messages.length > 0
     ? snapshot.feedback.messages
-    : [`等待运行 ${snapshot.level.id}.py。插件会读取编辑器中的最新内容。`];
+    : [`等待运行 ${snapshot.playerFileName}。插件会读取编辑器中的最新内容。`];
   const list = element("ul", "feedback-messages");
   for (const message of messages) list.append(textElement("li", "", message));
   panel.append(list);
@@ -144,12 +144,12 @@ function renderFeedback(snapshot: GameViewSnapshot): HTMLElement {
   return panel;
 }
 
-function renderGuidance(guidance: LevelGuidance): HTMLElement {
+function renderGuidance(guidance: LevelGuidance, languageLabel: GameViewSnapshot["languageLabel"]): HTMLElement {
   const details = element("details", "guidance-drawer");
   details.append(textElement("summary", "", "展开本关提示"));
   for (const [title, values] of [
     ["本关目标", guidance.objective],
-    ["Python 概念", guidance.concepts],
+    [`${languageLabel} 概念`, guidance.concepts],
     ["world 字段", guidance.worldFields],
     ["命令示例", guidance.commandExamples],
     ["本关规则", guidance.levelRules],

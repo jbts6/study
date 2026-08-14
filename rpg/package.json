@@ -1,7 +1,7 @@
 {
   "name": "python-rpg",
-  "displayName": "Python RPG",
-  "description": "在 VS Code 中编写 Python，并在侧边编辑器组中推进六关战术 RPG。",
+  "displayName": "奥术战术 RPG",
+  "description": "在 VS Code 中编写 Python 或 Go 战术程序，并在侧边编辑器组中推进本地战役。",
   "private": true,
   "publisher": "local",
   "version": "0.1.0",
@@ -24,7 +24,7 @@
       "activitybar": [
         {
           "id": "pythonRpg",
-          "title": "Python RPG",
+          "title": "奥术战术 RPG",
           "icon": "media/python-rpg.svg"
         }
       ]
@@ -33,7 +33,7 @@
       "pythonRpg": [
         {
           "id": "pythonRpg.launcher",
-          "name": "Python RPG",
+          "name": "奥术战术 RPG",
           "icon": "media/python-rpg.svg"
         }
       ]
@@ -41,11 +41,11 @@
     "commands": [
       {
         "command": "pythonRpg.open",
-        "title": "Python RPG: 打开游戏"
+        "title": "奥术战术 RPG: 打开游戏"
       },
       {
         "command": "pythonRpg.runTurn",
-        "title": "Python RPG: 运行当前回合"
+        "title": "奥术战术 RPG: 运行当前回合"
       }
     ],
     "keybindings": [
@@ -53,16 +53,21 @@
         "command": "pythonRpg.runTurn",
         "key": "ctrl+enter",
         "mac": "cmd+enter",
-        "when": "editorLangId == python"
+        "when": "editorLangId == python || editorLangId == go"
       }
     ],
     "configuration": {
-      "title": "Python RPG",
+      "title": "奥术战术 RPG",
       "properties": {
         "pythonRpg.pythonPath": {
           "type": "string",
           "default": "",
           "description": "可选的 Python 3.12+ 可执行文件路径；留空时自动检测。"
+        },
+        "goRpg.goPath": {
+          "type": "string",
+          "default": "",
+          "description": "可选的 Go stable 可执行文件路径；留空时自动检测。"
         }
       }
     }
@@ -84,6 +89,7 @@
     "runner:dev": "node --watch --experimental-strip-types src/runners/local/runner-cli.ts"
   },
   "dependencies": {
+    "@codemirror/lang-go": "^6.0.1",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/state": "^6.7.1",
     "codemirror": "^6.0.2",

@@ -1,7 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { dirname, normalize } from "node:path";
 import * as vscode from "vscode";
-import { AppController } from "../app/app-controller";
+import { AppController, createDefaultRunLimits } from "../app/app-controller";
+import type { RunnerClient } from "../app/runner-client";
+import { getCampaign } from "../game/content/campaigns";
+import { detectGo } from "../runners/go/go-detector";
+import { GoRunner } from "../runners/go/go-runner";
 import { detectPython } from "../runners/local/python-detector";
 import { PythonRunProcess } from "../runners/local/python-process";
 import type { RunnerDiagnostic } from "../runners/protocol/types";
@@ -11,6 +15,7 @@ import { GameSession, type SessionDiagnostics } from "./game-session";
 import { DocumentWorkspace, levelFilePath, type WorkspaceDocument, type WorkspaceHost } from "./level-workspace";
 import type { ThemePreference, WebviewCommand } from "./messages";
 import { WorkspaceSaveStore } from "./workspace-save-store";
+import type { CampaignDefinition, CampaignId } from "../programs/types";
 
 const THEME_KEY = "python-rpg.theme";
 const PANEL_TYPE = "pythonRpg.game";
@@ -19,13 +24,18 @@ export function activate(context: vscode.ExtensionContext): void {
   let activeGame: ActiveGame | undefined;
   let opening: Promise<ActiveGame | undefined> | undefined;
 
-  const openGame = async (): Promise<ActiveGame | undefined> => {
-    if (activeGame !== undefined) {
+  const openCampaign = async (campaignId: CampaignId): Promise<ActiveGame | undefined> => {
+    if (activeGame?.campaignId === campaignId) {
       activeGame.reveal();
       return activeGame;
     }
-    if (opening !== undefined) return opening;
-    opening = createActiveGame(context).then((game) => {
+    if (opening !== undefined) await opening;
+    if (activeGame?.campaignId === campaignId) {
+      activeGame.reveal();
+      return activeGame;
+    }
+    activeGame?.dispose();
+    opening = createActiveGame(context, getCampaign(campaignId)).then((game) => {
       activeGame = game;
       game?.onDispose(() => { activeGame = undefined; });
       return game;
@@ -35,9 +45,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("pythonRpg.launcher", new GameLauncher()),
-    vscode.commands.registerCommand("pythonRpg.open", openGame),
+    vscode.commands.registerCommand("pythonRpg.open", (value?: unknown) =>
+      openCampaign(isCampaignId(value) ? value : "python-rpg")),
     vscode.commands.registerCommand("pythonRpg.runTurn", async () => {
-      const game = await openGame();
+      const selected = activeGame?.campaignId
+        ?? (vscode.window.activeTextEditor?.document.languageId === "go" ? "go-rpg" : "python-rpg");
+      const game = await openCampaign(selected);
       await game?.runTurn();
     }),
     { dispose: () => activeGame?.dispose() },
@@ -52,9 +65,10 @@ class ActiveGame {
   private disposed = false;
 
   constructor(
+    readonly campaignId: CampaignId,
     private readonly panel: vscode.WebviewPanel,
     private readonly session: GameSession,
-    private readonly runner: DirectRunnerClient,
+    private readonly runner: RunnerClient,
     diagnostics: vscode.DiagnosticCollection,
   ) {
     this.disposables.push(
@@ -90,25 +104,30 @@ class ActiveGame {
   }
 }
 
-async function createActiveGame(context: vscode.ExtensionContext): Promise<ActiveGame | undefined> {
+async function createActiveGame(
+  context: vscode.ExtensionContext,
+  campaign: CampaignDefinition,
+): Promise<ActiveGame | undefined> {
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   if (workspaceFolder === undefined) {
-    await vscode.window.showErrorMessage("Python RPG 需要一个已打开的工作区文件夹，用于保存六个关卡脚本。");
+    await vscode.window.showErrorMessage("奥术战术 RPG 需要一个已打开的工作区文件夹，用于保存玩家脚本。");
     return undefined;
   }
 
-  const workspace = new DocumentWorkspace(createWorkspaceHost(workspaceFolder.uri));
+  const workspace = new DocumentWorkspace(createWorkspaceHost(workspaceFolder.uri), campaign);
   const saveStore = new WorkspaceSaveStore({
     get: (key) => context.workspaceState.get(key),
     update: async (key, value) => { await context.workspaceState.update(key, value); },
-  });
+  }, campaign.id);
   await workspace.ensureLevelFiles();
   const loaded = saveStore.load();
-  await workspace.openLevel(loaded.ok && loaded.save !== null ? loaded.save.currentLevelId : "python-marsh-01");
+  const firstLevelId = campaign.levelOrder[0];
+  if (firstLevelId === undefined) throw new Error(`战役没有可用关卡: ${campaign.id}`);
+  await workspace.openLevel(loaded.ok && loaded.save !== null ? loaded.save.currentLevelId : firstLevelId);
 
   const panel = vscode.window.createWebviewPanel(
     PANEL_TYPE,
-    "Python RPG 战场",
+    `${campaign.title}战场`,
     { viewColumn: vscode.ViewColumn.Two, preserveFocus: false },
     {
       enableScripts: true,
@@ -116,31 +135,39 @@ async function createActiveGame(context: vscode.ExtensionContext): Promise<Activ
       localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "dist")],
     },
   );
-  const diagnostics = vscode.languages.createDiagnosticCollection("python-rpg");
-  panel.webview.html = loadingHtml(panel.webview, context.extensionUri);
-  const runner = createRunner(context);
-  const controller = new AppController({ runner, saveStore });
+  const diagnostics = vscode.languages.createDiagnosticCollection(campaign.id);
+  panel.webview.html = loadingHtml(panel.webview, context.extensionUri, campaign);
+  const runner = createRunner(context, campaign);
+  const controller = new AppController({ runner, saveStore, runLimits: createDefaultRunLimits() }, campaign);
   const session = new GameSession({
     controller,
     workspace,
-    diagnostics: createDiagnostics(diagnostics, workspaceFolder.uri.fsPath),
+    diagnostics: createDiagnostics(diagnostics, workspaceFolder.uri.fsPath, campaign),
     postMessage: (message) => panel.webview.postMessage(message),
     getTheme: () => readTheme(context),
     setTheme: (theme) => context.workspaceState.update(THEME_KEY, theme),
   });
-  const game = new ActiveGame(panel, session, runner, diagnostics);
+  const game = new ActiveGame(campaign.id, panel, session, runner, diagnostics);
   try {
     await session.start();
-    panel.webview.html = webviewHtml(panel.webview, context.extensionUri);
+    panel.webview.html = webviewHtml(panel.webview, context.extensionUri, campaign);
     return game;
   } catch (error) {
     game.dispose();
-    await vscode.window.showErrorMessage(`Python RPG 启动失败：${errorMessage(error)}`);
+    await vscode.window.showErrorMessage(`${campaign.title}启动失败：${errorMessage(error)}`);
     return undefined;
   }
 }
 
-function createRunner(context: vscode.ExtensionContext): DirectRunnerClient {
+function createRunner(context: vscode.ExtensionContext, campaign: CampaignDefinition): RunnerClient {
+  if (campaign.program.language === "go") {
+    const configured = vscode.workspace.getConfiguration("goRpg").get<string>("goPath", "").trim();
+    return new GoRunner({
+      globalStoragePath: context.globalStorageUri.fsPath,
+      runtimeDirectory: vscode.Uri.joinPath(context.extensionUri, "dist", "go-runtime").fsPath,
+      detectGo: () => detectGo(configured ? { goPath: configured } : undefined),
+    });
+  }
   const script = vscode.Uri.joinPath(
     context.extensionUri,
     "src", "runners", "python", "runtime", "run_once.py",
@@ -183,19 +210,28 @@ function createWorkspaceHost(root: vscode.Uri): WorkspaceHost {
   };
 }
 
-function createDiagnostics(collection: vscode.DiagnosticCollection, workspaceRoot: string): SessionDiagnostics {
+function createDiagnostics(
+  collection: vscode.DiagnosticCollection,
+  workspaceRoot: string,
+  campaign: CampaignDefinition,
+): SessionDiagnostics {
   return {
     clear: () => collection.clear(),
     replace: (levelId, values) => {
-      const projected = values.flatMap((diagnostic) => toVsCodeDiagnostic(diagnostic));
-      collection.set(vscode.Uri.file(levelFilePath(workspaceRoot, levelId)), projected);
+      const sourceFileName = campaign.program.sourceFileName(levelId);
+      const projected = values.flatMap((diagnostic) => toVsCodeDiagnostic(
+        diagnostic,
+        sourceFileName,
+        diagnosticSource(campaign.program.editorLanguageId),
+      ));
+      collection.set(vscode.Uri.file(levelFilePath(workspaceRoot, campaign, levelId)), projected);
     },
   };
 }
 
-function toVsCodeDiagnostic(value: RunnerDiagnostic): vscode.Diagnostic[] {
+function toVsCodeDiagnostic(value: RunnerDiagnostic, sourceFileName: string, source: string): vscode.Diagnostic[] {
   const location = value.location;
-  if (location === undefined || location.file !== "main.py") return [];
+  if (location === undefined || location.file !== sourceFileName) return [];
   const line = Math.max(0, location.line - 1);
   const column = Math.max(0, (location.column ?? 1) - 1);
   const start = new vscode.Position(line, column);
@@ -205,8 +241,13 @@ function toVsCodeDiagnostic(value: RunnerDiagnostic): vscode.Diagnostic[] {
     diagnosticSeverity(value.severity),
   );
   diagnostic.code = value.code;
-  diagnostic.source = "Python RPG";
+  diagnostic.source = source;
   return [diagnostic];
+}
+
+function diagnosticSource(editorLanguageId: string): string {
+  const name = editorLanguageId.length === 0 ? editorLanguageId : `${editorLanguageId[0]!.toUpperCase()}${editorLanguageId.slice(1)}`;
+  return `${name} RPG`;
 }
 
 function diagnosticSeverity(value: RunnerDiagnostic["severity"]): vscode.DiagnosticSeverity {
@@ -229,7 +270,7 @@ function readTheme(context: vscode.ExtensionContext): ThemePreference {
   return value === "light" || value === "dark" || value === "system" ? value : "system";
 }
 
-function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, campaign: CampaignDefinition): string {
   const nonce = randomBytes(16).toString("base64");
   const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "dist", "webview.js"));
   const style = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "dist", "webview.css"));
@@ -240,10 +281,10 @@ function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <link rel="stylesheet" href="${style}">
-  <title>Python RPG 战场</title>
+  <title>${campaign.title}战场</title>
 </head>
 <body>
-  <main id="game-root" aria-label="Python RPG 战场"></main>
+  <main id="game-root" aria-label="${campaign.title}战场"></main>
   <script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;
@@ -257,7 +298,7 @@ function isWebviewCommand(value: unknown): value is WebviewCommand {
     || record.type === "retryLevel" || record.type === "advanceLevel" || record.type === "resetCampaign";
 }
 
-function loadingHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+function loadingHtml(webview: vscode.Webview, extensionUri: vscode.Uri, campaign: CampaignDefinition): string {
   const style = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "dist", "webview.css"));
   return `<!doctype html>
 <html lang="zh-CN">
@@ -266,14 +307,14 @@ function loadingHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource};">
   <link rel="stylesheet" href="${style}">
-  <title>Python RPG 战场</title>
+  <title>${campaign.title}战场</title>
 </head>
 <body>
   <main class="game-view recovery-view" aria-live="polite">
     <section class="recovery-panel">
-      <p class="game-kicker">Python RPG</p>
+      <p class="game-kicker">${campaign.title}</p>
       <h1>正在准备战场</h1>
-      <p>正在恢复战役、创建关卡文件并检测本机 Python。</p>
+      <p>正在恢复战役、创建关卡文件并检测本机 ${campaign.program.language === "python" ? "Python" : "Go"}。</p>
     </section>
   </main>
 </body>
@@ -282,4 +323,8 @@ function loadingHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string 
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isCampaignId(value: unknown): value is CampaignId {
+  return value === "python-rpg" || value === "go-rpg";
 }

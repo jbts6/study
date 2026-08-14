@@ -51,7 +51,8 @@ export class DirectRunnerClient implements RunnerClient {
     const adapter = this.adapter;
     if (!adapter || this.pythonPath === undefined) throw new Error("本地 Python Runner 尚未连接。");
     try {
-      return await adapter.run(request);
+      const result = await adapter.run(request);
+      return projectSourceFile(result, request);
     } finally {
       const process = this.activeProcess;
       this.activeProcess = undefined;
@@ -80,4 +81,15 @@ export class DirectRunnerClient implements RunnerClient {
     this._state = state;
     for (const listener of this.listeners) listener(state);
   }
+}
+
+function projectSourceFile(result: RunResult, request: RunRequest): RunResult {
+  if (request.language !== "python") return result;
+  const sourceFile = `${request.questId}.py`;
+  return {
+    ...result,
+    diagnostics: result.diagnostics.map((value) => value.location?.file !== "main.py"
+      ? value
+      : { ...value, location: { ...value.location, file: sourceFile } }),
+  };
 }

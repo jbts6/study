@@ -5,6 +5,9 @@ import type { ExecutionStatus, JsonValue, RunRequest, RunResult } from "../runne
 import { AppController } from "./app-controller";
 import { mountApp } from "./app-view";
 import { getLevel } from "../game/content/levels";
+import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
+import { GO_RPG_CAMPAIGN } from "../game/content/go/levels";
+import type { AppControllerRunLimits } from "./app-controller";
 
 class FakeRunner implements RunnerClient {
   readonly state: RunnerDisplayState = "ready";
@@ -77,12 +80,38 @@ function failedResult(
   };
 }
 
+const TEST_RUN_LIMITS: AppControllerRunLimits = {
+  python: {
+    timeoutMs: 5_000,
+    interruptGraceMs: 500,
+    maxFiles: 10,
+    maxFileBytes: 65_536,
+    maxSourceBytes: 65_536,
+    maxOutputBytes: 16_384,
+    maxTraceEvents: 1_000,
+    maxValueDepth: 7,
+  },
+  go: {
+    timeoutMs: 5_000,
+    interruptGraceMs: 500,
+    maxFiles: 10,
+    maxFileBytes: 65_536,
+    maxSourceBytes: 65_536,
+    maxOutputBytes: 16_384,
+    maxTraceEvents: 1_000,
+    maxValueDepth: 8,
+    buildTimeoutMs: 15_000,
+    executionTimeoutMs: 5_000,
+  },
+};
+
 function createController(runner: FakeRunner, saveStore: MemorySaveStore): AppController {
   return new AppController({
     runner,
     saveStore,
     createId: () => "test-run",
-  });
+    runLimits: TEST_RUN_LIMITS,
+  }, PYTHON_RPG_CAMPAIGN);
 }
 
 function mountSettlement(controller: AppController): Readonly<{ root: HTMLDivElement; unmount: () => void }> {
@@ -128,7 +157,7 @@ describe("AppController", () => {
     expect(saves.saved?.battleState.revision).toBe(0);
     expect(snapshot.feedback.kind).toBe("error");
     expect(snapshot.feedback.messages).toContain("[INTERACTION_INVALID] $.action.targetId scout 只能交互非关键目标");
-    expect(runner.lastRequest?.limits.maxValueDepth).toBe(4);
+    expect(runner.lastRequest?.limits.maxValueDepth).toBe(7);
   });
 
   it("keeps battle and save unchanged when Python fails", async () => {
@@ -172,6 +201,56 @@ describe("AppController", () => {
     const snapshot = controller.getSnapshot();
     expect(snapshot.mode).toBe("game");
     expect(snapshot.mode === "game" && snapshot.battleState.revision).toBe(2);
+  });
+
+  it("creates a compiled Go request from the active campaign program", async () => {
+    const runner = new FakeRunner(completed({
+      actorId: "scout",
+      expectedRevision: 0,
+      action: { type: "wait" },
+    }));
+    const controller = new AppController({
+      runner,
+      saveStore: new MemorySaveStore(null),
+      createId: () => "go-run",
+      runLimits: TEST_RUN_LIMITS,
+    }, GO_RPG_CAMPAIGN);
+    await controller.start();
+
+    await controller.runCode("package main\nfunc ChooseTurn() {}\n");
+
+    expect(controller.campaign).toBe(GO_RPG_CAMPAIGN);
+    expect(runner.lastRequest).toMatchObject({
+      language: "go",
+      files: { "strategy.go": "package main\nfunc ChooseTurn() {}\n" },
+      entrypoint: { file: "strategy.go" },
+      limits: {
+        timeoutMs: 5_000,
+        buildTimeoutMs: 15_000,
+        executionTimeoutMs: 5_000,
+        maxValueDepth: 8,
+      },
+    });
+    expect(runner.lastRequest && "allowedModules" in runner.lastRequest).toBe(false);
+  });
+
+  it("从 Go 战役的首关创建和重置存档", async () => {
+    const saves = new MemorySaveStore(null);
+    const controller = new AppController({
+      runner: new FakeRunner(completed(null)),
+      saveStore: saves,
+      runLimits: TEST_RUN_LIMITS,
+    }, GO_RPG_CAMPAIGN);
+
+    await controller.start();
+
+    expect(controller.getSnapshot()).toMatchObject({ mode: "game", currentLevelId: "go-marsh-01" });
+    expect(saves.saved?.currentLevelId).toBe("go-marsh-01");
+
+    controller.resetSave("重置存档");
+
+    expect(controller.getSnapshot()).toMatchObject({ mode: "game", currentLevelId: "go-marsh-01" });
+    expect(saves.saved?.currentLevelId).toBe("go-marsh-01");
   });
 
   it("requires the exact reset phrase before replacing a corrupt save", async () => {
