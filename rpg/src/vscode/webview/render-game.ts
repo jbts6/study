@@ -88,6 +88,7 @@ function renderBattle(snapshot: GameViewSnapshot, viewState: ManualViewState): H
     stage.id = "battle-panel";
     stage.dataset.view = "battle";
     stage.setAttribute("role", "tabpanel");
+    stage.setAttribute("aria-labelledby", "battle-tab");
     stage.append(renderViewTabs(viewState));
   }
   const frame = element("div", "battle-frame");
@@ -106,6 +107,7 @@ function renderBattle(snapshot: GameViewSnapshot, viewState: ManualViewState): H
   }
   frame.append(grid, renderLegend());
   stage.append(frame);
+  if (snapshot.programReference !== undefined) stage.append(renderHiddenViewPanel("manual-panel", "manual", "manual-tab"));
   return stage;
 }
 
@@ -116,7 +118,9 @@ function renderManual(snapshot: GameViewSnapshot, viewState: ManualViewState): H
   stage.id = "manual-panel";
   stage.dataset.view = "manual";
   stage.setAttribute("role", "tabpanel");
+  stage.setAttribute("aria-labelledby", "manual-tab");
   stage.append(renderManualTabs(viewState.sectionId), renderViewTabs(viewState), renderManualPanel(snapshot, viewState.sectionId, reference));
+  stage.append(renderHiddenViewPanel("battle-panel", "battle", "battle-tab"));
   return stage;
 }
 
@@ -129,6 +133,7 @@ function renderViewTabs(viewState: ManualViewState): HTMLElement {
     const tab = document.createElement("button");
     tab.type = "button";
     tab.className = "view-tab";
+    tab.id = `${id}-tab`;
     tab.dataset.view = id;
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-selected", String(viewState.view === id));
@@ -165,7 +170,7 @@ function renderManualPanel(snapshot: GameViewSnapshot, sectionId: ManualSectionI
   const panel = element("article", "manual-content");
   panel.id = "manual-content";
   panel.setAttribute("role", "tabpanel");
-  panel.setAttribute("aria-label", MANUAL_TABS.find((item) => item.id === sectionId)?.label ?? "战术手册");
+  panel.setAttribute("aria-labelledby", sectionId);
   const heading = textElement("h2", "manual-heading", MANUAL_TABS.find((item) => item.id === sectionId)?.label ?? "战术手册");
   heading.tabIndex = -1;
   heading.dataset.manualHeading = "";
@@ -173,6 +178,16 @@ function renderManualPanel(snapshot: GameViewSnapshot, sectionId: ManualSectionI
 
   if (sectionId === "focus") renderFocusSection(panel, snapshot, reference);
   else for (const entry of entriesForSection(reference, sectionId)) panel.append(renderReferenceEntry(entry));
+  return panel;
+}
+
+function renderHiddenViewPanel(id: "battle-panel" | "manual-panel", view: "battle" | "manual", labelledBy: string): HTMLElement {
+  const panel = element("section", "view-panel-placeholder");
+  panel.id = id;
+  panel.dataset.view = view;
+  panel.setAttribute("role", "tabpanel");
+  panel.setAttribute("aria-labelledby", labelledBy);
+  panel.hidden = true;
   return panel;
 }
 
@@ -284,7 +299,7 @@ function renderFeedback(snapshot: GameViewSnapshot): HTMLElement {
   for (const message of messages) list.append(textElement("li", "", message));
   panel.append(list);
   const relatedReferenceId = snapshot.feedback.relatedReferenceIds?.[0];
-  if (relatedReferenceId !== undefined) {
+  if (snapshot.programReference !== undefined && relatedReferenceId !== undefined) {
     const referenceButton = document.createElement("button");
     referenceButton.type = "button";
     referenceButton.className = "feedback-reference-button";

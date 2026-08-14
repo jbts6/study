@@ -30,8 +30,16 @@ describe("manual view state", () => {
     expect(resolveManualView(
       { view: "manual", sectionId: "world" },
       { levelId: "go-marsh-02", revision: 0, hasReference: true },
-      undefined,
+      { previousLevelId: first.levelId },
     )).toEqual({ view: "manual", sectionId: "focus" });
+  });
+
+  it("does not infer a level change without an explicit previous level", () => {
+    expect(resolveManualView(
+      { view: "manual", sectionId: "world" },
+      { levelId: "go-marsh-02", revision: 0, hasReference: true },
+      undefined,
+    )).toEqual({ view: "manual", sectionId: "world" });
   });
 
   it("restores the persisted section for the same level", () => {

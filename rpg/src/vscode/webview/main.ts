@@ -49,6 +49,7 @@ window.addEventListener("message", (event: MessageEvent<ExtensionMessage>) => {
     hasReference: message.snapshot.programReference !== undefined,
   }, {
     previousRevision: previousSnapshot?.battleState.revision,
+    previousLevelId: previousSnapshot?.level.id,
     persistedLevelId: persistedState?.levelId,
   });
   persistManualState(message.snapshot.level.id);
@@ -140,7 +141,14 @@ function updateManualView(next: ManualViewState, focusMode: "view" | "section" |
   if (focusMode === "reference" && referenceId !== undefined) {
     const entry = [...root.querySelectorAll<HTMLElement>("[data-reference-id]")]
       .find((candidate) => candidate.dataset.referenceId === referenceId);
-    entry?.querySelector<HTMLElement>("[tabindex='-1']")?.focus();
+    const target = entry?.querySelector<HTMLElement>("[tabindex='-1']");
+    if (target !== null && target !== undefined) {
+      target.focus();
+      return;
+    }
+  }
+  if (focusMode === "reference") {
+    root.querySelector<HTMLElement>("[data-manual-heading]")?.focus();
     return;
   }
   if (focusMode === "section" || (focusMode === "view" && next.view === "manual")) {

@@ -60,6 +60,23 @@ describe("game Webview renderer", () => {
     expect(root.querySelector("[data-view-tabs]")).toBeNull();
   });
 
+  it("does not show a manual navigation button for Python combat feedback", () => {
+    const root = document.createElement("div");
+    renderGame(root, {
+      ...snapshot("python-marsh-02"),
+      feedback: {
+        kind: "error",
+        title: "指令无效",
+        messages: ["[INVALID_COMMAND] $.action 无效"],
+        stdout: "",
+        stderr: "",
+        relatedReferenceIds: ["type.turn-command"],
+      },
+    });
+
+    expect(root.querySelector("[data-local-command='openManualReference']")).toBeNull();
+  });
+
   it("renders the 6 by 4 finale without changing component structure", () => {
     const root = document.createElement("div");
     renderGame(root, snapshot("python-marsh-06", "light"));
@@ -198,6 +215,41 @@ describe("game Webview renderer", () => {
       feedback: { ...goSnapshot.feedback, title: "Go 编译失败", relatedReferenceIds: undefined },
     });
     expect(compileRoot.querySelector("[data-local-command='openManualReference']")).toBeNull();
+  });
+
+  it("keeps view and manual tab controls connected to labelled panels", () => {
+    const level = getLevel("go-marsh-01");
+    const goSnapshot: GameViewSnapshot = {
+      ...snapshot("go-marsh-01"),
+      campaignTitle: "Go 沼泽战役",
+      languageLabel: "Go",
+      playerFileName: "go-marsh-01.go",
+      level,
+      programReference: GO_PROGRAM.reference,
+    };
+
+    for (const view of ["battle", "manual"] as const) {
+      const root = document.createElement("div");
+      renderGame(root, goSnapshot, { view, sectionId: "focus" });
+
+      for (const tab of root.querySelectorAll<HTMLButtonElement>("[data-view-tabs] [role='tab']")) {
+        const panelId = tab.getAttribute("aria-controls");
+        expect(panelId).not.toBeNull();
+        const panel = panelId === null ? null : root.querySelector(`#${panelId}`);
+        expect(panel).not.toBeNull();
+        expect(panel?.getAttribute("aria-labelledby")).toBe(tab.id);
+      }
+
+      const manualTabs = [...root.querySelectorAll<HTMLButtonElement>("[data-manual-tabs] [role='tab']")];
+      const manualPanel = root.querySelector("#manual-content");
+      if (view === "manual") {
+        expect(manualTabs.map((tab) => tab.id)).toEqual(["focus", "turn-command", "world", "actions", "sdk"]);
+        expect(manualPanel?.getAttribute("aria-labelledby")).toBe("focus");
+      } else {
+        expect(manualTabs).toHaveLength(0);
+        expect(manualPanel).toBeNull();
+      }
+    }
   });
 
   it("renders every level with its own complete guidance and board dimensions", () => {
