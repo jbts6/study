@@ -6,8 +6,8 @@ import type {
   RunnerDiagnostic,
   RunnerState,
   RunResult,
-} from "../protocol/types";
-import { clearTimer, RunnerStateStore } from "../shared/adapter";
+} from "../protocol/types.ts";
+import { clearTimer, RunnerStateStore } from "../shared/adapter.ts";
 
 interface AdapterDependencies {
   startProcess(request: RunRequest): LocalPythonProcess;
