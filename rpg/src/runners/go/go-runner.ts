@@ -19,7 +19,7 @@ import {
   type StartGoProcess,
 } from "./go-process";
 
-interface GoRunnerOptions {
+export interface GoRunnerOptions {
   readonly globalStoragePath: string;
   readonly runtimeDirectory?: string;
   readonly detectGo?: () => Promise<GoDetection>;
@@ -50,6 +50,19 @@ const RECOVERY_ACTION = "修改 Go 代码后重新运行。";
 
 function diagnostic(code: string, message: string): RunnerDiagnostic {
   return { code, severity: "error", message, recoveryAction: RECOVERY_ACTION };
+}
+
+function cleanupDiagnostic(error: unknown): RunnerDiagnostic {
+  return {
+    code: "GO_CLEANUP_FAILED",
+    severity: "warning",
+    message: error instanceof Error ? error.message : String(error),
+    recoveryAction: "关闭 Runner 后重试；临时目录可能需要手动清理。",
+  };
+}
+
+function appendDiagnostic(result: RunResult, extra: RunnerDiagnostic): RunResult {
+  return { ...result, diagnostics: [...result.diagnostics, extra] };
 }
 
 function result(request: Pick<RunRequest, "runId" | "attemptId">, details: ResultDetails): RunResult {
@@ -133,9 +146,11 @@ export class GoRunner implements RunnerClient {
     this.states.set("connecting");
     const detection = await this.detect();
     if (!detection.ok) {
+      if (this.disposed) throw new Error("Go 执行器已关闭。");
       this.states.set("unavailable");
       throw new Error(`${detection.message} ${detection.recoveryAction}`);
     }
+    if (this.disposed) throw new Error("Go 执行器已关闭。");
     this.detection = detection;
     this.states.set("ready");
   }
@@ -173,6 +188,7 @@ export class GoRunner implements RunnerClient {
     this.active = active;
     this.states.set("running");
     let project: GoProject | undefined;
+    let outcome: RunResult;
     try {
       project = await this.prepareProject({
         request,
@@ -180,22 +196,28 @@ export class GoRunner implements RunnerClient {
         globalStoragePath: this.globalStoragePath,
         runtimeDirectory: this.runtimeDirectory,
       });
-      return await this.runProject(request, project, active);
+      outcome = await this.runProject(request, project, active);
     } catch (error) {
-      return result(request, {
+      outcome = result(request, {
         status: active.interrupted ? "interrupted" : "runner_error",
         diagnostics: [diagnostic(
           active.interrupted ? "RUNNER_INTERRUPTED" : "GO_RUNNER_FAILED",
           active.interrupted ? "Go 代码运行已中断。" : error instanceof Error ? error.message : String(error),
         )],
       });
+    }
+    let cleanupError: unknown;
+    try {
+      if (project) await project.cleanup();
+    } catch (error) {
+      cleanupError = error;
     } finally {
       clearTimer(active.interruptTimer);
       active.handle = undefined;
-      if (project) await project.cleanup();
       if (this.active === active) this.active = undefined;
       this.states.set(this.disposed ? "unavailable" : "ready");
     }
+    return cleanupError === undefined ? outcome : appendDiagnostic(outcome, cleanupDiagnostic(cleanupError));
   }
 
   interrupt(runId: string): void {
@@ -225,39 +247,54 @@ export class GoRunner implements RunnerClient {
     project: GoProject,
     active: ActiveRun,
   ): Promise<RunResult> {
-    let buildDurationMs = 0;
-    if (!project.cached) {
-      const build = await this.runStage(active, {
-        command: this.detection!.goPath,
-        args: ["build", "-o", project.buildBinaryPath, "."],
-        cwd: project.directory,
-        timeoutMs: request.limits.buildTimeoutMs,
-        maxOutputBytes: request.limits.maxOutputBytes,
-      });
-      buildDurationMs = build.durationMs;
-      if (active.interrupted) return this.interruptedResult(request, buildDurationMs, 0, build);
-      if (build.timedOut) {
-        return result(request, {
-          status: "timeout",
-          diagnostics: [diagnostic("GO_BUILD_TIMEOUT", `Go 构建超过 ${request.limits.buildTimeoutMs}ms，已停止。`)],
-          stderr: build.stderr,
-          truncated: build.truncated,
-          buildDurationMs,
-        });
-      }
-      if (build.exitCode !== 0) {
-        return result(request, {
-          status: "compile_error",
-          diagnostics: parseCompileDiagnostics(build.stderr, request.questId),
-          stdout: build.stdout,
-          stderr: build.stderr,
-          truncated: build.truncated,
-          buildDurationMs,
-        });
-      }
-      await project.promoteBuild();
-    }
+    const build = await this.buildProject(request, project, active);
+    if (!build.ok) return build.result;
+    return this.executeProject(request, project, active, build.durationMs);
+  }
 
+  private async buildProject(
+    request: CompiledRunRequest,
+    project: GoProject,
+    active: ActiveRun,
+  ): Promise<{ readonly ok: true; readonly durationMs: number } | { readonly ok: false; readonly result: RunResult }> {
+    if (project.cached) return { ok: true, durationMs: 0 };
+    const build = await this.runStage(active, {
+      command: this.detection!.goPath,
+      args: ["build", "-o", project.buildBinaryPath, "."],
+      cwd: project.directory,
+      timeoutMs: request.limits.buildTimeoutMs,
+      maxOutputBytes: request.limits.maxOutputBytes,
+    });
+    if (active.interrupted) return { ok: false, result: this.interruptedResult(request, build.durationMs, 0, build) };
+    if (build.timedOut) {
+      return { ok: false, result: result(request, {
+        status: "timeout",
+        diagnostics: [diagnostic("GO_BUILD_TIMEOUT", `Go 构建超过 ${request.limits.buildTimeoutMs}ms，已停止。`)],
+        stderr: build.stderr,
+        truncated: build.truncated,
+        buildDurationMs: build.durationMs,
+      }) };
+    }
+    if (build.exitCode !== 0) {
+      return { ok: false, result: result(request, {
+        status: "compile_error",
+        diagnostics: parseCompileDiagnostics(build.stderr, request.questId),
+        stdout: build.stdout,
+        stderr: build.stderr,
+        truncated: build.truncated,
+        buildDurationMs: build.durationMs,
+      }) };
+    }
+    await project.promoteBuild();
+    return { ok: true, durationMs: build.durationMs };
+  }
+
+  private async executeProject(
+    request: CompiledRunRequest,
+    project: GoProject,
+    active: ActiveRun,
+    buildDurationMs: number,
+  ): Promise<RunResult> {
     const execution = await this.runStage(active, {
       command: project.binaryPath,
       args: [],
@@ -291,8 +328,17 @@ export class GoRunner implements RunnerClient {
         executionDurationMs,
       });
     }
+    return this.readExecutionResult(request, project.resultPath, execution, buildDurationMs, executionDurationMs);
+  }
 
-    const returnValue = await readTurnResult(project.resultPath);
+  private async readExecutionResult(
+    request: CompiledRunRequest,
+    resultPath: string,
+    execution: GoProcessResult,
+    buildDurationMs: number,
+    executionDurationMs: number,
+  ): Promise<RunResult> {
+    const returnValue = await readTurnResult(resultPath);
     if (returnValue === undefined) {
       return result(request, {
         status: "runner_error",

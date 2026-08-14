@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { clearTimer } from "../shared/adapter";
 
 export interface StartGoProcessOptions {
@@ -28,6 +28,33 @@ export interface GoProcessHandle {
 }
 
 export type StartGoProcess = (options: StartGoProcessOptions) => GoProcessHandle;
+
+export type ProcessTreeTermination =
+  | Readonly<{ kind: "taskkill"; args: readonly string[] }>
+  | Readonly<{ kind: "process-group"; pid: number; signal: NodeJS.Signals }>;
+
+export function processTreeTermination(
+  platform: NodeJS.Platform,
+  pid: number,
+  signal: NodeJS.Signals,
+): ProcessTreeTermination {
+  if (platform === "win32") {
+    return {
+      kind: "taskkill",
+      args: ["/PID", String(pid), "/T", ...(signal === "SIGKILL" ? ["/F"] : [])],
+    };
+  }
+  return { kind: "process-group", pid: -pid, signal };
+}
+
+function runTaskkill(args: readonly string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile("taskkill", [...args], { windowsHide: true }, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
 
 class LimitedOutput {
   private readonly chunks: Buffer[] = [];
@@ -73,6 +100,7 @@ export class GoProcess implements GoProcessHandle {
       cwd: options.cwd,
       env: options.env ?? process.env,
       stdio: ["pipe", "pipe", "pipe"],
+      detached: process.platform !== "win32",
       windowsHide: true,
     });
 
@@ -81,7 +109,9 @@ export class GoProcess implements GoProcessHandle {
     this.result = new Promise<GoProcessResult>((resolve, reject) => {
       const timer = setTimeout(() => {
         timedOut = true;
-        this.child.kill("SIGKILL");
+        void this.terminateTree("SIGKILL").catch(() => {
+          if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill("SIGKILL");
+        });
       }, options.timeoutMs);
       this.child.stdout.on("data", (chunk: Buffer) => stdout.append(chunk));
       this.child.stderr.on("data", (chunk: Buffer) => stderr.append(chunk));
@@ -108,13 +138,39 @@ export class GoProcess implements GoProcessHandle {
   }
 
   interrupt(): void {
-    if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill("SIGINT");
+    void this.terminateTree("SIGINT").catch(() => {
+      if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill("SIGINT");
+    });
   }
 
   async kill(): Promise<void> {
-    if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill("SIGKILL");
+    await this.terminateTree("SIGKILL");
     await this.exited;
   }
+
+  private async terminateTree(signal: NodeJS.Signals): Promise<void> {
+    if (this.child.exitCode !== null || this.child.signalCode !== null) return;
+    const pid = this.child.pid;
+    if (pid === undefined) {
+      if (!this.child.kill(signal)) throw new Error("Go 进程没有可终止的 PID。");
+      return;
+    }
+    const plan = processTreeTermination(process.platform, pid, signal);
+    try {
+      if (plan.kind === "taskkill") await runTaskkill(plan.args);
+      else process.kill(plan.pid, plan.signal);
+    } catch (error) {
+      if (isNoSuchProcess(error)) return;
+      if (this.child.exitCode !== null || this.child.signalCode !== null) return;
+      if (!this.child.kill(signal)) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
+    }
+  }
+}
+
+function isNoSuchProcess(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ESRCH";
 }
 
 export const startGoProcess: StartGoProcess = (options) => new GoProcess(options);
