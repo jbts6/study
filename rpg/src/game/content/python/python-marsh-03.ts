@@ -1,5 +1,5 @@
-import type { BattleState } from "../combat/types";
-import type { LevelDefinition } from "./types";
+import type { BattleState } from "../../combat/types";
+import type { LevelDefinition } from "../shared/types";
 
 export const STARTER_CODE_03 = `# 遍历 world["units"]，选择优先处理的敌人。
 # 敌人全部失能前，请激活 scout-mark。

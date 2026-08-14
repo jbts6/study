@@ -1,5 +1,5 @@
-import type { BattleState } from "../combat/types";
-import type { LevelDefinition } from "./types";
+import type { BattleState } from "../../combat/types";
+import type { LevelDefinition } from "../shared/types";
 
 export const STARTER_CODE_04 = `# 下面的表达式只示范组合条件语法，不对应本关答案。
 # world 会公开单位、目标、危险格和技能冷却。

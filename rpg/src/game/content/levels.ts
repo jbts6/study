@@ -1,15 +1,10 @@
 import { ABILITY_CATALOG } from "./ability-catalog";
-import { PYTHON_MARSH_01 } from "./python-marsh-01";
-import { PYTHON_MARSH_02 } from "./python-marsh-02";
-import { PYTHON_MARSH_03 } from "./python-marsh-03";
-import { PYTHON_MARSH_04 } from "./python-marsh-04";
-import { PYTHON_MARSH_05 } from "./python-marsh-05";
-import { PYTHON_MARSH_06 } from "./python-marsh-06";
-import type { LevelDefinition, LevelId } from "./types";
+import { PYTHON_LEVEL_ORDER, PYTHON_LEVELS } from "./python/levels";
+import type { LevelDefinition, LevelId } from "./shared/types";
 
-export const LEVEL_ORDER: readonly LevelId[] = ["python-marsh-01", "python-marsh-02", "python-marsh-03", "python-marsh-04", "python-marsh-05", "python-marsh-06"];
+export const LEVEL_ORDER: readonly LevelId[] = PYTHON_LEVEL_ORDER;
 
-const LEVELS = [PYTHON_MARSH_01, PYTHON_MARSH_02, PYTHON_MARSH_03, PYTHON_MARSH_04, PYTHON_MARSH_05, PYTHON_MARSH_06] as const;
+const LEVELS = PYTHON_LEVELS;
 
 validateLevels(LEVELS);
 

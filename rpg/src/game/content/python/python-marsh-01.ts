@@ -1,5 +1,5 @@
-import type { BattleState } from "../combat/types";
-import type { LevelDefinition } from "./types";
+import type { BattleState } from "../../combat/types";
+import type { LevelDefinition } from "../shared/types";
 
 export const CURRENT_LEVEL_ID = "python-marsh-01" as const;
 
