@@ -164,9 +164,12 @@ function createGameShell(controller: AppController, snapshot: GameSnapshot): Gam
     dialog.close();
   });
 
-  const editor = mountCodeEditor(requiredElement(element, "[data-testid='code-editor']"), snapshot.codeDraft, (code) => {
-    controller.setCode(code);
-  });
+  const editor = mountCodeEditor(
+    requiredElement(element, "[data-testid='code-editor']"),
+    snapshot.codeDraft,
+    controller.campaign.program.language,
+    (code) => controller.setCode(code),
+  );
   const shell: GameShell = {
     element,
     controller,

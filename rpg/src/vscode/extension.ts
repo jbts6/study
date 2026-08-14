@@ -12,9 +12,11 @@ import { DocumentWorkspace, levelFilePath, type WorkspaceDocument, type Workspac
 import type { ThemePreference, WebviewCommand } from "./messages";
 import { WorkspaceSaveStore } from "./workspace-save-store";
 import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
+import type { CampaignDefinition } from "../programs/types";
 
 const THEME_KEY = "python-rpg.theme";
 const PANEL_TYPE = "pythonRpg.game";
+const DEFAULT_CAMPAIGN = PYTHON_RPG_CAMPAIGN;
 
 export function activate(context: vscode.ExtensionContext): void {
   let activeGame: ActiveGame | undefined;
@@ -92,17 +94,18 @@ class ActiveGame {
 }
 
 async function createActiveGame(context: vscode.ExtensionContext): Promise<ActiveGame | undefined> {
+  const campaign = DEFAULT_CAMPAIGN;
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   if (workspaceFolder === undefined) {
     await vscode.window.showErrorMessage("Python RPG 需要一个已打开的工作区文件夹，用于保存六个关卡脚本。");
     return undefined;
   }
 
-  const workspace = new DocumentWorkspace(createWorkspaceHost(workspaceFolder.uri));
+  const workspace = new DocumentWorkspace(createWorkspaceHost(workspaceFolder.uri), campaign);
   const saveStore = new WorkspaceSaveStore({
     get: (key) => context.workspaceState.get(key),
     update: async (key, value) => { await context.workspaceState.update(key, value); },
-  });
+  }, campaign.id);
   await workspace.ensureLevelFiles();
   const loaded = saveStore.load();
   await workspace.openLevel(loaded.ok && loaded.save !== null ? loaded.save.currentLevelId : "python-marsh-01");
@@ -120,11 +123,11 @@ async function createActiveGame(context: vscode.ExtensionContext): Promise<Activ
   const diagnostics = vscode.languages.createDiagnosticCollection("python-rpg");
   panel.webview.html = loadingHtml(panel.webview, context.extensionUri);
   const runner = createRunner(context);
-  const controller = new AppController({ runner, saveStore, runLimits: createDefaultRunLimits() }, PYTHON_RPG_CAMPAIGN);
+  const controller = new AppController({ runner, saveStore, runLimits: createDefaultRunLimits() }, campaign);
   const session = new GameSession({
     controller,
     workspace,
-    diagnostics: createDiagnostics(diagnostics, workspaceFolder.uri.fsPath),
+    diagnostics: createDiagnostics(diagnostics, workspaceFolder.uri.fsPath, campaign),
     postMessage: (message) => panel.webview.postMessage(message),
     getTheme: () => readTheme(context),
     setTheme: (theme) => context.workspaceState.update(THEME_KEY, theme),
@@ -184,19 +187,34 @@ function createWorkspaceHost(root: vscode.Uri): WorkspaceHost {
   };
 }
 
-function createDiagnostics(collection: vscode.DiagnosticCollection, workspaceRoot: string): SessionDiagnostics {
+function createDiagnostics(
+  collection: vscode.DiagnosticCollection,
+  workspaceRoot: string,
+  campaign: CampaignDefinition,
+): SessionDiagnostics {
   return {
     clear: () => collection.clear(),
     replace: (levelId, values) => {
-      const projected = values.flatMap((diagnostic) => toVsCodeDiagnostic(diagnostic));
-      collection.set(vscode.Uri.file(levelFilePath(workspaceRoot, levelId)), projected);
+      const sourceFileName = campaign.program.sourceFileName(levelId);
+      const entrypointFileName = campaign.program.runEntrypointFileName(levelId);
+      const projected = values.flatMap((diagnostic) => toVsCodeDiagnostic(
+        mapDiagnosticFile(diagnostic, entrypointFileName, sourceFileName),
+        sourceFileName,
+        diagnosticSource(campaign.program.editorLanguageId),
+      ));
+      collection.set(vscode.Uri.file(levelFilePath(workspaceRoot, campaign, levelId)), projected);
     },
   };
 }
 
-function toVsCodeDiagnostic(value: RunnerDiagnostic): vscode.Diagnostic[] {
+function mapDiagnosticFile(value: RunnerDiagnostic, entrypointFileName: string, sourceFileName: string): RunnerDiagnostic {
+  if (value.location?.file !== entrypointFileName || entrypointFileName === sourceFileName) return value;
+  return { ...value, location: { ...value.location, file: sourceFileName } };
+}
+
+function toVsCodeDiagnostic(value: RunnerDiagnostic, sourceFileName: string, source: string): vscode.Diagnostic[] {
   const location = value.location;
-  if (location === undefined || location.file !== "main.py") return [];
+  if (location === undefined || location.file !== sourceFileName) return [];
   const line = Math.max(0, location.line - 1);
   const column = Math.max(0, (location.column ?? 1) - 1);
   const start = new vscode.Position(line, column);
@@ -206,8 +224,13 @@ function toVsCodeDiagnostic(value: RunnerDiagnostic): vscode.Diagnostic[] {
     diagnosticSeverity(value.severity),
   );
   diagnostic.code = value.code;
-  diagnostic.source = "Python RPG";
+  diagnostic.source = source;
   return [diagnostic];
+}
+
+function diagnosticSource(editorLanguageId: string): string {
+  const name = editorLanguageId.length === 0 ? editorLanguageId : `${editorLanguageId[0]!.toUpperCase()}${editorLanguageId.slice(1)}`;
+  return `${name} RPG`;
 }
 
 function diagnosticSeverity(value: RunnerDiagnostic["severity"]): vscode.DiagnosticSeverity {

@@ -1,5 +1,6 @@
 import { basicSetup, EditorView } from "codemirror";
 import { Compartment, EditorState } from "@codemirror/state";
+import { go } from "@codemirror/lang-go";
 import { python } from "@codemirror/lang-python";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
@@ -60,14 +61,16 @@ export type CodeEditorHandle = Readonly<{
 export function mountCodeEditor(
   parent: HTMLElement,
   initialValue: string,
+  language: "python" | "go",
   onChange: (value: string) => void,
 ): CodeEditorHandle {
   const editable = new Compartment();
+  const languageExtension = language === "go" ? go() : python();
   const state = EditorState.create({
     doc: initialValue,
     extensions: [
       basicSetup,
-      python(),
+      languageExtension,
       syntaxHighlighting(pythonLightHighlightStyle),
       editable.of(EditorView.editable.of(true)),
       EditorView.updateListener.of((update) => {
