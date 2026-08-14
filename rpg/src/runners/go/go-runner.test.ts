@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { WorldView } from "../../game/combat/types";
 import { worldViewFixture } from "../../game/testing/fixture";
 import type { CompiledRunRequest } from "../protocol/types";
 import type { GoProcessHandle, GoProcessResult, StartGoProcessOptions } from "./go-process";
@@ -16,7 +17,11 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-function request(source: string, overrides: Partial<CompiledRunRequest["limits"]> = {}): CompiledRunRequest {
+function request(
+  source: string,
+  overrides: Partial<CompiledRunRequest["limits"]> = {},
+  worldView: WorldView = worldViewFixture,
+): CompiledRunRequest {
   return {
     protocolVersion: 1,
     runId: "run-go-1",
@@ -25,7 +30,7 @@ function request(source: string, overrides: Partial<CompiledRunRequest["limits"]
     language: "go",
     files: { "strategy.go": source },
     entrypoint: { file: "strategy.go" },
-    worldView: worldViewFixture,
+    worldView,
     limits: {
       timeoutMs: 5_000,
       buildTimeoutMs: 2_000,
@@ -41,6 +46,77 @@ function request(source: string, overrides: Partial<CompiledRunRequest["limits"]
     },
   };
 }
+
+const sdkWorldViewFixture: WorldView = {
+  ...worldViewFixture,
+  units: worldViewFixture.units.map((unit) => unit.id === "scout"
+    ? {
+        ...unit,
+        statuses: [{ id: "warded", remainingTurns: 2, defenseBonus: 1 }],
+      }
+    : unit),
+};
+
+const sdkContractProgram = `package main
+
+func require(condition bool, message string) {
+    if !condition {
+        panic(message)
+    }
+}
+
+func ChooseTurn(world World) TurnCommand {
+    require(world.BattleID == "core-fixture", "battleId")
+    require(world.ContentVersion == "python-slice-1", "contentVersion")
+    require(world.ActiveUnitID == "scout", "activeUnitId")
+    require(world.Revision == 0, "revision")
+    require(world.Board.Width == 3 && world.Board.Height == 2, "board size")
+    require(len(world.Board.BlockedCells) == 0, "blocked cells")
+    require(len(world.Board.HazardCells) == 1 && world.Board.HazardCells[0] == (Cell{X: 2, Y: 1}), "hazard cells")
+    require(len(world.Board.CoverCells) == 1 && world.Board.CoverCells[0] == (Cell{X: 2, Y: 0}), "cover cells")
+    require(len(world.Objectives) == 1, "objectives")
+    relay := world.Objectives[0]
+    require(relay.ID == "relay" && relay.Cell == (Cell{X: 0, Y: 1}), "relay identity")
+    require(relay.Durability == 2 && !relay.Completed, "relay state")
+    require(len(world.Units) == 2, "units")
+    scout := world.Units[0]
+    require(scout.ID == "scout" && scout.Team == "allies", "scout identity")
+    require(scout.Cell == (Cell{X: 0, Y: 0}) && scout.HP == 10 && scout.MaxHP == 10, "scout health")
+    require(!scout.Disabled && scout.Move == 2 && scout.Attack == 4 && scout.Defense == 0, "scout stats")
+    require(len(scout.Statuses) == 1, "scout statuses")
+    require(scout.Statuses[0].ID == "warded" && scout.Statuses[0].RemainingTurns == 2 && scout.Statuses[0].DefenseBonus == 1, "status fields")
+    require(len(scout.Skills) == 2, "scout skills")
+    spark := scout.Skills[0]
+    require(spark.ID == "spark" && spark.Range == 2 && spark.Power == 2, "spark stats")
+    require(spark.RemainingCooldown == 0 && spark.Target == "unit" && spark.Kind == "damage", "spark fields")
+    golem := world.Units[1]
+    require(golem.ID == "golem" && golem.Team == "enemies", "golem identity")
+    require(golem.HP == 8 && golem.MaxHP == 8 && !golem.Disabled, "golem state")
+
+    switch world.Round {
+    case 1:
+        return Guard(world)
+    case 2:
+        return Cast(world, "spark", "golem")
+    case 3:
+        return MoveAndCast(world, []Cell{{X: 1, Y: 0}}, "spark", "golem")
+    case 4:
+        return Interact(world, "relay")
+    case 5:
+        return MoveAndInteract(world, []Cell{{X: 0, Y: 1}}, "relay")
+    default:
+        panic("unexpected round")
+    }
+}
+`;
+
+const sdkExpectedTurns = [
+  { round: 1, command: { actorId: "scout", expectedRevision: 0, action: { type: "guard" } } },
+  { round: 2, command: { actorId: "scout", expectedRevision: 0, action: { type: "cast", targetId: "golem", skillId: "spark" } } },
+  { round: 3, command: { actorId: "scout", expectedRevision: 0, movePath: [{ x: 1, y: 0 }], action: { type: "cast", targetId: "golem", skillId: "spark" } } },
+  { round: 4, command: { actorId: "scout", expectedRevision: 0, action: { type: "interact", targetId: "relay" } } },
+  { round: 5, command: { actorId: "scout", expectedRevision: 0, movePath: [{ x: 0, y: 1 }], action: { type: "interact", targetId: "relay" } } },
+] as const;
 
 function completedProcess(overrides: Partial<GoProcessResult> = {}): GoProcessHandle {
   return {
@@ -265,11 +341,10 @@ func ChooseTurn(world World) TurnCommand {
     });
   });
 
-  it("使用本机 Go 执行 Wait(world)，或返回明确的工具链恢复信息", async () => {
+  it("使用本机 Go 校验完整世界字段并精确构造六关所需动作", async () => {
     const detection = await detectGo();
     if (!detection.ok) {
-      expect(detection).toMatchObject({ code: "GO_NOT_FOUND", recoveryAction: expect.stringContaining("go.dev") });
-      return;
+      throw new Error(`${detection.code}: ${detection.recoveryAction}`);
     }
     const root = await mkdtemp(path.join(tmpdir(), "go-runner-real-test-"));
     roots.push(root);
@@ -280,13 +355,15 @@ func ChooseTurn(world World) TurnCommand {
     });
     await runner.connect();
 
-    await expect(runner.run(request(
-      "package main\nfunc ChooseTurn(world World) TurnCommand { return Wait(world) }\n",
-      { buildTimeoutMs: 15_000, executionTimeoutMs: 5_000 },
-    ))).resolves.toMatchObject({
-      executionStatus: "completed",
-      returnValue: { actorId: "scout", expectedRevision: 0, action: { type: "wait" } },
-    });
+    for (const expected of sdkExpectedTurns) {
+      const result = await runner.run(request(
+        sdkContractProgram,
+        { buildTimeoutMs: 15_000, executionTimeoutMs: 5_000 },
+        { ...sdkWorldViewFixture, round: expected.round },
+      ));
+      expect(result.executionStatus).toBe("completed");
+      expect(result.returnValue).toEqual(expected.command);
+    }
     runner.close();
   });
 });

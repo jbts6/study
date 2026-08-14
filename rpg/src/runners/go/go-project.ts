@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { CompiledRunRequest, JsonValue } from "../protocol/types";
 
-const SDK_VERSION = "1";
+const SDK_VERSION = "2";
 
 export interface GoProject {
   readonly directory: string;
@@ -32,6 +32,21 @@ async function exists(file: string): Promise<boolean> {
   }
 }
 
+export function createGoBuildCacheKey(
+  source: string,
+  sdkVersion: string,
+  goVersion: string,
+  platform: string,
+  arch: string,
+): string {
+  return createHash("sha256")
+    .update(source)
+    .update(sdkVersion)
+    .update(goVersion)
+    .update(`${platform}/${arch}`)
+    .digest("hex");
+}
+
 export async function createGoProject(options: CreateGoProjectOptions): Promise<GoProject> {
   const source = options.request.files[options.request.entrypoint.file];
   const runtimeDirectory = options.runtimeDirectory;
@@ -40,12 +55,13 @@ export async function createGoProject(options: CreateGoProjectOptions): Promise<
     readFile(path.join(runtimeDirectory, "sdk.go"), "utf8"),
     readFile(path.join(runtimeDirectory, "runner_main.go"), "utf8"),
   ]);
-  const hash = createHash("sha256")
-    .update(source)
-    .update(SDK_VERSION)
-    .update(options.goVersion)
-    .update(`${process.platform}/${process.arch}`)
-    .digest("hex");
+  const hash = createGoBuildCacheKey(
+    source,
+    SDK_VERSION,
+    options.goVersion,
+    process.platform,
+    process.arch,
+  );
   const cacheDirectory = path.join(options.globalStoragePath, "go-cache");
   const binaryName = `${hash}${process.platform === "win32" ? ".exe" : ""}`;
   const binaryPath = path.join(cacheDirectory, binaryName);
