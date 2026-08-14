@@ -240,16 +240,39 @@ describe("game Webview renderer", () => {
         expect(panel?.getAttribute("aria-labelledby")).toBe(tab.id);
       }
 
-      const manualTabs = [...root.querySelectorAll<HTMLButtonElement>("[data-manual-tabs] [role='tab']")];
       const manualPanel = root.querySelector("#manual-content");
       if (view === "manual") {
+        const manualTabs = [...root.querySelectorAll<HTMLButtonElement>("[data-manual-tabs] [role='tab']")];
         expect(manualTabs.map((tab) => tab.id)).toEqual(["focus", "turn-command", "world", "actions", "sdk"]);
         expect(manualPanel?.getAttribute("aria-labelledby")).toBe("focus");
+        for (const sectionId of ["focus", "turn-command", "world", "actions", "sdk"] as const) {
+          const sectionRoot = document.createElement("div");
+          renderGame(sectionRoot, goSnapshot, { view: "manual", sectionId });
+          const selectedTab = sectionRoot.querySelector<HTMLButtonElement>("[data-manual-tabs] [aria-selected='true']");
+          const sectionPanel = sectionRoot.querySelector<HTMLElement>("#manual-content");
+          expect(selectedTab?.id).toBe(sectionId);
+          expect(selectedTab?.getAttribute("aria-controls")).toBe("manual-content");
+          expect(sectionPanel?.getAttribute("aria-labelledby")).toBe(sectionId);
+        }
       } else {
-        expect(manualTabs).toHaveLength(0);
+        expect(root.querySelectorAll("[data-manual-tabs] [role='tab']")).toHaveLength(0);
         expect(manualPanel).toBeNull();
       }
     }
+
+    const sdkRoot = document.createElement("div");
+    renderGame(sdkRoot, goSnapshot, { view: "manual", sectionId: "sdk" });
+    const reference = GO_PROGRAM.reference;
+    if (reference === undefined) throw new Error("Go reference is required for SDK rendering assertions");
+    const expectedReferenceIds = [
+      "entrypoint.choose-turn",
+      ...reference.sections.flatMap((section) => section.entries.map((entry) => entry.id)),
+    ];
+    for (const referenceId of expectedReferenceIds) {
+      expect(sdkRoot.querySelector(`[data-reference-id='${referenceId}']`), referenceId).not.toBeNull();
+    }
+    expect(sdkRoot.textContent).toContain("func ChooseTurn(world World) TurnCommand");
+    expect(sdkRoot.textContent).toContain("func MoveAndInteract(world World, path []Cell, targetID string) TurnCommand");
   });
 
   it("renders every level with its own complete guidance and board dimensions", () => {

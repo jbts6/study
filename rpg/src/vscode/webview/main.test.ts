@@ -75,6 +75,13 @@ describe("webview main local manual interactions", () => {
     sendSnapshot(goSnapshot());
     stateCalls.length = 0;
 
+    const viewTabs = [...root.querySelectorAll<HTMLButtonElement>("[data-view-tabs] [role='tab']")];
+    viewTabs[0]!.focus();
+    press(viewTabs[0]!, "ArrowLeft");
+    expect(document.activeElement).toBe(viewTabs.at(-1));
+    press(viewTabs.at(-1)!, "ArrowRight");
+    expect(document.activeElement).toBe(viewTabs[0]);
+
     let manualTabs = [...root.querySelectorAll<HTMLButtonElement>("[data-manual-tabs] [role='tab']")];
     manualTabs[0]!.focus();
     press(manualTabs[0]!, "ArrowLeft");
