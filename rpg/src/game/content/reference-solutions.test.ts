@@ -108,15 +108,17 @@ const marsh02Solution: ReferenceSolution = (world) => {
   return castOrAttack(world, "corruptor", ["spark"]);
 };
 
+const marsh03Solution: ReferenceSolution = (world) => {
+  const hunterA = findUnit(world, "hunter-a");
+  if (!hunterA.disabled) return castOrAttack(world, "hunter-a", ["spark"]);
+  if (!findObjective(world, "scout-mark").completed) return interactWith(world, "scout-mark");
+  return castOrAttack(world, "hunter-b", ["spark"]);
+};
+
 const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
   "python-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
   "python-marsh-02": marsh02Solution,
-  "python-marsh-03": (world) => {
-    const hunterA = findUnit(world, "hunter-a");
-    if (!hunterA.disabled) return castOrAttack(world, "hunter-a", ["spark"]);
-    if (!findObjective(world, "scout-mark").completed) return interactWith(world, "scout-mark");
-    return castOrAttack(world, "hunter-b", ["spark"]);
-  },
+  "python-marsh-03": marsh03Solution,
   "python-marsh-04": (world) => {
     const corruptor = findUnit(world, "corruptor");
     if (!corruptor.disabled) return castOrAttack(world, "corruptor", ["spark"]);
@@ -164,9 +166,15 @@ const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
   },
   "go-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
   "go-marsh-02": marsh02Solution,
+  "go-marsh-03": marsh03Solution,
 };
 
-const REFERENCE_LEVEL_IDS: readonly LevelId[] = [...LEVEL_ORDER, "go-marsh-01", "go-marsh-02"];
+const REFERENCE_LEVEL_IDS: readonly LevelId[] = [
+  ...LEVEL_ORDER,
+  "go-marsh-01",
+  "go-marsh-02",
+  "go-marsh-03",
+];
 
 function parseInstruction(input: TurnCommand): TurnCommand {
   return JSON.parse(JSON.stringify(input)) as TurnCommand;

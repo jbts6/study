@@ -61,6 +61,7 @@ const LEVEL_UNLOCKS: Readonly<Record<LevelId, readonly AbilityId[]>> = {
   "python-marsh-06": ["ward", "pierce", "renew", "fracture", "aegis"],
   "go-marsh-01": [],
   "go-marsh-02": ["ward"],
+  "go-marsh-03": ["ward", "pierce"],
 };
 
 function copySkill(skill: Skill): Skill {

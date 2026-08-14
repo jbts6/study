@@ -67,6 +67,7 @@ describe("ABILITY_CATALOG", () => {
       "python-marsh-06": ["spark", "mend", "ward", "pierce", "renew", "fracture", "aegis"],
       "go-marsh-01": ["spark", "mend"],
       "go-marsh-02": ["spark", "mend", "ward"],
+      "go-marsh-03": ["spark", "mend", "ward", "pierce"],
     };
 
     for (const [levelId, expectedSkillIds] of Object.entries(expectedSkillsByLevel)) {
