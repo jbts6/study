@@ -34,14 +34,17 @@
 先引入一层很小的“语言战役描述”，不要马上泛化为插件注册框架。每个语言战役独立维护关卡数量、教学内容与源码模板，不能假设三者始终同关数或同进度。
 
 ```text
-LevelDefinition
-  ├─ 战斗定义、奖励、引导目标                 继续复用
+CampaignDefinition
+  ├─ language: python | go | rust
+  ├─ levelOrder: readonly LevelId[]
   └─ PlayerProgramDefinition
-       ├─ language: python | go | rust
        ├─ workspaceDirectory: "python-rpg" | "go-rpg" | "rust-rpg"
        ├─ sourceFileName(levelId): string
        ├─ starterFiles(level): Record<string, string>
        └─ runConvention: 固定的项目入口约定
+
+LevelDefinition
+  └─ 战斗定义、奖励、引导目标                 按战役独立维护
 
 AppController
   └─ 按 PlayerProgramDefinition 创建 RunRequest
@@ -54,6 +57,60 @@ RunnerClient
 `RunRequest` 保持顶层相关性字段、`worldView`、限制和 `files`；把 `language` 扩展为 `"python" | "go" | "rust"`。`allowedModules` 继续作为仅 Python 的适配器字段，不进入 Go/Rust 的通用协议。编译型语言的入口不再表达“可调用函数名”，改为固定项目约定：每个临时项目均由宿主生成 `main`，它读取 stdin 的 `WorldView` JSON，调用玩家导出的策略函数，向 stdout 写出一行 `TurnCommand` JSON。
 
 这让宿主能始终控制 stdin/stdout 协议，玩家只需实现强类型策略函数。
+
+### 目录与复用边界
+
+保持一个 `rpg/` 宿主工程，不能复制为三套完整项目。复制宿主会让 VS Code 扩展、Webview 和战斗规则演变成三套实现，并造成行为漂移。
+
+```text
+rpg/src/
+  app/                       单一游戏控制器与通用界面状态
+  vscode/                    单一扩展、Webview、诊断与工作区服务
+  game/
+    combat/                  共享：回合结算、指令校验、战斗类型
+    world/                   共享：WorldView 投影
+    campaign/                共享：敌方行动、关卡规则
+    content/
+      shared/                可复用能力表与战斗场景骨架
+      python/                Python 关卡、教学、模板、战役顺序
+      go/                    Go 关卡、教学、模板、战役顺序
+      rust/                  Rust 关卡、教学、模板、战役顺序
+  programs/
+    types.ts                 CampaignDefinition、PlayerProgramDefinition
+    python/                  Python 文件与入口约定
+    go/                      Go 文件、SDK 与入口约定
+    rust/                    Rust 文件、SDK 与入口约定
+  runners/
+    protocol/                共享 RunRequest、RunResult 与诊断模型
+    shared/                  共享进程管理、超时、中断与输出限长
+    python/                  Python 本地代码执行器
+    go/                      Go 工具链探测、临时项目与构建
+    rust/                    Rust 工具链探测、Cargo 工作区与构建
+```
+
+`CampaignDefinition` 拥有一种语言的关卡顺序和 `PlayerProgramDefinition`；`LevelDefinition` 只描述单个语言战役中的战斗、教学和玩家程序模板。不要在一个关卡定义中并列三种语言的模板或教学字段。
+
+复用契约如下：
+
+- 共享：`TurnCommand` JSON、`WorldView`、战斗规则、敌方行动、通用诊断展示，以及 VS Code 的打开、运行和中断流程。
+- 独立：关卡 ID、关卡顺序、教学目标、说明文案、模板、玩家源码文件、工具链检测、构建策略、工作区目录和存档。
+- 可选共享：适合多种语言的地图、敌人和奖励可在 `content/shared/` 定义战斗场景骨架；每个语言关卡自行引用，不共享关卡 ID，也不要求相同关数。
+
+玩家工作区与存档按照战役隔离：
+
+```text
+<用户工作区>/
+  python-rpg/
+  go-rpg/
+  rust-rpg/
+
+VS Code workspaceState/
+  python-rpg.save
+  go-rpg.save
+  rust-rpg.save
+```
+
+切换战役只切换 `CampaignDefinition`。它不得读取、覆盖或迁移其他语言的源码和进度。
 
 ## 统一玩家 API
 
@@ -75,7 +132,7 @@ func ChooseTurn(world World) TurnCommand {
 }
 ```
 
-宿主生成的 `runner_main.go` 负责 `json.NewDecoder(os.Stdin)`、调用 `ChooseTurn`、把最终命令 JSON 写入 `RPG_RESULT_PATH`。同包 API 定义 `World`、坐标、单位、技能与扁平的 `TurnCommand`/`Action` 结构体，字段使用 JSON tag 保持 `actorId`、`expectedRevision`、`movePath`、`action`。保持扁平结构，继续让 TypeScript 规则层反馈非法字段组合，不为六关教学引入 Go 接口体系。
+宿主生成的 `runner_main.go` 负责 `json.NewDecoder(os.Stdin)`、调用 `ChooseTurn`、把最终命令 JSON 写入 `RPG_RESULT_PATH`。同包 API 定义 `World`、坐标、单位、技能与扁平的 `TurnCommand`/`Action` 结构体，字段使用 JSON tag 保持 `actorId`、`expectedRevision`、`movePath`、`action`。保持扁平结构，继续让 TypeScript 规则层反馈非法字段组合，不为首版教学引入 Go 接口体系。
 
 玩家 API 不返回 `error`：回合策略是纯同步选择；程序级失败由编译错误、panic 和超时统一报告。这样第一关不会被 Go 的错误处理噪音淹没。
 
@@ -140,10 +197,11 @@ Go 的模块依赖固定为项目内 `rpg/sdk`，`GONOSUMDB`、联网拉取、�
 ### 阶段 0：语言战役底座
 
 1. 将 `RunRequest`、请求校验、`AppController.createRunRequest` 和 `LevelDefinition` 改为读取 `PlayerProgramDefinition`，同时保留 Python 适配器的 `allowedModules` 与现有入口约定。
-2. 将 VS Code 工作区路径、扩展名和 CodeMirror 语法模式改为关卡语言配置。
-3. 保持 Python 适配器工作，用它回归六关。此阶段没有 Go/Rust 编译器调用。
+2. 提取 `CampaignDefinition`，将现有 Python 关卡内容迁至 `content/python/`；为关卡共享的战斗场景建立最小 `content/shared/` 骨架，不迁移或复制现有 Python 教学文本。
+3. 将 VS Code 工作区路径、扩展名和 CodeMirror 语法模式改为战役语言配置；存档键改为战役独立键。
+4. 保持 Python 适配器工作，用它回归六关。此阶段没有 Go/Rust 编译器调用。
 
-验收：Python 六关的现有源码文件不被覆盖；运行、诊断、存档恢复、重置和 VS Code 打开关卡行为不变。
+验收：Python 六关的现有源码文件不被覆盖；运行、诊断、存档恢复、重置和 VS Code 打开关卡行为不变。宿主可仅凭战役配置解析玩家文件路径、存档键和编辑器语言模式。
 
 ### 阶段 1：Go 垂直切片
 
