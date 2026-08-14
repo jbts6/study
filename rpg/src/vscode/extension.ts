@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { dirname, normalize } from "node:path";
 import * as vscode from "vscode";
-import { AppController } from "../app/app-controller";
+import { AppController, createDefaultRunLimits } from "../app/app-controller";
 import { detectPython } from "../runners/local/python-detector";
 import { PythonRunProcess } from "../runners/local/python-process";
 import type { RunnerDiagnostic } from "../runners/protocol/types";
@@ -120,7 +120,7 @@ async function createActiveGame(context: vscode.ExtensionContext): Promise<Activ
   const diagnostics = vscode.languages.createDiagnosticCollection("python-rpg");
   panel.webview.html = loadingHtml(panel.webview, context.extensionUri);
   const runner = createRunner(context);
-  const controller = new AppController({ runner, saveStore }, PYTHON_RPG_CAMPAIGN);
+  const controller = new AppController({ runner, saveStore, runLimits: createDefaultRunLimits() }, PYTHON_RPG_CAMPAIGN);
   const session = new GameSession({
     controller,
     workspace,

@@ -7,6 +7,7 @@ import { mountApp } from "./app-view";
 import { getLevel } from "../game/content/levels";
 import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
 import { GO_PROGRAM } from "../programs/go";
+import type { AppControllerRunLimits } from "./app-controller";
 import type { CampaignDefinition } from "../programs/types";
 
 class FakeRunner implements RunnerClient {
@@ -80,11 +81,37 @@ function failedResult(
   };
 }
 
+const TEST_RUN_LIMITS: AppControllerRunLimits = {
+  python: {
+    timeoutMs: 5_000,
+    interruptGraceMs: 500,
+    maxFiles: 10,
+    maxFileBytes: 65_536,
+    maxSourceBytes: 65_536,
+    maxOutputBytes: 16_384,
+    maxTraceEvents: 1_000,
+    maxValueDepth: 7,
+  },
+  go: {
+    timeoutMs: 5_000,
+    interruptGraceMs: 500,
+    maxFiles: 10,
+    maxFileBytes: 65_536,
+    maxSourceBytes: 65_536,
+    maxOutputBytes: 16_384,
+    maxTraceEvents: 1_000,
+    maxValueDepth: 8,
+    buildTimeoutMs: 15_000,
+    executionTimeoutMs: 5_000,
+  },
+};
+
 function createController(runner: FakeRunner, saveStore: MemorySaveStore): AppController {
   return new AppController({
     runner,
     saveStore,
     createId: () => "test-run",
+    runLimits: TEST_RUN_LIMITS,
   }, PYTHON_RPG_CAMPAIGN);
 }
 
@@ -138,7 +165,7 @@ describe("AppController", () => {
     expect(saves.saved?.battleState.revision).toBe(0);
     expect(snapshot.feedback.kind).toBe("error");
     expect(snapshot.feedback.messages).toContain("[INTERACTION_INVALID] $.action.targetId scout 只能交互非关键目标");
-    expect(runner.lastRequest?.limits.maxValueDepth).toBe(4);
+    expect(runner.lastRequest?.limits.maxValueDepth).toBe(7);
   });
 
   it("keeps battle and save unchanged when Python fails", async () => {
@@ -194,6 +221,7 @@ describe("AppController", () => {
       runner,
       saveStore: new MemorySaveStore(null),
       createId: () => "go-run",
+      runLimits: TEST_RUN_LIMITS,
     }, GO_TEST_CAMPAIGN);
     await controller.start();
 
@@ -204,7 +232,12 @@ describe("AppController", () => {
       language: "go",
       files: { "strategy.go": "package main\nfunc ChooseTurn() {}\n" },
       entrypoint: { file: "strategy.go" },
-      limits: { timeoutMs: 5_000, buildTimeoutMs: 15_000, executionTimeoutMs: 5_000 },
+      limits: {
+        timeoutMs: 5_000,
+        buildTimeoutMs: 15_000,
+        executionTimeoutMs: 5_000,
+        maxValueDepth: 8,
+      },
     });
     expect(runner.lastRequest && "allowedModules" in runner.lastRequest).toBe(false);
   });

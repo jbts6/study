@@ -6,7 +6,13 @@ import { injectUnlockedAbilities } from "../game/content/ability-catalog";
 import { getLevel, getNextLevelId } from "../game/content/levels";
 import type { LevelDefinition, LevelId } from "../game/content/types";
 import { projectWorldView } from "../game/world/project-world-view";
-import type { RunRequest, RunResult, RunnerDiagnostic } from "../runners/protocol/types";
+import type {
+  CompiledRunRequest,
+  ExecutionLimits,
+  RunRequest,
+  RunResult,
+  RunnerDiagnostic,
+} from "../runners/protocol/types";
 import type { CampaignDefinition, ImplementedLanguage } from "../programs/types";
 import type { RunnerClient, RunnerDisplayState } from "./runner-client";
 import {
@@ -22,22 +28,6 @@ import {
 } from "./app-feedback";
 import { RESET_CONFIRMATION } from "./save-store";
 import type { SaveDataV2, SaveStore } from "./save-store";
-const PYTHON_LIMITS = {
-  timeoutMs: 5_000,
-  interruptGraceMs: 500,
-  maxFiles: 10,
-  maxFileBytes: 65_536,
-  maxSourceBytes: 65_536,
-  maxOutputBytes: 16_384,
-  maxTraceEvents: 1_000,
-  maxValueDepth: 4,
-} as const;
-
-const GO_LIMITS = {
-  ...PYTHON_LIMITS,
-  buildTimeoutMs: 15_000,
-  executionTimeoutMs: 5_000,
-} as const;
 
 const RUNNER_UNAVAILABLE_MESSAGE: Readonly<Record<ImplementedLanguage, string>> = {
   python: "本地 Python Runner 不可用。启动 Runner 后刷新页面。",
@@ -68,16 +58,24 @@ export type AppControllerDependencies = Readonly<{
   runner: RunnerClient;
   saveStore: SaveStore;
   createId?: () => string;
+  runLimits?: AppControllerRunLimits;
+}>;
+
+export type AppControllerRunLimits = Readonly<{
+  python: ExecutionLimits;
+  go: CompiledRunRequest["limits"];
 }>;
 
 export class AppController {
   private readonly listeners = new Set<(snapshot: AppSnapshot) => void>();
+  private readonly runLimits: AppControllerRunLimits;
   private snapshot: AppSnapshot;
 
   constructor(
     private readonly dependencies: AppControllerDependencies,
     public readonly campaign: CampaignDefinition,
   ) {
+    this.runLimits = dependencies.runLimits ?? createDefaultRunLimits();
     const level = getLevel("python-marsh-01");
     this.snapshot = this.createGameSnapshot(level.id, createLevelBattle(level), level.starterCode, idleFeedback());
     dependencies.runner.onStateChange((state) => this.updateRunnerState(state));
@@ -205,14 +203,14 @@ export class AppController {
         language: "python",
         entrypoint: { file: runEntrypointFile, callable: "choose_turn" },
         allowedModules: ["math"],
-        limits: PYTHON_LIMITS,
+        limits: this.runLimits.python,
       };
     }
     return {
       ...base,
       language: "go",
       entrypoint: { file: runEntrypointFile },
-      limits: GO_LIMITS,
+      limits: this.runLimits.go,
     };
   }
 
@@ -363,6 +361,23 @@ function isTurnCommand(value: unknown): value is TurnCommand {
 
 function createId(): string {
   return globalThis.crypto.randomUUID();
+}
+
+export function createDefaultRunLimits(): AppControllerRunLimits {
+  const python: ExecutionLimits = {
+    timeoutMs: 5_000,
+    interruptGraceMs: 500,
+    maxFiles: 10,
+    maxFileBytes: 65_536,
+    maxSourceBytes: 65_536,
+    maxOutputBytes: 16_384,
+    maxTraceEvents: 1_000,
+    maxValueDepth: 4,
+  };
+  return {
+    python,
+    go: { ...python, buildTimeoutMs: 15_000, executionTimeoutMs: 5_000 },
+  };
 }
 
 function languageLabel(language: ImplementedLanguage): string {
