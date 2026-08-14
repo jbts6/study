@@ -29,7 +29,7 @@ describe("mountCodeEditor", () => {
     const changes: string[] = [];
     const editor = mountCodeEditor(parent, "def choose_turn(world):\n    return {}\n", "python", (value) => changes.push(value));
 
-    expect(syntaxTreeText(parent).length).toBeGreaterThan(0);
+    expect(syntaxTreeText(parent)).toContain("FunctionDefinition");
     editor.setValue("def choose_turn(world):\n    return {'wait': True}\n");
 
     expect(editor.getValue()).toContain("wait");

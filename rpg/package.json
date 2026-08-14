@@ -53,7 +53,7 @@
         "command": "pythonRpg.runTurn",
         "key": "ctrl+enter",
         "mac": "cmd+enter",
-        "when": "editorLangId == python"
+        "when": "editorLangId == python || editorLangId == go"
       }
     ],
     "configuration": {

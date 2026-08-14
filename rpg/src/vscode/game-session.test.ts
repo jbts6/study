@@ -3,10 +3,14 @@ import type { RunRequest, RunnerDiagnostic, RunResult } from "../runners/protoco
 import type { RunnerClient, RunnerDisplayState } from "../app/runner-client";
 import type { SaveDataV2, SaveLoadResult, SaveStore } from "../app/save-store";
 import { AppController } from "../app/app-controller";
+import type { GameSnapshot } from "../app/app-controller";
 import { GameSession } from "./game-session";
 import type { ExtensionMessage, ThemePreference } from "./messages";
 import { getLevel } from "../game/content/levels";
 import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
+import { GO_RPG_CAMPAIGN } from "../game/content/go/levels";
+import type { CampaignDefinition } from "../programs/types";
+import { idleFeedback } from "../app/app-feedback";
 
 class FakeRunner implements RunnerClient {
   readonly state: RunnerDisplayState = "ready";
@@ -57,6 +61,18 @@ class MemorySaveStore implements SaveStore {
   load(): SaveLoadResult { return this.initial; }
   save(value: SaveDataV2): void { this.value = value; }
   remove(): void { this.value = undefined; }
+}
+
+function staticController(snapshot: GameSnapshot, campaign: CampaignDefinition): AppController {
+  return {
+    campaign,
+    start: async () => undefined,
+    getSnapshot: () => snapshot,
+    subscribe: (listener: (value: GameSnapshot) => void) => {
+      listener(snapshot);
+      return () => undefined;
+    },
+  } as unknown as AppController;
 }
 
 describe("GameSession", () => {
@@ -173,6 +189,70 @@ describe("GameSession", () => {
     await session.handle({ type: "advanceLevel" });
 
     expect(opened).toEqual(["python-marsh-01", "python-marsh-02"]);
+    session.dispose();
+  });
+
+  it("uses the active Go campaign when opening and publishing its level", async () => {
+    const level = getLevel("go-marsh-01");
+    const controller = staticController({
+      mode: "game",
+      currentLevelId: level.id,
+      battleState: level.initialBattle,
+      codeDraft: "",
+      runnerState: "ready",
+      feedback: idleFeedback(),
+      diagnostics: [],
+    }, GO_RPG_CAMPAIGN);
+    const opened: string[] = [];
+    const messages: ExtensionMessage[] = [];
+    const session = new GameSession({
+      controller,
+      workspace: {
+        ensureLevelFiles: async () => undefined,
+        readLevelCode: async () => "",
+        openLevel: async (levelId) => { opened.push(levelId); },
+      },
+      postMessage: async (message) => { messages.push(message); },
+      getTheme: () => "system",
+      setTheme: async () => undefined,
+      diagnostics: { clear: () => undefined, replace: () => undefined },
+    });
+
+    await session.start();
+
+    expect(opened).toEqual(["go-marsh-01"]);
+    const message = messages.at(-1);
+    expect(message?.type === "snapshot" && message.snapshot.mode === "game"
+      ? message.snapshot.level.id
+      : undefined).toBe("go-marsh-01");
+    session.dispose();
+  });
+
+  it("rejects a level outside the active campaign instead of looking it up globally", async () => {
+    const level = getLevel("python-marsh-01");
+    const controller = staticController({
+      mode: "game",
+      currentLevelId: level.id,
+      battleState: level.initialBattle,
+      codeDraft: "",
+      runnerState: "ready",
+      feedback: idleFeedback(),
+      diagnostics: [],
+    }, GO_RPG_CAMPAIGN);
+    const session = new GameSession({
+      controller,
+      workspace: {
+        ensureLevelFiles: async () => undefined,
+        readLevelCode: async () => "",
+        openLevel: async () => undefined,
+      },
+      postMessage: async () => undefined,
+      getTheme: () => "system",
+      setTheme: async () => undefined,
+      diagnostics: { clear: () => undefined, replace: () => undefined },
+    });
+
+    await expect(session.start()).rejects.toThrow("关卡不属于当前战役");
     session.dispose();
   });
 });

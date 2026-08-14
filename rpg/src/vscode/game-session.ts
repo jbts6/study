@@ -1,6 +1,7 @@
 import type { AppController, AppSnapshot, GameSnapshot } from "../app/app-controller";
 import { getLevel } from "../game/content/levels";
-import type { LevelId } from "../game/content/types";
+import type { LevelDefinition, LevelId } from "../game/content/types";
+import type { CampaignDefinition } from "../programs/types";
 import type { RunnerDiagnostic } from "../runners/protocol/types";
 import { RESET_CONFIRMATION } from "../app/save-store";
 import type { ExtensionMessage, ThemePreference, WebviewCommand, WebviewSnapshot } from "./messages";
@@ -38,7 +39,9 @@ export class GameSession {
     await this.dependencies.workspace.ensureLevelFiles();
     await this.dependencies.controller.start();
     this.snapshot = this.dependencies.controller.getSnapshot();
+    assertCampaignSnapshot(this.snapshot, this.dependencies.controller.campaign);
     this.unsubscribe = this.dependencies.controller.subscribe((snapshot) => {
+      assertCampaignSnapshot(snapshot, this.dependencies.controller.campaign);
       this.snapshot = snapshot;
       void this.publish(snapshot);
       if (snapshot.mode === "game" && snapshot.currentLevelId !== this.openedLevelId) {
@@ -88,26 +91,40 @@ export class GameSession {
   }
 
   private async publish(snapshot: AppSnapshot): Promise<void> {
+    const campaign = this.dependencies.controller.campaign;
+    assertCampaignSnapshot(snapshot, campaign);
     if (snapshot.mode === "game" && snapshot.diagnostics.length > 0) {
       this.dependencies.diagnostics.replace(snapshot.currentLevelId, snapshot.diagnostics);
     }
-    await this.dependencies.postMessage({ type: "snapshot", snapshot: toViewSnapshot(snapshot, this.dependencies.getTheme()) });
+    await this.dependencies.postMessage({
+      type: "snapshot",
+      snapshot: toViewSnapshot(snapshot, this.dependencies.getTheme(), campaign),
+    });
   }
 }
 
-function toViewSnapshot(snapshot: AppSnapshot, theme: ThemePreference): WebviewSnapshot {
+function toViewSnapshot(snapshot: AppSnapshot, theme: ThemePreference, campaign: CampaignDefinition): WebviewSnapshot {
   if (snapshot.mode === "save_recovery") return { ...snapshot, theme };
-  return gameViewSnapshot(snapshot, theme);
+  return gameViewSnapshot(snapshot, theme, campaign);
 }
 
-function gameViewSnapshot(snapshot: GameSnapshot, theme: ThemePreference): WebviewSnapshot {
+function gameViewSnapshot(snapshot: GameSnapshot, theme: ThemePreference, campaign: CampaignDefinition): WebviewSnapshot {
   return {
     mode: "game",
     theme,
-    level: getLevel(snapshot.currentLevelId),
+    level: campaignLevel(campaign, snapshot.currentLevelId),
     battleState: snapshot.battleState,
     runnerState: snapshot.runnerState,
     feedback: snapshot.feedback,
     ...(snapshot.activeRunId === undefined ? {} : { activeRunId: snapshot.activeRunId }),
   };
+}
+
+function assertCampaignSnapshot(snapshot: AppSnapshot, campaign: CampaignDefinition): void {
+  if (snapshot.mode === "game") campaignLevel(campaign, snapshot.currentLevelId);
+}
+
+function campaignLevel(campaign: CampaignDefinition, levelId: LevelId): LevelDefinition {
+  if (!campaign.levelOrder.includes(levelId)) throw new Error(`关卡不属于当前战役: ${levelId}`);
+  return getLevel(levelId);
 }
