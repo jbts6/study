@@ -1,26 +1,29 @@
 # 恢复快照
 
 ## 主线目标
-完成合并回 master 后的 RPG 全量验证，并修复验证中暴露的回归与并发阻断
+补齐 Go RPG 第二至第六关，形成可从第一关推进到战役结算的六关主流程
 
 ## 正在做什么
-验证已完成，准备提交本地检查点
+首轮独立子代理审查已完成，正在闭合重要发现并准备复审
 
 ## 关键上下文
-- 当前 HEAD 是 `d453950`，合并提交 `feature/language-campaign-go-slice` 后的 `master`。
-- 恢复 `rpg/src/app/app-view.ts` 中被合并冲突遗漏的 `scout-skills` 列表与冷却文案。
-- 将 `rpg/src/app/code-editor.ts` 的 `.cm-content` 背景设为白色，匹配浅色主题 E2E 契约。
-- `rpg/vite.config.ts` 将 Vitest `maxWorkers` 限制为 4，避免真实 Python/Go 子进程在默认并行度下争用。
-- 最终默认验证：Vitest 33/33 文件、188/188 断言；build、test:extension、test:e2e 均退出码 0。
-- VS Code/Electron 输出既有非致命告警；测试端口 5174/5175 已清理。
+- 用户确认复用 Python 第二至第六关战斗内容，独立重写 Go 教学与起始代码。
+- Go 关卡不得导入 Python 关卡文件；只逐字段复制战斗参数并使用 Go `battleId`。
+- 当前 Go SDK 只支持第一关；规划已纳入完整 `WorldView` DTO、现有动作构造器和 `SDK_VERSION` 提升。
+- `LEVEL_UNLOCKS` 当前只登记 Python；规划已纳入 Go 六关奖励注入。
+- 设计规格：`docs/superpowers/specs/2026-08-14-go-rpg-stages-2-6-design.md`。
+- 详细计划：`docs/superpowers/plans/2026-08-14-go-rpg-stages-2-6.md`。
+- 方案包：`.helloagents/plans/202608141522_go-rpg-stages-2-6/`。
+- 设计已分三次提交：`ee4acf6`、`df57dd7`、`35320bf`。
+- 首轮审查无致命问题；要求补强 SDK 具体值/动作 JSON、缓存键失效、Go/Python 数据逐字段对齐、全部起始代码编译和测试先行顺序。
 
 ## 下一步
-执行 `git status`，提交源码与验证配置变更；保留 `.helloagents` 运行态文件。
+完成规划修订和契约同步，提交规划产物，再交由原独立子代理复审
 
 ## 阻塞项
 （无）
 
 ## 方案
-无方案包
+`.helloagents/plans/202608141522_go-rpg-stages-2-6/`
 ## 已标记技能
-using-superpowers、context-mode、hello-test、systematic-debugging、verification-before-completion、qa-review
+using-superpowers、brainstorming、project-design-docs、context-mode、writing-plans、hello-write、hello-subagent、requesting-code-review
