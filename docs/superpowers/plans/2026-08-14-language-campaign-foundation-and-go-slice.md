@@ -48,6 +48,7 @@
 - Create: `rpg/src/programs/go/index.ts`
 - Create: `rpg/src/game/content/shared/types.ts`
 - Create: `rpg/src/game/content/python/levels.ts`
+- Create: `rpg/src/game/content/campaigns.ts`
 - Modify: `rpg/src/game/content/types.ts`
 - Modify: `rpg/src/game/content/levels.ts`
 - Modify: `rpg/src/game/content/python-marsh-01.ts` through `python-marsh-06.ts`
@@ -57,7 +58,7 @@
 
 - Produces `Language = "python" | "go" | "rust"`、`CampaignId`、`CampaignDefinition` 和 `PlayerProgramDefinition`。
 - Produces `PYTHON_PROGRAM` 与 `GO_PROGRAM`。Go 玩家文件名为 `<levelId>.go`；`GO_PROGRAM.createRunFiles` 将其源码映射为临时构建入口 `strategy.go`。
-- Produces `getCampaign(campaignId)`、`getLevel(levelId)`、`getNextLevelId(levelId)`；后续控制器和工作区只调用这些函数。
+- Produces仅注册 Python 的 `getCampaign(campaignId)`、`getLevel(levelId)`、`getNextLevelId(levelId)`；后续控制器和工作区只调用这些函数。Task 5 才把 `GO_RPG_CAMPAIGN` 加入该注册表。
 - Python 战役的关卡 ID 和初始关仍是 `python-marsh-01`，已有源码与存档语义不变。
 
 - [ ] **Step 1: 为战役注册编写失败测试**
@@ -84,10 +85,11 @@ Expected: FAIL，提示 `getCampaign` 尚未导出。
 ```ts
 // src/programs/types.ts
 export type Language = "python" | "go" | "rust";
+export type ImplementedLanguage = Exclude<Language, "rust">;
 export type CampaignId = "python-rpg" | "go-rpg";
 
 export type PlayerProgramDefinition = Readonly<{
-  language: Language;
+  language: ImplementedLanguage;
   workspaceDirectory: string;
   sourceFileName(levelId: string): string;
   runEntrypointFileName(levelId: string): string;
@@ -150,8 +152,10 @@ git commit -m "refactor: 提取语言战役模型"
 - Modify: `rpg/src/app/app-controller.ts`
 - Modify: `rpg/src/app/app-feedback.ts`
 - Modify: `rpg/src/main.ts`
+- Modify: `rpg/src/vscode/extension.ts`
+- Modify: `rpg/src/vscode/game-session.test.ts`
 - Modify: `rpg/src/app/app-controller.test.ts`
-- Modify: `rpg/src/app/app-feedback.test.ts`
+- Create: `rpg/src/app/app-feedback.test.ts`
 - Modify: `rpg/src/runners/protocol/validate-request.test.ts`
 
 **Interfaces:**
@@ -235,17 +239,17 @@ private createRunRequest(snapshot: GameSnapshot, runId: string): RunRequest {
 }
 ```
 
-将 `RUN_LIMITS` 移到控制器依赖或战役运行配置中；Python 数值维持 `5_000` 毫秒，Go 请求显式传入 `buildTimeoutMs: 15_000` 与 `executionTimeoutMs: 5_000`。在 `main.ts` 注入 `PYTHON_RPG_CAMPAIGN`；在 `app-feedback.ts` 为 `compile_error` 增加“Go 编译失败”反馈测试，并由控制器调用 `feedbackFromRunResult(result, this.campaign.program.language)`。
+将 `RUN_LIMITS` 移到控制器依赖或战役运行配置中；Python 数值维持 `5_000` 毫秒，Go 请求显式传入 `buildTimeoutMs: 15_000` 与 `executionTimeoutMs: 5_000`。在 `main.ts`、`extension.ts` 和 `game-session.test.ts` 同步传入 `PYTHON_RPG_CAMPAIGN`；在 `app-feedback.ts` 为 `compile_error` 增加“Go 编译失败”反馈测试，并由控制器调用 `feedbackFromRunResult(result, this.campaign.program.language)`。将 `RUNNER_UNAVAILABLE_MESSAGE`、`connectRunner` 与 `reportRunnerUnavailable` 改为从当前战役取得语言标签，使 Go 缺少工具链时显示 “Go Runner 不可用” 和 Go 安装恢复动作。
 
 - [ ] **Step 4: 运行控制器与协议测试确认通过**
 
-Run: `cd rpg && npx vitest run src/app/app-controller.test.ts src/runners/protocol/validate-request.test.ts`  
+Run: `cd rpg && npx vitest run src/app/app-controller.test.ts src/app/app-feedback.test.ts src/runners/protocol/validate-request.test.ts src/vscode/game-session.test.ts && npm run typecheck`
 Expected: PASS。
 
 - [ ] **Step 5: 提交协议与控制器改造**
 
 ```bash
-git add rpg/src/runners/protocol rpg/src/app/app-controller.ts rpg/src/app/app-controller.test.ts rpg/src/app/app-feedback.ts rpg/src/app/app-feedback.test.ts rpg/src/main.ts
+git add rpg/src/runners/protocol rpg/src/app/app-controller.ts rpg/src/app/app-controller.test.ts rpg/src/app/app-feedback.ts rpg/src/app/app-feedback.test.ts rpg/src/main.ts rpg/src/vscode/extension.ts rpg/src/vscode/game-session.test.ts
 git commit -m "refactor: 支持语言化运行请求"
 ```
 
@@ -260,9 +264,9 @@ git commit -m "refactor: 支持语言化运行请求"
 - Modify: `rpg/src/vscode/game-session.ts`
 - Modify: `rpg/src/vscode/extension.ts`
 - Modify: `rpg/src/app/code-editor.ts`
-- Modify: `rpg/src/app/code-editor.test.ts`
+- Create: `rpg/src/app/code-editor.test.ts`
 - Modify: `rpg/src/app/app-view.ts`
-- Modify: `rpg/src/app/app-view.test.ts`
+- Create: `rpg/src/app/app-view.test.ts`
 - Modify: `rpg/package.json`
 
 **Interfaces:**
@@ -330,7 +334,7 @@ export function mountCodeEditor(
 
 - [ ] **Step 4: 运行 VS Code 单元测试与类型检查**
 
-Run: `cd rpg && npx vitest run src/vscode/level-workspace.test.ts src/vscode/workspace-save-store.test.ts src/vscode/game-session.test.ts src/app/code-editor.test.ts && npm run typecheck`
+Run: `cd rpg && npx vitest run src/vscode/level-workspace.test.ts src/vscode/workspace-save-store.test.ts src/vscode/game-session.test.ts src/app/code-editor.test.ts src/app/app-view.test.ts && npm run typecheck`
 Expected: PASS。
 
 - [ ] **Step 5: 提交工作区和存档隔离**
@@ -555,6 +559,8 @@ git commit -m "feat: 添加 Go 沼泽第一关"
 - Go 诊断投影到 `go-rpg/go-marsh-01.go`，不会写入 Python 诊断集合或 Python 存档。
 - `openCampaign(campaignId)` 在同一战役已打开时仅显示现有面板；切换到不同战役时先关闭旧 session、runner 与诊断集合，再创建新会话。
 - `GameViewSnapshot` 透传 `campaign.title`、`program.language` 和 `program.sourceFileName(levelId)`；Webview 头部、Runner 标签、教学分组与空反馈不得硬编码 Python 或 `.py`。
+- `ActiveGame` 的 runner 成员和构造参数使用通用 `RunnerClient`，不绑定 `DirectRunnerClient`；Python 与 Go 都可被关闭。
+- `loadingHtml`、`webviewHtml`、页面标题与根节点 aria-label 接收 `CampaignDefinition`，显示战役标题或中性“奥术战术 RPG”，不得残留 Python 专用页面元数据。
 
 - [ ] **Step 1: 写入启动器与 Go 工作区的失败测试**
 
@@ -595,6 +601,8 @@ function createRunner(context: vscode.ExtensionContext, campaign: CampaignDefini
 }
 ```
 
+将 `ActiveGame` 构造参数和字段从 `DirectRunnerClient` 改为 `RunnerClient`；`createActiveGame(context, campaign)` 把 campaign 传给 `loadingHtml` 和 `webviewHtml`，让加载页、HTML title 与根节点 aria-label 使用 `campaign.title`。
+
 ```ts
 function diagnosticFilePath(
   workspaceRoot: string,
@@ -633,7 +641,7 @@ const openCampaign = async (campaignId: CampaignId): Promise<ActiveGame | undefi
 
 - [ ] **Step 4: 执行单元、真实 Go 和扩展验证**
 
-Run: `cd rpg && npx vitest run src/vscode/game-launcher-model.test.ts src/vscode/game-session.test.ts src/vscode/direct-runner-client.test.ts src/runners/go/go-detector.test.ts src/runners/go/go-runner.test.ts && npm run typecheck && npm run build`  
+Run: `cd rpg && npx vitest run src/vscode/game-launcher-model.test.ts src/vscode/game-session.test.ts src/vscode/direct-runner-client.test.ts src/vscode/webview/render-game.test.ts src/runners/go/go-detector.test.ts src/runners/go/go-runner.test.ts && npm run typecheck && npm run build`
 Expected: PASS。
 
 Run: `cd rpg && npx vitest run src/runners/go/go-runner.test.ts`
@@ -647,7 +655,7 @@ Expected: 生成 `dist/python-rpg.vsix` 并以 `--force` 安装本地扩展。
 - [ ] **Step 5: 提交扩展接入与交付验证**
 
 ```bash
-git add rpg/src/vscode rpg/package.json rpg/src/runners/go/e2e.spec.ts
+git add rpg/src/vscode rpg/src/runners/go/go-detector.test.ts rpg/src/runners/go/go-runner.test.ts rpg/package.json
 git commit -m "feat: 在 VS Code 中接入 Go 战役"
 ```
 
