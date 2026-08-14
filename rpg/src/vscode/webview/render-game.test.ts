@@ -251,6 +251,9 @@ describe("game Webview renderer", () => {
           const selectedTab = sectionRoot.querySelector<HTMLButtonElement>("[data-manual-tabs] [aria-selected='true']");
           const sectionPanel = sectionRoot.querySelector<HTMLElement>("#manual-content");
           expect(selectedTab?.id).toBe(sectionId);
+          for (const tab of sectionRoot.querySelectorAll<HTMLButtonElement>("[data-manual-tabs] [role='tab']")) {
+            expect(tab.tabIndex).toBe(tab.id === sectionId ? 0 : -1);
+          }
           expect(selectedTab?.getAttribute("aria-controls")).toBe("manual-content");
           expect(sectionPanel?.getAttribute("aria-labelledby")).toBe(sectionId);
         }
