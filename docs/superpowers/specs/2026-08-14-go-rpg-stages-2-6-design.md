@@ -64,6 +64,8 @@ Go 战役沿用 Python 战役的能力奖励顺序：
 
 每关的起始战斗通过现有能力注入流程获得此前关卡已经解锁的能力。关卡文件不手工复制存档状态。
 
+现有 `LEVEL_UNLOCKS` 只登记 Python 关卡。实现时必须为 `go-marsh-01` 至 `go-marsh-06` 登记同一奖励序列，并在 `ability-catalog.test.ts` 验证 Go 每关获得的既有能力集合。这里不重构奖励系统，也不从关卡注册表动态推导能力。
+
 ### 4. Go SDK 对齐现有战斗协议
 
 当前 Runner 已把完整 `WorldView` JSON 写入 Go 进程标准输入，但 `sdk.go` 只声明了单位 ID、位置和技能范围，并且只提供等待、攻击和移动攻击三个构造器。第二至第六关需要的字段已经存在于 JSON 中，不需要修改 TypeScript 协议。
@@ -164,6 +166,8 @@ Go SDK 补齐以下动作构造器：
 
 - `rpg/src/game/content/go/levels.ts`：注册 Go 六关、固定顺序和奖励。
 - `rpg/src/game/content/levels.ts`：按所属战役解析下一关。
+- `rpg/src/game/content/ability-catalog.ts`：登记 Go 六关进入关卡前已经获得的能力。
+- `rpg/src/game/content/ability-catalog.test.ts`：覆盖 Go 能力注入顺序。
 - `rpg/src/runners/go/runtime/sdk.go`：对齐现有世界视图 DTO 和动作构造器。
 - `rpg/src/runners/go/go-project.ts`：提升 SDK 缓存版本。
 - `rpg/src/runners/go/go-runner.test.ts`：覆盖完整世界字段解码和新增动作构造器。
@@ -200,12 +204,13 @@ Go SDK 补齐以下动作构造器：
 遵循垂直切片的红—绿—重构循环，并减少重复测试：
 
 1. 在 `levels.test.ts` 中验证 Go 六关顺序、奖励、模板契约和关键教学递进。
-2. 在 `reference-solutions.test.ts` 中复用现有战斗模拟器，证明 Go 六关都有可完成策略。
-3. 在 `app-controller.test.ts` 中验证一个关键推进路径和终关不再推进。
-4. 在 `go-runner.test.ts` 增加一个代表性真实工具链用例，同时验证完整世界字段解码与新增动作构造器；不为五关重复 Runner 生命周期测试。
-5. 验证 SDK 版本变化会产生新的构建缓存键。
-6. 阶段完成后运行目标测试、TypeScript 构建和扩展测试；最终阶段才运行项目全量测试与 E2E。
-7. 所有验证通过后，在 `rpg/` 执行 `npm run install:local`，替换本机已安装扩展。
+2. 在 `ability-catalog.test.ts` 验证 Go 第二至第六关按顺序获得此前奖励。
+3. 在 `reference-solutions.test.ts` 中复用现有战斗模拟器，证明 Go 六关都有可完成策略。
+4. 在 `app-controller.test.ts` 中验证一个关键推进路径和终关不再推进。
+5. 在 `go-runner.test.ts` 增加一个代表性真实工具链用例，同时验证完整世界字段解码与新增动作构造器；不为五关重复 Runner 生命周期测试。
+6. 验证 SDK 版本变化会产生新的构建缓存键。
+7. 阶段完成后运行目标测试、TypeScript 构建和扩展测试；最终阶段才运行项目全量测试与 E2E。
+8. 所有验证通过后，在 `rpg/` 执行 `npm run install:local`，替换本机已安装扩展。
 
 ## 完成定义
 
@@ -213,6 +218,7 @@ Go SDK 补齐以下动作构造器：
 - 五个新增关卡拥有独立 Go 教学内容和合法战斗引用。
 - Go SDK 可以读取生命值、阵营、棋盘、目标、冷却和状态，并能构造守卫、施法和交互指令。
 - SDK 缓存版本已经提升，旧编译产物不会掩盖 SDK 变化。
+- Go 第二至第六关依次获得 `ward`、`pierce`、`renew`、`fracture` 和 `aegis`，且不会重复注入。
 - `go-marsh-01` 可推进至 `go-marsh-02`，`go-marsh-06` 不再推进。
 - Go 六关参考策略均以 `won` 结束，并满足关键目标。
 - Python 六关顺序、奖励、模板和结算保持不变。
