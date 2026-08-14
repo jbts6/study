@@ -230,6 +230,12 @@ describe("GameSession", () => {
       languageLabel: "Go",
       playerFileName: "go-marsh-01.go",
     });
+    expect(message?.type === "snapshot" && message.snapshot.mode === "game"
+      ? message.snapshot.programReference?.entrypoint.signature
+      : undefined).toBe(GO_RPG_CAMPAIGN.program.reference?.entrypoint.signature);
+    expect(message?.type === "snapshot" && message.snapshot.mode === "game"
+      ? message.snapshot.level.guidance.apiFocus?.referenceIds
+      : undefined).toEqual(getLevel("go-marsh-01").guidance.apiFocus?.referenceIds);
     session.dispose();
   });
 

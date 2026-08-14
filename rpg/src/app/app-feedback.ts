@@ -1,4 +1,4 @@
-import type { BattleEvent, BattleState } from "../game/combat/types";
+import type { BattleErrorCode, BattleEvent, BattleState } from "../game/combat/types";
 import { getLevel } from "../game/content/levels";
 import type { LevelDefinition, LevelId } from "../game/content/types";
 import type { ImplementedLanguage } from "../programs/types";
@@ -11,7 +11,23 @@ export type AppFeedback = Readonly<{
   messages: readonly string[];
   stdout: string;
   stderr: string;
+  relatedReferenceIds?: readonly string[];
 }>;
+
+const ERROR_REFERENCE_MAP: Partial<Record<BattleErrorCode, readonly string[]>> = {
+  INVALID_COMMAND: ["type.turn-command"],
+  UNKNOWN_FIELD: ["type.turn-command"],
+  EXPECTED_REVISION_MISMATCH: ["type.turn-command"],
+  INVALID_MOVE_PATH: ["type.cell", "action.move-and-attack", "action.move-and-cast", "action.move-and-interact"],
+  MOVE_TOO_FAR: ["type.cell", "action.move-and-attack", "action.move-and-cast", "action.move-and-interact"],
+  MOVE_BLOCKED: ["type.cell", "type.board", "action.move-and-attack", "action.move-and-cast", "action.move-and-interact"],
+  INVALID_TARGET: ["type.unit", "action.attack", "action.cast"],
+  TARGET_OUT_OF_RANGE: ["type.unit", "action.attack", "action.cast", "action.move-and-attack", "action.move-and-cast"],
+  SKILL_NOT_FOUND: ["type.skill", "action.cast", "action.move-and-cast"],
+  SKILL_ON_COOLDOWN: ["type.skill", "action.cast", "action.move-and-cast"],
+  SKILL_TARGET_SHAPE: ["type.skill", "action.cast", "action.move-and-cast"],
+  INTERACTION_INVALID: ["type.objective", "action.interact", "action.move-and-interact"],
+};
 
 export function idleFeedback(): AppFeedback {
   return { kind: "idle", title: "", messages: [], stdout: "", stderr: "" };
@@ -51,7 +67,13 @@ export function isRetriableSettlement(levelId: LevelId, state: BattleState): boo
 }
 
 export function combatErrorFeedback(errors: readonly Readonly<{ code: string; path: string; message: string }>[]): AppFeedback {
-  return errorFeedback("指令无效", errors.map((error) => `[${error.code}] ${error.path} ${error.message}`));
+  const relatedReferenceIds = [...new Set(errors.flatMap((error) =>
+    ERROR_REFERENCE_MAP[error.code as BattleErrorCode] ?? ["type.turn-command"]
+  ))];
+  return {
+    ...errorFeedback("指令无效", errors.map((error) => `[${error.code}] ${error.path} ${error.message}`)),
+    relatedReferenceIds,
+  };
 }
 
 export function feedbackFromRunResult(result: RunResult, language: ImplementedLanguage): AppFeedback {

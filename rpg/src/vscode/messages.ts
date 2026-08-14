@@ -2,6 +2,7 @@ import type { AppFeedback } from "../app/app-controller";
 import type { RunnerDisplayState } from "../app/runner-client";
 import type { BattleState } from "../game/combat/types";
 import type { LevelDefinition } from "../game/content/types";
+import type { ProgramReference } from "../programs/types";
 
 export type ThemePreference = "light" | "dark" | "system";
 
@@ -24,6 +25,7 @@ export type GameViewSnapshot = Readonly<{
   battleState: BattleState;
   runnerState: RunnerDisplayState;
   feedback: AppFeedback;
+  programReference?: ProgramReference;
   activeRunId?: string;
 }>;
 

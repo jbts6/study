@@ -119,6 +119,7 @@ function gameViewSnapshot(snapshot: GameSnapshot, theme: ThemePreference, campai
     battleState: snapshot.battleState,
     runnerState: snapshot.runnerState,
     feedback: snapshot.feedback,
+    ...(campaign.program.reference === undefined ? {} : { programReference: campaign.program.reference }),
     ...(snapshot.activeRunId === undefined ? {} : { activeRunId: snapshot.activeRunId }),
   };
 }
