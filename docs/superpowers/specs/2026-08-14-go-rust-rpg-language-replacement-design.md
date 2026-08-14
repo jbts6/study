@@ -1,14 +1,14 @@
-# Go 与 Rust RPG 语言替换设计
+# Go 与 Rust RPG 独立战役设计
 
 ## 目标
 
-把当前 `rpg/` 中“玩家用 Python 编写回合策略”的部分演进为可选的 Go 与 Rust 学习战役，同时保留已经完成的回合制战斗、六关流程、存档、VS Code 双栏体验和本地运行方式。
+在现有 Python 战役之外，新增 Go 与 Rust 学习战役，同时保留已经完成的回合制战斗、六关流程、存档、VS Code 双栏体验和本地运行方式。
 
 这不是把 TypeScript 游戏内核重写成 Go 或 Rust。Go 与 Rust 是玩家代码的语言；游戏宿主、战斗规则、Webview 和 VS Code 扩展继续使用当前 TypeScript 实现。
 
 ## 已确认的边界
 
-- 本项目是单人本地学习游戏，采用信任本地代码模型。运行玩家自行编辑的 Go/Rust 代码，不建设恶意代码隔离或容器平台。
+- 本项目是单人本地学习游戏，采用信任本地代码模型。运行玩家自行编辑的 Python、Go/Rust 代码，不建设恶意代码隔离或容器平台。
 - 继续处理编译错误、运行时错误、超时、中断、未安装工具链和损坏存档；不为极端进程竞态或跨版本迁移设计额外状态机。
 - 保留 `WorldView -> 玩家函数 -> TurnCommand -> validateLevelCommand -> resolveTurn` 的游戏数据流。
 - `TurnCommand` 仍是 JSON 对象。语言适配器负责把语言原生结构编码为 JSON 后返回给 Node/TypeScript，不让 Go/Rust 类型穿透游戏协议。
@@ -20,8 +20,8 @@
 
 | 层 | 当前耦合 | 演进目标 |
 | --- | --- | --- |
-| 关卡内容 | `python-marsh-*` ID、Python 模板与 Python 文案 | 语言无关的战斗定义 + 语言专属教学模板 |
-| 请求协议 | `language: "python"`、`allowedModules` | `language: "go" | "rust"`，去掉 Python 模块白名单 |
+| 关卡内容 | `python-marsh-*` ID、Python 模板与 Python 文案 | 三套独立战役的关卡 ID、模板、教学文本与递进；仅复用语言无关的战斗骨架 |
+| 请求协议 | `language: "python"`、`allowedModules` | `language: "python" | "go" | "rust"`；仅 Python 请求保留模块白名单 |
 | 应用控制器 | 固定 `main.py` / `choose_turn` / `math` | 从关卡语言配置取得项目文件、入口约定与工具链 |
 | 工作区 | `python-rpg/<level>.py` | 语言独立目录与每关一个可读源码文件 |
 | 本地运行器 | CPython 探测、`execute.py`、解释器追踪 | Go/Rust 工具链探测 + 临时项目编译和执行 |
@@ -31,14 +31,14 @@
 
 ## 推荐架构
 
-先引入一层很小的“语言战役描述”，不要马上泛化为插件注册框架。
+先引入一层很小的“语言战役描述”，不要马上泛化为插件注册框架。每个语言战役独立维护关卡数量、教学内容与源码模板，不能假设三者始终同关数或同进度。
 
 ```text
 LevelDefinition
   ├─ 战斗定义、奖励、引导目标                 继续复用
   └─ PlayerProgramDefinition
-       ├─ language: go | rust
-       ├─ workspaceDirectory: "go-rpg" | "rust-rpg"
+       ├─ language: python | go | rust
+       ├─ workspaceDirectory: "python-rpg" | "go-rpg" | "rust-rpg"
        ├─ sourceFileName(levelId): string
        ├─ starterFiles(level): Record<string, string>
        └─ runConvention: 固定的项目入口约定
@@ -47,11 +47,11 @@ AppController
   └─ 按 PlayerProgramDefinition 创建 RunRequest
 
 RunnerClient
-  └─ LanguageRunner (GoRunner | RustRunner)
+  └─ LanguageRunner (PythonRunner | GoRunner | RustRunner)
        └─ 临时项目 -> 编译 -> 执行 -> 单行 JSON RunResult
 ```
 
-`RunRequest` 保持顶层相关性字段、`worldView`、限制和 `files`；把 `language` 扩展为 `"go" | "rust"`。移除 `allowedModules`，因为它是 Python 导入机制的专属概念。入口不再表达“可调用函数名”，改为固定项目约定：每个临时项目均由宿主生成 `main`，它读取 stdin 的 `WorldView` JSON，调用玩家导出的策略函数，向 stdout 写出一行 `TurnCommand` JSON。
+`RunRequest` 保持顶层相关性字段、`worldView`、限制和 `files`；把 `language` 扩展为 `"python" | "go" | "rust"`。`allowedModules` 继续作为仅 Python 的适配器字段，不进入 Go/Rust 的通用协议。编译型语言的入口不再表达“可调用函数名”，改为固定项目约定：每个临时项目均由宿主生成 `main`，它读取 stdin 的 `WorldView` JSON，调用玩家导出的策略函数，向 stdout 写出一行 `TurnCommand` JSON。
 
 这让宿主能始终控制 stdin/stdout 协议，玩家只需实现强类型策略函数。
 
@@ -127,21 +127,19 @@ Go 的模块依赖固定为项目内 `rpg/sdk`，`GONOSUMDB`、联网拉取、�
 
 ## 关卡与存档迁移
 
-推荐交付为三个独立战役，不在同一存档里混编语言：
+交付为三个独立战役，不在同一存档里混编语言。目录、关卡数、教学文本、模板和进度彼此独立，允许随各自教学需要演进：
 
-- `go-marsh-01` 至 `go-marsh-06`，工作区目录 `go-rpg/`。
-- `rust-marsh-01` 至 `rust-marsh-06`，工作区目录 `rust-rpg/`。
-- 已完成的 `python-marsh-*` 保持可玩且只进入维护模式，除非产品明确决定删除 Python 战役。
+- Go 战役使用独立的 `go-marsh-*` 关卡 ID 与工作区目录 `go-rpg/`。
+- Rust 战役使用独立的 `rust-marsh-*` 关卡 ID 与工作区目录 `rust-rpg/`。
+- `python-marsh-01` 至 `python-marsh-06` 保持可玩，工作区目录 `python-rpg/`；Python 战役不删除，也不降级为仅维护模式。
 
-原因是：源文件语法、学习目标和玩家已有文件都不同；把同一关 ID 从 `.py` 原地换成 `.go`/`.rs` 会破坏存档和复盘。三套战役共享同一地图与战斗数值，但每种语言各写自己的模板、解释和逐关概念递进。
-
-当产品最终定位为“只保留 Go”或“只保留 Rust”时，才在一次明确的破坏性版本中删除 Python 战役和相关存档入口；不要把旧 `.py` 静默重命名或转换。
+原因是：源文件语法、学习目标和玩家已有文件都不同；把同一关 ID 从 `.py` 原地换成 `.go`/`.rs` 会破坏存档和复盘。三套战役可以复用地图与战斗数值骨架，但每种语言各自决定使用哪些关卡、模板、解释和逐关概念递进。不要把旧 `.py` 静默重命名或转换。
 
 ## 分阶段实施顺序
 
-### 阶段 0：语言无关化底座
+### 阶段 0：语言战役底座
 
-1. 将 `RunRequest`、请求校验、`AppController.createRunRequest` 和 `LevelDefinition` 改为读取 `PlayerProgramDefinition`。
+1. 将 `RunRequest`、请求校验、`AppController.createRunRequest` 和 `LevelDefinition` 改为读取 `PlayerProgramDefinition`，同时保留 Python 适配器的 `allowedModules` 与现有入口约定。
 2. 将 VS Code 工作区路径、扩展名和 CodeMirror 语法模式改为关卡语言配置。
 3. 保持 Python 适配器工作，用它回归六关。此阶段没有 Go/Rust 编译器调用。
 
@@ -152,15 +150,15 @@ Go 的模块依赖固定为项目内 `rpg/sdk`，`GONOSUMDB`、联网拉取、�
 1. 提供项目内 Go SDK 和临时项目生成器。
 2. 实现 Go 探测、进程管理、编译错误映射和 JSON 命令回传。
 3. 仅制作 `go-marsh-01`，使等待、攻击、非法命令、编译错误、未安装 Go、超时和中断可验证。
-4. 完成后再编写其余五关的 Go 模板和引导。
+4. Go 第一关验收后，按 Go 自己的教学节奏扩展后续关卡、模板和引导；不预设关卡总数。
 
 验收：Go 玩家可在 VS Code 左侧编辑一关源码、右侧运行一个回合；游戏内核只接受 JSON 指令；失败信息定位到玩家源文件。
 
 ### 阶段 2：Rust 垂直切片
 
-1. 在相同协议和诊断模型下加入 Rust SDK、Cargo 临时项目和工具链探测。
+1. 在 Go 第一关稳定后，在相同协议和诊断模型下加入 Rust SDK、Cargo 临时项目和工具链探测。
 2. 先制作 `rust-marsh-01`，确认借用、枚举和 serde DTO 的模板不会遮蔽回合策略本身。
-3. 再补齐五关，逐关引入结构体/枚举、集合遍历、模式匹配与所有权相关的最小概念。
+3. 再按 Rust 自己的教学节奏扩展后续关卡，逐步引入结构体/枚举、集合遍历、模式匹配与所有权相关的最小概念；不预设关卡总数。
 
 验收：Rust 的编译/运行失败不影响 Go 或 Python；同一张地图产生的合法命令在三种语言下得到相同战斗结算。
 
@@ -179,7 +177,7 @@ Go 的模块依赖固定为项目内 `rpg/sdk`，`GONOSUMDB`、联网拉取、�
 | Rust 模板过早引入生命周期/trait | 策略函数只借用 `&WorldView`，SDK 返回拥有的 `TurnCommand`，首版不需要泛型或 trait 教学 |
 | 诊断混入临时路径和宿主源码 | 运行器在返回 `RunResult` 前过滤临时路径，只显示 `strategy.go`/`src/strategy.rs` 与行列 |
 | 多语言复制六份战斗数据后漂移 | 地图、敌人和奖励仍由一份语言无关关卡骨架生成；仅模板与文本按语言分离 |
-| Python 兼容负担拖慢新战役 | Python 保持维护模式；语言通用化完成后不再让 Go/Rust 为 Python 的追踪功能妥协 |
+| 三套战役互相牵制 | 只共享底层战斗、宿主和协议能力；Python、Go、Rust 的关卡、教学、模板、目录和进度独立维护，新增语言功能不得破坏 Python 的现有体验 |
 
 ## 明确不做
 
@@ -191,10 +189,10 @@ Go 的模块依赖固定为项目内 `rpg/sdk`，`GONOSUMDB`、联网拉取、�
 
 ## 推荐决策
 
-先完成阶段 0 和 Go 第一关，再决定 Rust 是否按完全相同的游戏接口进入。Go 的单文件/显式结构体模型更适合作为编译型语言在当前 RPG 中的首个证明点；Rust 在复用协议、错误模型和 VS Code 路径配置后，风险会集中在教学模板而不是运行器架构。
+先完成阶段 0 和 Go 第一关。Go 的单文件/显式结构体模型更适合作为编译型语言在当前 RPG 中的首个证明点；Rust 在复用协议、错误模型和 VS Code 路径配置后，风险会集中在教学模板而不是运行器架构。Go 第一关通过验收后，才进入 Rust 垂直切片。
 
-## 未确定项
+## 已确认决策
 
-- Python 战役的最终去留尚未决定。本方案要求切换期间保留 `python-marsh-*` 并进入维护模式；只有产品明确选择“Go/Rust 替代 Python”时，才另行规划一次破坏性删除，不迁移或转换既有玩家 `.py` 源码。
-- Rust 是否在 Go 第一关验证后立刻进入实现尚未决定。判定依据是 Go 垂直切片能否证明协议解耦、编译诊断和 VS Code 工作区配置足够稳定；未通过前，Rust 不启动实现。
-- 首次 Rust 构建的可接受耗时尚未测量。暂按 30 至 60 秒显示首次编译状态，只有真实体验证明不可接受时，才调整 SDK 预构建或缓存策略。
+- Python、Go、Rust 三者均保留为独立战役。除游戏内核、语言战役描述、运行请求和 VS Code 宿主能力外，关卡定义、教学内容、源码模板、工作区和玩家进度都按语言分离；每种语言可独立调整关卡数量与教学顺序。
+- 当前只实施 Go 第一关垂直切片。它是语言战役底座、Go 运行器、诊断和 VS Code 体验的第一个证明点；Go 第一关通过验收前，不启动 Rust 实现。
+- Rust 的首次构建耗时暂按 30 至 60 秒呈现为“首次编译”。实际 Rust 垂直切片启动时测量该体验，再决定是否调整缓存策略；该测量不阻塞 Go 第一关。
