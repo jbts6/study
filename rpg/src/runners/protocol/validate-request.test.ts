@@ -105,4 +105,13 @@ describe("validateRunRequest", () => {
     expect(diagnosticCode({ ...validRequest(), worldView: null })).toBe("INVALID_WORLD_VIEW");
     expect(diagnosticCode({ ...validRequest(), worldView: [] })).toBe("INVALID_WORLD_VIEW");
   });
+
+  it("accepts a non-combat world object", () => {
+    const result = validateRunRequest({
+      ...validRequest(),
+      worldView: { revision: 0, location: { id: "rust-marsh-camp" } },
+    });
+
+    expect(result.ok).toBe(true);
+  });
 });

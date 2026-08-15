@@ -1,9 +1,10 @@
-import type { TurnCommand, WorldView } from "../../game/combat/types";
+import type { TurnCommand } from "../../game/combat/types";
 
 export const PROTOCOL_VERSION = 1 as const;
 
 export type JsonPrimitive = boolean | number | string | null;
-export type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+export type JsonObject = { readonly [key: string]: JsonValue };
+export type JsonValue = JsonPrimitive | readonly JsonValue[] | JsonObject;
 export type ExecutionStatus = "completed" | "syntax_error" | "compile_error" | "runtime_error" | "timeout" | "interrupted" | "invalid_request" | "runner_error";
 export type RunnerState = "loading" | "ready" | "running" | "interrupting" | "unavailable";
 export type DiagnosticSeverity = "error" | "warning" | "info";
@@ -36,7 +37,7 @@ export type BaseRunRequest = Readonly<{
   readonly attemptId: string;
   readonly questId: string;
   readonly files: Readonly<Record<string, string>>;
-  readonly worldView: WorldView;
+  readonly worldView: JsonObject;
   readonly limits: ExecutionLimits;
 }>;
 
