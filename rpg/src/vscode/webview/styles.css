@@ -555,11 +555,15 @@ summary:focus-visible {
 .keyboard-hint { margin-left: auto; color: var(--game-muted); font-size: 16px; }
 
 .recovery-view { place-items: center; padding: 24px; }
-.recovery-panel { max-width: 480px; border: 1px solid var(--game-border); padding: 24px; background: var(--game-surface); box-shadow: var(--game-shadow); }
+.recovery-panel { width: min(100%, 560px); border: 1px solid var(--game-border); padding: 24px; background: var(--game-surface); box-shadow: var(--game-shadow); }
 .recovery-panel .game-kicker { color: var(--game-danger); }
 .recovery-panel h1 { margin: 5px 0 10px; font-size: 22px; }
 .recovery-panel p { color: var(--game-muted); line-height: 1.5; }
-.recovery-panel button { margin-top: 12px; border-color: var(--game-danger); color: var(--game-danger); }
+.legacy-code-export { display: grid; gap: 8px; margin-top: 16px; }
+.legacy-code-export h2 { margin: 0; font-size: 15px; }
+.legacy-code-export textarea { min-height: 180px; resize: vertical; border: 1px solid var(--game-border); padding: 10px; background: var(--game-bg); color: var(--game-text); font-family: var(--font-code); font-size: 13px; line-height: 1.5; }
+.recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.recovery-panel button { border-color: var(--game-danger); color: var(--game-danger); }
 
 @media (max-width: 720px) {
   .game-header { padding-inline: 12px; }

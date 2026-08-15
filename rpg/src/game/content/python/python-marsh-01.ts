@@ -4,7 +4,17 @@ import { createMarshSlice } from "../shared/marsh-slice";
 export const CURRENT_LEVEL_ID = "python-marsh-01" as const;
 const MARSH_SLICE = createMarshSlice(CURRENT_LEVEL_ID, "python-slice-1");
 
-export const STARTER_CODE = `def choose_turn(world):
+export const STARTER_CODE = `def choose_world_action(world):
+    # 探索阶段读取 location、npcs、objects 和 inventory。
+    # quests 给出任务；revision 必须原样回传。
+    return {
+        "expectedRevision": world["revision"],
+        "type": "talk",
+        "targetId": "toma",
+    }
+
+
+def choose_turn(world):
     # world 包含当前行动者、战场、单位和目标。
     # 返回值必须是一个 Python 字典。
     # 顶层只能有 actorId、expectedRevision、movePath 和 action。
@@ -55,20 +65,25 @@ export const PYTHON_MARSH_01: LevelDefinition = {
   starterCode: STARTER_CODE,
   guidance: {
     objective: ["在中继器 relay 被腐化前消灭 golem。"],
-    concepts: ["实现 choose_turn(world)，读取字典并返回一条回合指令。"],
+    concepts: ["同一文件用 choose_world_action(world) 处理探索，用 choose_turn(world) 处理战斗。"],
     worldFields: [
-      "world[\"activeUnitId\"] 是当前行动者 ID，用作 actorId。",
-      "world[\"revision\"] 是当前战场修订号，用作 expectedRevision。",
+      "探索：location、npcs、objects、inventory、quests、availableTravel 和 revision。",
+      "战斗：activeUnitId、board、units、objectives 和 revision。",
+      "两个阶段都把 world[\"revision\"] 原样写入 expectedRevision。",
     ],
     commandExamples: [
+      "探索：{\"expectedRevision\": world[\"revision\"], \"type\": \"talk\", \"targetId\": \"toma\"}。",
+      "探索旅行：{\"expectedRevision\": world[\"revision\"], \"type\": \"travel\", \"locationId\": \"old_foundry\"}。",
+      "探索进入战斗：{\"expectedRevision\": world[\"revision\"], \"type\": \"prepareBattle\", \"encounterId\": \"marsh_guardian\"}。",
       "返回值顶层只允许 actorId、expectedRevision、movePath（可选）和 action。",
       "movePath 必须是坐标对象数组，例如 [{\"x\": 1, \"y\": 0}, {\"x\": 2, \"y\": 0}]；单步不能写成 [[1, 0]]，完整路径不能写成 [[1, 0], [2, 0]]。",
       "攻击：{\"action\": {\"type\": \"attack\", \"targetId\": \"golem\"}}。",
       "施法：{\"action\": {\"type\": \"cast\", \"skillId\": \"spark\", \"targetId\": \"golem\"}}。",
     ],
     levelRules: [
-      "movePath 每一步必须正交相邻，scout 最多移动 2 步。",
-      "action.type 可用 attack、cast、interact、guard、wait；本关不能交互关键目标 relay。",
+      "探索命令只从 choose_world_action 返回，不要在页面上直接操作世界目标。",
+      "战斗命令只从 choose_turn 返回；movePath 每一步必须正交相邻，scout 最多移动 2 步。",
+      "战斗 action.type 可用 attack、cast、interact、guard、wait；本关不能交互关键目标 relay。",
     ],
   },
   initialBattle: MARSH_SLICE.initialBattle,

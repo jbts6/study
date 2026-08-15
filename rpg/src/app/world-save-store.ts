@@ -2,6 +2,7 @@ import { isSaveDataV2, SAVE_KEY } from "./save-store";
 import type { WorldCampaignContent } from "../game/content/world/types";
 import type { GameState } from "../game/world/campaign-types";
 import { validateGameState } from "../game/world/validate-game-state";
+import type { LevelId } from "../game/content/types";
 
 export const WORLD_SAVE_KEY = "python-rpg.world-save";
 export const LEGACY_WORLD_SAVE_KEY = SAVE_KEY;
@@ -23,6 +24,7 @@ export type WorldSaveLoadResult =
       ok: false;
       reason: "legacy_v2" | "corrupt";
       message: string;
+      legacyLevelId?: LevelId;
       legacyCodeDraft?: string;
     }>;
 
@@ -74,7 +76,13 @@ export class LocalWorldSaveStore implements WorldSaveStore {
     try {
       const value: unknown = JSON.parse(raw);
       return isSaveDataV2(value)
-        ? { ok: false, reason: "legacy_v2", message: LEGACY_MESSAGE, legacyCodeDraft: value.codeDraft }
+        ? {
+          ok: false,
+          reason: "legacy_v2",
+          message: LEGACY_MESSAGE,
+          legacyLevelId: value.currentLevelId,
+          legacyCodeDraft: value.codeDraft,
+        }
         : corrupted();
     } catch {
       return corrupted();

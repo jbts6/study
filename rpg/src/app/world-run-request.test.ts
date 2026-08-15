@@ -43,6 +43,7 @@ describe("createWorldRunRequest", () => {
     });
 
     expect(request.entrypoint.callable).toBe("choose_world_action");
+    expect(request.questId).toBe("python-marsh-01");
     expect(request.allowedModules).toEqual(["math"]);
     expect(request.worldView).toMatchObject({ revision: 0, location: { id: "rust-marsh-camp" } });
   });

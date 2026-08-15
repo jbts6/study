@@ -1,6 +1,12 @@
 import "./styles.css";
 import "./styles-exploration.css";
-import type { BattleViewSnapshot, ExtensionMessage, ThemePreference, WebviewCommand } from "../messages";
+import type {
+  BattleViewSnapshot,
+  ExtensionMessage,
+  RecoveryViewSnapshot,
+  ThemePreference,
+  WebviewCommand,
+} from "../messages";
 import { renderExploration } from "./render-exploration";
 import { calculateCellSize, renderGame } from "./render-game";
 import {
@@ -39,7 +45,7 @@ window.addEventListener("message", (event: MessageEvent<ExtensionMessage>) => {
     previousSnapshot = undefined;
     latestSnapshot = undefined;
     manualViewState = undefined;
-    renderRecovery(message.snapshot.message, message.snapshot.theme);
+    renderRecovery(message.snapshot);
     return;
   }
   if (message.snapshot.mode === "exploration") {
@@ -197,9 +203,9 @@ function observeBattlefield(): void {
   resizeObserver.observe(stage);
 }
 
-function renderRecovery(message: string, theme: ThemePreference): void {
+function renderRecovery(snapshot: RecoveryViewSnapshot): void {
   resizeObserver?.disconnect();
-  root.dataset.theme = theme;
+  root.dataset.theme = snapshot.theme;
   root.className = "game-view recovery-view";
   const panel = document.createElement("section");
   panel.className = "recovery-panel";
@@ -209,13 +215,49 @@ function renderRecovery(message: string, theme: ThemePreference): void {
   const heading = document.createElement("h1");
   heading.textContent = "战役状态无法读取";
   const detail = document.createElement("p");
-  detail.textContent = message;
+  detail.textContent = snapshot.message;
+  const actions = document.createElement("div");
+  actions.className = "recovery-actions";
+  panel.append(kicker, heading, detail);
+  if (snapshot.legacyCodeDraft !== undefined) {
+    panel.append(renderLegacyCode(snapshot.legacyCodeDraft));
+    actions.append(downloadLegacyCodeButton(snapshot.legacyCodeDraft));
+  }
   const reset = document.createElement("button");
   reset.type = "button";
   reset.dataset.command = "resetCampaign";
   reset.textContent = "重置战役";
-  panel.append(kicker, heading, detail, reset);
+  actions.append(reset);
+  panel.append(actions);
   root.replaceChildren(panel);
+}
+
+function renderLegacyCode(code: string): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "legacy-code-export";
+  const heading = document.createElement("h2");
+  heading.textContent = "旧版代码备份";
+  const textarea = document.createElement("textarea");
+  textarea.dataset.testid = "legacy-code";
+  textarea.readOnly = true;
+  textarea.value = code;
+  textarea.setAttribute("aria-label", "旧版代码");
+  section.append(heading, textarea);
+  return section;
+}
+
+function downloadLegacyCodeButton(code: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.testid = "download-legacy-code";
+  button.textContent = "下载旧代码";
+  button.addEventListener("click", () => {
+    const link = document.createElement("a");
+    link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(code)}`;
+    link.download = "python-rpg-legacy.py";
+    link.click();
+  });
+  return button;
 }
 
 function isSimpleCommand(value: string | undefined): value is Exclude<WebviewCommand["type"], "setTheme"> {

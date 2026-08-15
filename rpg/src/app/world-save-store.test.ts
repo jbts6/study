@@ -33,6 +33,7 @@ describe("LocalWorldSaveStore", () => {
       ok: false,
       reason: "legacy_v2",
       message: "检测到旧版战斗存档。导出旧代码后开始新的世界战役。",
+      legacyLevelId: "python-marsh-01",
       legacyCodeDraft: "old code",
     });
   });

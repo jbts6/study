@@ -1,0 +1,30 @@
+.legacy-code-export {
+  display: grid;
+  gap: 10px;
+}
+
+.legacy-code-export h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.legacy-code-export textarea {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px;
+  color: var(--text);
+  background: var(--surface-deep);
+  font-family: var(--font-code);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.legacy-code-export button {
+  justify-self: start;
+  border-color: var(--arcane);
+  color: var(--arcane);
+  background: var(--surface);
+}

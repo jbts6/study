@@ -4,20 +4,25 @@ import type { CampaignDefinition } from "../programs/types";
 import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
 import { PYTHON_WORLD_CONTENT } from "../game/content/python/world-chapter-01";
 import { createPythonWorldInitialState } from "../game/content/python/world-chapter-01";
+import { getLevel } from "../game/content/levels";
 import type { GameState } from "../game/world/campaign-types";
 import { WorldCampaignController } from "./world-campaign-controller";
 import type { LocalSaveDataV3, WorldSaveLoadResult, WorldSaveStore } from "./world-save-store";
 import type { RunnerClient, RunnerDisplayState } from "./runner-client";
 
 class FakeRunner implements RunnerClient {
-  readonly state: RunnerDisplayState = "ready";
   readonly requests: RunRequest[] = [];
   private readonly listeners = new Set<(state: RunnerDisplayState) => void>();
+  private currentState: RunnerDisplayState = "ready";
 
   constructor(
     private readonly results: readonly RunResult[],
     private readonly validateEntrypoint = false,
   ) {}
+
+  get state(): RunnerDisplayState {
+    return this.currentState;
+  }
 
   async connect(): Promise<void> {}
 
@@ -38,6 +43,53 @@ class FakeRunner implements RunnerClient {
     return () => this.listeners.delete(listener);
   }
 
+  emit(state: RunnerDisplayState): void {
+    this.currentState = state;
+    for (const listener of this.listeners) listener(state);
+  }
+
+  close(): void {}
+}
+
+class ChapterFlowRunner implements RunnerClient {
+  readonly state: RunnerDisplayState = "ready";
+  readonly requests: RunRequest[] = [];
+  private worldStep = 0;
+
+  async connect(): Promise<void> {}
+
+  async run(request: RunRequest): Promise<RunResult> {
+    this.requests.push(request);
+    if (request.language !== "python") throw new Error("chapter flow requires Python requests");
+    const revision = requestRevision(request);
+    if (request.entrypoint.callable === "choose_turn") {
+      const battleTurn = this.requests.filter((item) => item.language === "python" && item.entrypoint.callable === "choose_turn").length;
+      return completed({
+        actorId: "scout",
+        expectedRevision: revision,
+        movePath: battleTurn === 1 ? [{ x: 1, y: 0 }, { x: 2, y: 0 }] : [{ x: 1, y: 0 }],
+        action: { type: "attack", targetId: "golem" },
+      });
+    }
+
+    const commands: readonly JsonValue[] = [
+      { expectedRevision: revision, type: "talk", targetId: "toma" },
+      { expectedRevision: revision, type: "inspect", targetId: "scrap_pile" },
+      { expectedRevision: revision, type: "collect", targetId: "copper_wire_source" },
+      { expectedRevision: revision, type: "inspect", targetId: "weather_station" },
+      { expectedRevision: revision, type: "travel", locationId: "old_foundry" },
+      { expectedRevision: revision, type: "use", itemId: "copper_wire", targetId: "relay" },
+      { expectedRevision: revision, type: "prepareBattle", encounterId: "marsh_guardian" },
+      { expectedRevision: revision, type: "talk", targetId: "toma" },
+    ];
+    const command = commands[this.worldStep];
+    if (command === undefined) throw new Error("chapter flow has no remaining world command");
+    this.worldStep += 1;
+    return completed(command);
+  }
+
+  interrupt(): void {}
+  onStateChange(): () => void { return () => undefined; }
   close(): void {}
 }
 
@@ -69,6 +121,12 @@ function completed(returnValue: JsonValue): RunResult {
     streams: { stdout: "", stderr: "", truncated: false },
     metrics: { durationMs: 1, traceEvents: 0 },
   };
+}
+
+function requestRevision(request: PythonRunRequest): number {
+  const revision = request.worldView.revision;
+  if (typeof revision !== "number") throw new Error("world revision is missing");
+  return revision;
 }
 
 function syntaxErrorResult(): RunResult {
@@ -109,7 +167,7 @@ function missingEntrypointResult(request: PythonRunRequest): RunResult {
 }
 
 function createWorldController(
-  runner: FakeRunner,
+  runner: RunnerClient,
   saveStore: MemoryWorldSaveStore,
   campaign: CampaignDefinition = PYTHON_RPG_CAMPAIGN,
 ): WorldCampaignController {
@@ -140,6 +198,9 @@ describe("WorldCampaignController", () => {
     if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot");
     expect(snapshot.codeDraft).toContain("def choose_world_action(world):");
     expect(snapshot.codeDraft).toContain("def choose_turn(world):");
+    const starter = getLevel("python-marsh-01").starterCode;
+    expect(starter.match(/def choose_world_action\(world\):/g)).toHaveLength(1);
+    expect(starter.match(/def choose_turn\(world\):/g)).toHaveLength(1);
   });
 
   it("runs the default exploration draft without a missing-callable program error", async () => {
@@ -173,6 +234,58 @@ describe("WorldCampaignController", () => {
     expect(snapshot.worldView).toEqual(snapshot.worldView);
     expect(runner.requests[0]).toMatchObject({ entrypoint: { callable: "choose_world_action" } });
     expect(saveStore.saved.at(-1)?.gameState.revision).toBe(1);
+  });
+
+  it("preserves an edited draft across runner state snapshots", async () => {
+    const runner = new FakeRunner([]);
+    const saveStore = new MemoryWorldSaveStore();
+    const controller = createWorldController(runner, saveStore);
+    await controller.start();
+
+    controller.setCode("# edited draft\n");
+    runner.emit("connecting");
+
+    const snapshot = controller.getSnapshot();
+    expect(snapshot.mode).toBe("exploration");
+    if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot");
+    expect(snapshot.codeDraft).toBe("# edited draft\n");
+    expect(saveStore.saved.at(-1)?.codeDrafts["python-marsh-01"]).toBe("# edited draft\n");
+  });
+
+  it("completes the first chapter from exploration through battle and report submission", async () => {
+    const runner = new ChapterFlowRunner();
+    const saveStore = new MemoryWorldSaveStore();
+    const controller = createWorldController(runner, saveStore);
+    await controller.start();
+
+    for (let step = 0; step < 10; step += 1) {
+      const current = controller.getSnapshot();
+      if (current.mode !== "exploration" && current.mode !== "battle") throw new Error("expected active chapter snapshot");
+      await controller.runCode(current.codeDraft);
+    }
+
+    const snapshot = controller.getSnapshot();
+    expect(snapshot.mode).toBe("exploration");
+    if (snapshot.mode !== "exploration") throw new Error("expected completed exploration snapshot");
+    expect(snapshot.gameState.quests).toEqual([
+      { id: "repair_relay", status: "completed", stepId: "completed" },
+    ]);
+    expect(snapshot.gameState.worldFlags.chapter_02_unlocked).toBe(true);
+    expect(snapshot.gameState.battle).toBeNull();
+    expect(saveStore.saved.at(-1)?.gameState).toEqual(snapshot.gameState);
+    expect(runner.requests.map((request) => request.language === "python" ? request.entrypoint.callable : "go"))
+      .toEqual([
+        "choose_world_action",
+        "choose_world_action",
+        "choose_world_action",
+        "choose_world_action",
+        "choose_world_action",
+        "choose_world_action",
+        "choose_world_action",
+        "choose_turn",
+        "choose_turn",
+        "choose_world_action",
+      ]);
   });
 
   it("keeps world state unchanged after a syntax error", async () => {

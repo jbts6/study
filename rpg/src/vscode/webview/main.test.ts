@@ -75,6 +75,7 @@ function explorationSnapshot(): ExplorationViewSnapshot {
     objects: [],
     inventory: [],
     quests: [{ id: "repair_relay", status: "active", stepId: "talk_to_toma" }],
+    availableTravel: [],
     runnerState: "ready",
     feedback: { layer: "task", kind: "idle", title: "", messages: [], stdout: "", stderr: "" },
   };
@@ -168,8 +169,23 @@ describe("webview main local manual interactions", () => {
     expect(root.querySelector("h1")?.textContent).toBe("锈沼营地");
     expect(root.querySelector(".battle-grid")).toBeNull();
 
-    sendSnapshot({ mode: "recovery", theme: "dark", reason: "corrupt", message: "存档损坏", canReset: true });
+    sendSnapshot({
+      mode: "recovery",
+      theme: "dark",
+      reason: "legacy_v2",
+      message: "检测到旧版存档",
+      legacyCodeDraft: "def choose_turn(world):\n    return {}\n",
+      canReset: true,
+    });
     expect(root.textContent).toContain("战役状态无法读取");
-    expect(root.querySelector("[data-command='resetCampaign']")).not.toBeNull();
+    const legacyCode = root.querySelector<HTMLTextAreaElement>("[data-testid='legacy-code']");
+    const download = root.querySelector<HTMLButtonElement>("[data-testid='download-legacy-code']");
+    const reset = root.querySelector<HTMLButtonElement>("[data-command='resetCampaign']");
+    expect(legacyCode?.readOnly).toBe(true);
+    expect(legacyCode?.value).toContain("choose_turn");
+    expect(download).not.toBeNull();
+    expect(reset).not.toBeNull();
+    if (download === null || reset === null) throw new Error("Recovery actions were not rendered");
+    expect(download.compareDocumentPosition(reset) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 });

@@ -26,7 +26,7 @@ export function createWorldRunRequest(input: WorldRunRequestInput): PythonRunReq
     protocolVersion: 1,
     runId: input.runId,
     attemptId: `${input.runId}:1`,
-    questId: input.state.quests.find((quest) => quest.status === "active")?.id ?? input.state.chapterId,
+    questId: input.state.chapterId,
     language: "python",
     files: input.campaign.program.createRunFiles(input.state.chapterId, input.codeDraft),
     worldView,

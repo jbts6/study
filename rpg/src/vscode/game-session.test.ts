@@ -244,11 +244,16 @@ describe("GameSession", () => {
     const worldSession = new GameSession({
       controller: new WorldCampaignController({
         runner: new FakeRunner(),
-        saveStore: new MemoryWorldSaveStore({ ok: false, reason: "corrupt", message: "broken" }),
+        saveStore: new MemoryWorldSaveStore({
+          ok: false,
+          reason: "legacy_v2",
+          message: "legacy world",
+          legacyLevelId: "python-marsh-01",
+        }),
       }, PYTHON_RPG_CAMPAIGN, PYTHON_WORLD_CONTENT),
       workspace: {
         ensureLevelFiles: async () => undefined,
-        readLevelCode: async () => "",
+        readLevelCode: async () => "workspace old code",
         openLevel: async () => undefined,
       },
       postMessage: (message) => { worldMessages.push(message); },
@@ -261,8 +266,9 @@ describe("GameSession", () => {
     const worldSnapshot = worldMessage?.type === "snapshot" ? worldMessage.snapshot : undefined;
     expect(worldSnapshot).toMatchObject({
       mode: "recovery",
-      reason: "corrupt",
-      message: "broken",
+      reason: "legacy_v2",
+      message: "legacy world",
+      legacyCodeDraft: "workspace old code",
       canReset: true,
     });
     worldSession.dispose();

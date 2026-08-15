@@ -34,6 +34,7 @@ export type WorldRecoverySnapshot = Readonly<{
   mode: "world_recovery";
   reason: "legacy_v2" | "corrupt";
   message: string;
+  legacyLevelId?: LevelId;
   legacyCodeDraft?: string;
 }>;
 
@@ -42,6 +43,7 @@ export type ControllerSnapshot = AppSnapshot | WorldExplorationSnapshot | WorldB
 export interface GameController {
   readonly campaign: CampaignDefinition;
   start(): Promise<void>;
+  setCode(code: string): void;
   runCode(code: string): Promise<void>;
   interrupt(): Promise<void>;
   resetSave(confirmation: string): void;

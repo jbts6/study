@@ -75,7 +75,7 @@ function renderWorld(snapshot: ExplorationViewSnapshot): HTMLElement {
 
   const intel = element("aside", "exploration-intel");
   intel.setAttribute("aria-label", "战役情报");
-  intel.append(renderInventory(snapshot), renderQuests(snapshot));
+  intel.append(renderInventory(snapshot), renderTravel(snapshot), renderQuests(snapshot));
   stage.append(field, intel);
   return stage;
 }
@@ -137,6 +137,11 @@ function worldRow(
 function renderInventory(snapshot: ExplorationViewSnapshot): HTMLElement {
   const rows = snapshot.inventory.map((item) => compactRow(item.id, `× ${item.amount}`));
   return renderIntelSection("随身物资", "INVENTORY", rows, "物资栏为空");
+}
+
+function renderTravel(snapshot: ExplorationViewSnapshot): HTMLElement {
+  const rows = snapshot.availableTravel.map((locationId) => compactRow(locationId, "locationId"));
+  return renderIntelSection("可前往地点", "TRAVEL", rows, "当前没有可前往地点");
 }
 
 function renderQuests(snapshot: ExplorationViewSnapshot): HTMLElement {

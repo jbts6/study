@@ -73,6 +73,7 @@ export class WorldCampaignController implements GameController {
         mode: "world_recovery",
         reason: loaded.reason,
         message: loaded.message,
+        ...(loaded.legacyLevelId === undefined ? {} : { legacyLevelId: loaded.legacyLevelId }),
         ...(loaded.legacyCodeDraft === undefined ? {} : { legacyCodeDraft: loaded.legacyCodeDraft }),
       });
       return;
@@ -96,17 +97,17 @@ export class WorldCampaignController implements GameController {
   }
 
   async runCode(code: string): Promise<void> {
+    this.setCode(code);
     const snapshot = this.currentWorldSnapshot();
     if (snapshot === undefined) return;
+    await this.runCurrent(snapshot);
+  }
 
-    let next = snapshot;
-    if (code !== snapshot.codeDraft) {
-      this.codeDrafts = { ...this.codeDrafts, [snapshot.gameState.chapterId]: code };
-      this.saveWorld(snapshot.gameState, code);
-      next = { ...snapshot, codeDraft: code };
-      this.replaceSnapshot(next);
-    }
-    await this.runCurrent(next);
+  setCode(code: string): void {
+    const snapshot = this.currentWorldSnapshot();
+    if (snapshot === undefined || snapshot.codeDraft === code) return;
+    this.saveWorld(snapshot.gameState, code);
+    this.replaceSnapshot({ ...snapshot, codeDraft: code });
   }
 
   async interrupt(): Promise<void> {
@@ -302,15 +303,7 @@ export class WorldCampaignController implements GameController {
   private defaultCodeDraft(chapterId: string): string {
     const levelId = this.campaign.levelOrder.find((candidate) => candidate === chapterId) ?? this.campaign.levelOrder[0];
     if (levelId === undefined) throw new Error(`战役没有可用关卡: ${this.campaign.id}`);
-    return `def choose_world_action(world):
-    # 探索时返回 talk / inspect / collect / use / travel / prepareBattle 之一。
-    return {
-        "expectedRevision": world["revision"],
-        "type": "talk",
-        "targetId": "toma",
-    }
-
-${getLevel(levelId).starterCode}`;
+    return getLevel(levelId).starterCode;
   }
 
   private currentWorldSnapshot(): ActiveWorldSnapshot | undefined {

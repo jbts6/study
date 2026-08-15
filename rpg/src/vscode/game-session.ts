@@ -54,16 +54,18 @@ export class GameSession {
     await this.dependencies.controller.start();
     this.snapshot = this.dependencies.controller.getSnapshot();
     assertCampaignSnapshot(this.snapshot, this.dependencies.controller.campaign);
+    let readyForDocumentChanges = false;
     this.unsubscribe = this.dependencies.controller.subscribe((snapshot) => {
       assertCampaignSnapshot(snapshot, this.dependencies.controller.campaign);
       this.snapshot = snapshot;
-      void this.publish(snapshot);
-      const levelId = snapshotDocumentId(snapshot);
-      if (levelId !== undefined && levelId !== this.openedLevelId) {
-        this.openedLevelId = levelId;
-        void this.dependencies.workspace.openLevel(levelId);
+      if (readyForDocumentChanges) {
+        void this.publish(snapshot);
+        void this.openSnapshotDocument(snapshot);
       }
     });
+    await this.openSnapshotDocument(this.snapshot);
+    readyForDocumentChanges = true;
+    await this.publish(this.snapshot);
   }
 
   async handle(command: WebviewCommand): Promise<void> {
@@ -115,17 +117,45 @@ export class GameSession {
     }
     await this.dependencies.postMessage({
       type: "snapshot",
-      snapshot: toViewSnapshot(snapshot, this.dependencies.getTheme(), campaign),
+      snapshot: toViewSnapshot(
+        snapshot,
+        this.dependencies.getTheme(),
+        campaign,
+        await this.recoveryCodeDraft(snapshot),
+      ),
     });
+  }
+
+  private async recoveryCodeDraft(snapshot: ControllerSnapshot): Promise<string | undefined> {
+    if (snapshot.mode !== "world_recovery" || snapshot.reason !== "legacy_v2") return undefined;
+    if (snapshot.legacyCodeDraft !== undefined) return snapshot.legacyCodeDraft;
+    if (snapshot.legacyLevelId === undefined) return undefined;
+    try {
+      return await this.dependencies.workspace.readLevelCode(snapshot.legacyLevelId);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async openSnapshotDocument(snapshot: ControllerSnapshot): Promise<void> {
+    const levelId = snapshotDocumentId(snapshot);
+    if (levelId === undefined || levelId === this.openedLevelId) return;
+    this.openedLevelId = levelId;
+    await this.dependencies.workspace.openLevel(levelId);
   }
 }
 
-function toViewSnapshot(snapshot: ControllerSnapshot, theme: ThemePreference, campaign: CampaignDefinition): WebviewSnapshot {
+function toViewSnapshot(
+  snapshot: ControllerSnapshot,
+  theme: ThemePreference,
+  campaign: CampaignDefinition,
+  legacyCodeDraft?: string,
+): WebviewSnapshot {
   switch (snapshot.mode) {
     case "save_recovery":
       return recoveryViewSnapshot(theme, "corrupt", snapshot.message);
     case "world_recovery":
-      return recoveryViewSnapshot(theme, snapshot.reason, snapshot.message);
+      return recoveryViewSnapshot(theme, snapshot.reason, snapshot.message, legacyCodeDraft);
     case "exploration":
       return explorationViewSnapshot(snapshot, theme, campaign);
     case "battle":
@@ -194,8 +224,16 @@ function recoveryViewSnapshot(
   theme: ThemePreference,
   reason: RecoveryViewSnapshot["reason"],
   message: string,
+  legacyCodeDraft?: string,
 ): RecoveryViewSnapshot {
-  return { mode: "recovery", theme, reason, message, canReset: true };
+  return {
+    mode: "recovery",
+    theme,
+    reason,
+    message,
+    canReset: true,
+    ...(legacyCodeDraft === undefined ? {} : { legacyCodeDraft }),
+  };
 }
 
 function assertCampaignSnapshot(snapshot: ControllerSnapshot, campaign: CampaignDefinition): void {

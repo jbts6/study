@@ -163,6 +163,7 @@ async function createActiveGame(
   const game = new ActiveGame(campaign.id, panel, session, runner, diagnostics);
   try {
     await session.start();
+    panel.reveal(vscode.ViewColumn.Two);
     panel.webview.html = webviewHtml(panel.webview, context.extensionUri, campaign);
     return game;
   } catch (error) {

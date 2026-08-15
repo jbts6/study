@@ -1,0 +1,27 @@
+@media (max-width: 1180px) {
+  .world-app-body,
+  .world-app-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .world-intel {
+    border-block-start: 1px solid #315e63;
+    border-inline-start: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .world-app-header,
+  .world-task-band {
+    align-items: flex-start;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .world-app-header {
+    flex-direction: column;
+  }
+
+  .world-app-status {
+    justify-content: flex-start;
+  }
+}

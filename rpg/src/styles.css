@@ -2,3 +2,6 @@
 @import "./styles/layout.css";
 @import "./styles/responsive.css";
 @import "./styles/game.css";
+@import "./styles/world.css";
+@import "./styles/world-responsive.css";
+@import "./styles/recovery.css";

@@ -7,6 +7,7 @@ import type {
 } from "../app/world-save-store";
 import { validateGameState } from "../game/world/validate-game-state";
 import type { WorldCampaignContent } from "../game/content/world/types";
+import type { LevelId } from "../game/content/types";
 import type { CampaignId } from "../programs/types";
 import type { WorkspaceState } from "./platform-types";
 
@@ -43,7 +44,7 @@ export class WorkspaceWorldSaveStore implements WorldSaveStore {
     if (isWorkspaceSaveDataV3(value, this.content)) {
       return { ok: true, save: { ...value, codeDrafts: {} } };
     }
-    if (isWorkspaceSaveDataV2(value)) return legacyV2();
+    if (isWorkspaceSaveDataV2(value)) return legacyV2(value.currentLevelId as LevelId);
     return corrupted();
   }
 
@@ -75,7 +76,9 @@ function isWorkspaceSaveDataV3(value: unknown, content: WorldCampaignContent): v
     && validateGameState(value.gameState, content);
 }
 
-function isWorkspaceSaveDataV2(value: unknown): boolean {
+function isWorkspaceSaveDataV2(
+  value: unknown,
+): value is Readonly<{ version: 2; currentLevelId: LevelId }> {
   if (!isRecord(value)
     || value.version !== 2
     || typeof value.currentLevelId !== "string"
@@ -88,11 +91,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function legacyV2(): WorldSaveLoadResult {
+function legacyV2(legacyLevelId: LevelId): WorldSaveLoadResult {
   return {
     ok: false,
     reason: "legacy_v2",
     message: "检测到旧版战斗存档。导出旧代码后开始新的世界战役。",
+    legacyLevelId,
   };
 }
 

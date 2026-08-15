@@ -28,6 +28,7 @@ export type ExplorationViewSnapshot = Readonly<{
   objects: CampaignWorldView["objects"];
   inventory: CampaignWorldView["inventory"];
   quests: CampaignWorldView["quests"];
+  availableTravel: CampaignWorldView["availableTravel"];
   runnerState: RunnerDisplayState;
   feedback: AppFeedback;
   activeRunId?: string;
@@ -52,6 +53,7 @@ export type RecoveryViewSnapshot = Readonly<{
   theme: ThemePreference;
   reason: "legacy_v2" | "corrupt";
   message: string;
+  legacyCodeDraft?: string;
   canReset: true;
 }>;
 

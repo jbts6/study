@@ -15,6 +15,7 @@ function explorationSnapshot(): ExplorationViewSnapshot {
     objects: [{ id: "scrap_pile", type: "salvage", status: "uninspected", requiredItems: [] }],
     inventory: [{ id: "copper_wire", amount: 1 }],
     quests: [{ id: "repair_relay", status: "active", stepId: "talk_to_toma" }],
+    availableTravel: ["old_foundry"],
     runnerState: "ready",
     feedback: {
       layer: "task",
@@ -43,6 +44,7 @@ describe("exploration Webview renderer", () => {
     expect(root.textContent).toContain("托玛");
     expect(root.textContent).toContain("repair_relay");
     expect(root.textContent).toContain("copper_wire");
+    expect(root.textContent).toContain("old_foundry");
     expect(root.querySelector(".battle-grid")).toBeNull();
     expect(root.querySelector("[data-feedback-layer]")?.getAttribute("data-feedback-layer")).toBe("task");
     expect(root.querySelector(".feedback-panel h2")?.textContent).toBe("任务反馈");

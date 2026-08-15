@@ -291,6 +291,7 @@ describe("game Webview renderer", () => {
       expect(root.querySelectorAll(".guidance-group"), levelId).toHaveLength(5);
       expect(root.textContent, levelId).toContain(level.guidance.objective[0]);
       expect(root.textContent, levelId).toContain(level.guidance.levelRules[0]);
+      if (levelId === "python-marsh-01") expect(root.textContent).not.toContain("prepareBattle");
     }
   });
 });

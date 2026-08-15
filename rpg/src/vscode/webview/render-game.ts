@@ -177,11 +177,12 @@ function renderFeedback(snapshot: BattleViewSnapshot): HTMLElement {
 function renderGuidance(guidance: LevelGuidance, languageLabel: BattleViewSnapshot["languageLabel"]): HTMLElement {
   const details = element("details", "guidance-drawer");
   details.append(textElement("summary", "", "展开本关提示"));
+  const battleExamples = guidance.commandExamples.filter((entry) => !entry.startsWith("探索"));
   for (const [title, values] of [
     ["本关目标", guidance.objective],
     [`${languageLabel} 概念`, guidance.concepts],
     ["world 字段", guidance.worldFields],
-    ["命令示例", guidance.commandExamples],
+    ["命令示例", battleExamples],
     ["本关规则", guidance.levelRules],
   ] as const) {
     const section = element("section", "guidance-group");
