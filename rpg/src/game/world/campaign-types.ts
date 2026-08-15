@@ -22,6 +22,21 @@ export type GameState = Readonly<{
   battle: ActiveBattle | null;
 }>;
 
+export type CampaignWorldView = Readonly<{
+  revision: number;
+  location: Readonly<{ id: string; name: string; weather?: string }>;
+  npcs: readonly Readonly<{ id: string; name: string; role: string; mood: string }>[];
+  objects: readonly Readonly<{
+    id: string;
+    type: string;
+    status: string;
+    requiredItems: readonly string[];
+  }>[];
+  inventory: readonly ItemState[];
+  quests: readonly QuestState[];
+  availableTravel: readonly string[];
+}>;
+
 export type WorldCommand =
   | Readonly<{ expectedRevision: number; type: "inspect"; targetId: string }>
   | Readonly<{ expectedRevision: number; type: "talk"; targetId: string }>
