@@ -63,3 +63,39 @@
 提交：待提交，提交信息为 `fix: address campaign content review`。
 
 疑虑：未运行全量测试和 E2E，按 brief 仅执行两条定向验证命令。
+
+---
+
+# Task 4 补充报告：桥接世界遭遇结算
+
+## RED
+
+先添加胜利结算、失败重试和终态拒绝测试，再运行 `cd rpg && npm test -- src/game/world/settle-encounter.test.ts`。测试按预期失败：`./settle-encounter` 模块不存在。
+
+补充最终报告提交测试后运行 `cd rpg && npm test -- src/game/world/resolve-world-command.test.ts`，按预期失败：提交后任务仍为 `active/submit_report`，未设置章节完成和解锁标志。
+
+## GREEN
+
+新增 `settleEncounter` 与 `encounterBattleLevel`：无活动战斗或战斗仍在进行时抛错；胜利清空战斗、回到 `rust-marsh-camp`、设置 `marsh_guardian_defeated`、推进到 `submit_report` 并递增一次 revision；失败从注册遭遇的初始战斗深拷贝，保留探索状态与任务、维持 encounter ID 并递增一次 revision。
+
+扩展 `talk toma` 的报告提交：守卫已击败且任务处于 `submit_report` 时完成任务并设置 `chapter_01_completed`、`chapter_02_unlocked`；重复提交仍接受且不重复改变奖励状态。
+
+## 验证
+
+- `cd rpg && npm test -- src/game/world/settle-encounter.test.ts`：通过，3 tests。
+- `cd rpg && npm test -- src/game/world/settle-encounter.test.ts src/game/world/resolve-world-command.test.ts`：通过，7 tests。
+- `cd rpg && npm run typecheck`：通过，退出码 0。
+
+## 文件清单
+
+- `rpg/src/game/world/settle-encounter.ts`
+- `rpg/src/game/world/settle-encounter.test.ts`
+- `rpg/src/game/world/reduce-world.ts`
+- `rpg/src/game/world/resolve-world-command.test.ts`
+
+## 提交与遗留顾虑
+
+- 基线：`8a7dd96`。
+- 实现提交：`47c3d3a`（`feat: settle world campaign encounters`；本补充报告追加后提交哈希随 Git 历史更新）。
+- 未修改通用世界指令 DSL 或协议；未运行全量测试或 `npm run install:local`（按 brief 要求）。
+

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PYTHON_WORLD_CONTENT, createPythonWorldInitialState } from "../content/python/world-chapter-01";
 import type { GameState, WorldCommand } from "./campaign-types";
 import { resolveWorldCommand } from "./resolve-world-command";
+import { settleEncounter } from "./settle-encounter";
 
 type WorldCommandInput = {
   [K in WorldCommand["type"]]: Omit<Extract<WorldCommand, { type: K }>, "expectedRevision">
@@ -65,5 +66,32 @@ describe("resolveWorldCommand", () => {
         ]);
       }
     }
+  });
+
+  it("accepts the final report once and keeps repeated submissions idempotent", () => {
+    let state = createPythonWorldInitialState();
+    state = apply(state, { type: "talk", targetId: "toma" });
+    state = apply(state, { type: "inspect", targetId: "scrap_pile" });
+    state = apply(state, { type: "collect", targetId: "copper_wire_source" });
+    state = apply(state, { type: "inspect", targetId: "weather_station" });
+    state = apply(state, { type: "travel", locationId: "old_foundry" });
+    state = apply(state, { type: "use", itemId: "copper_wire", targetId: "relay" });
+    state = apply(state, { type: "prepareBattle", encounterId: "marsh_guardian" });
+    state = settleEncounter({
+      ...state,
+      battle: { ...state.battle!, state: { ...state.battle!.state, phase: "won" as const } },
+    }, PYTHON_WORLD_CONTENT);
+
+    state = apply(state, { type: "talk", targetId: "toma" });
+    expect(state.quests).toEqual([{ id: "repair_relay", status: "completed", stepId: "completed" }]);
+    expect(state.worldFlags.chapter_01_completed).toBe(true);
+    expect(state.worldFlags.chapter_02_unlocked).toBe(true);
+
+    const revisionBeforeRepeat = state.revision;
+    state = apply(state, { type: "talk", targetId: "toma" });
+    expect(state.revision).toBe(revisionBeforeRepeat + 1);
+    expect(state.quests).toEqual([{ id: "repair_relay", status: "completed", stepId: "completed" }]);
+    expect(state.worldFlags.chapter_01_completed).toBe(true);
+    expect(state.worldFlags.chapter_02_unlocked).toBe(true);
   });
 });

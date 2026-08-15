@@ -5,6 +5,12 @@ function advanceQuest(state: GameState, fromStep: string, toStep: string): reado
   return state.quests.map((quest, index) => index === 0 && quest.stepId === fromStep ? { ...quest, stepId: toStep } : quest);
 }
 
+function completeRepairQuest(quests: readonly QuestState[]): readonly QuestState[] {
+  return quests.map((quest, index) => index === 0 && quest.id === "repair_relay" && quest.stepId === "submit_report"
+    ? { ...quest, status: "completed", stepId: "completed" }
+    : quest);
+}
+
 function addClue(clues: readonly string[], clue: string): readonly string[] {
   return clues.includes(clue) ? [...clues] : [...clues, clue];
 }
@@ -46,7 +52,21 @@ export function reduceWorld(state: Readonly<GameState>, content: WorldCampaignCo
   };
 
   if (command.type === "talk" && command.targetId === "toma") {
-    next = { ...next, worldFlags: { ...next.worldFlags, talked_to_toma: true }, quests: advanceQuest(next, "talk_to_toma", "inspect_scrap_pile") };
+    const reportReady = next.worldFlags.marsh_guardian_defeated === true
+      && next.quests[0]?.id === "repair_relay"
+      && next.quests[0]?.stepId === "submit_report";
+    next = reportReady
+      ? {
+        ...next,
+        worldFlags: {
+          ...next.worldFlags,
+          talked_to_toma: true,
+          chapter_01_completed: true,
+          chapter_02_unlocked: true,
+        },
+        quests: completeRepairQuest(next.quests),
+      }
+      : { ...next, worldFlags: { ...next.worldFlags, talked_to_toma: true }, quests: advanceQuest(next, "talk_to_toma", "inspect_scrap_pile") };
   } else if (command.type === "inspect" && command.targetId === "scrap_pile") {
     next = { ...next, worldFlags: { ...next.worldFlags, scrap_pile_inspected: true }, discoveredClues: addClue(next.discoveredClues, "scrap_contains_copper"), quests: advanceQuest(next, "inspect_scrap_pile", "collect_copper_wire") };
   } else if (command.type === "collect") {
