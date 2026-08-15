@@ -1,6 +1,7 @@
 import "./styles.css";
-import type { ExtensionMessage, ThemePreference, WebviewCommand } from "../messages";
-import type { GameViewSnapshot } from "../messages";
+import "./styles-exploration.css";
+import type { BattleViewSnapshot, ExtensionMessage, ThemePreference, WebviewCommand } from "../messages";
+import { renderExploration } from "./render-exploration";
 import { calculateCellSize, renderGame } from "./render-game";
 import {
   resolveManualView,
@@ -24,8 +25,8 @@ if (gameRoot === null) throw new Error("Missing #game-root");
 const root: HTMLElement = gameRoot;
 
 let resizeObserver: ResizeObserver | undefined;
-let previousSnapshot: GameViewSnapshot | undefined;
-let latestSnapshot: GameViewSnapshot | undefined;
+let previousSnapshot: BattleViewSnapshot | undefined;
+let latestSnapshot: BattleViewSnapshot | undefined;
 let persistedState = vscode.getState<PersistedManualState>();
 let manualViewState: ManualViewState | undefined = persistedState === undefined
   ? undefined
@@ -34,11 +35,19 @@ let manualViewState: ManualViewState | undefined = persistedState === undefined
 window.addEventListener("message", (event: MessageEvent<ExtensionMessage>) => {
   const message = event.data;
   if (message.type !== "snapshot") return;
-  if (message.snapshot.mode === "save_recovery") {
+  if (message.snapshot.mode === "recovery") {
     previousSnapshot = undefined;
     latestSnapshot = undefined;
     manualViewState = undefined;
     renderRecovery(message.snapshot.message, message.snapshot.theme);
+    return;
+  }
+  if (message.snapshot.mode === "exploration") {
+    previousSnapshot = undefined;
+    latestSnapshot = undefined;
+    manualViewState = undefined;
+    renderExploration(root, message.snapshot);
+    resizeObserver?.disconnect();
     return;
   }
   previousSnapshot = latestSnapshot;

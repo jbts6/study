@@ -55,29 +55,9 @@ export type RecoveryViewSnapshot = Readonly<{
   canReset: true;
 }>;
 
-/**
- * Legacy Webview rendering still consumes the battle-only shape until the
- * exploration renderer is introduced. The host publishes WebviewSnapshot.
- */
-export type GameViewSnapshot = Readonly<{
-  mode: "game";
-  theme: ThemePreference;
-  campaignTitle: string;
-  languageLabel: "Python" | "Go";
-  playerFileName: string;
-  level: LevelDefinition;
-  battleState: BattleState;
-  runnerState: RunnerDisplayState;
-  feedback: AppFeedback;
-  programReference?: ProgramReference;
-  activeRunId?: string;
-}>;
-
 export type WebviewSnapshot = ExplorationViewSnapshot | BattleViewSnapshot | RecoveryViewSnapshot;
 
 export type ExtensionMessage =
-  // The current Webview bundle still narrows this message to the legacy
-  // battle/recovery shape; the host session supplies the discriminated union.
-  | Readonly<{ type: "snapshot"; snapshot: any }>
+  | Readonly<{ type: "snapshot"; snapshot: WebviewSnapshot }>
   | Readonly<{ type: "focusDiagnostic"; file: string; line: number; column: number }>;
 

@@ -4,12 +4,12 @@ import { getLevel, LEVEL_ORDER } from "../../game/content/levels";
 import type { LevelId } from "../../game/content/types";
 import { GO_PROGRAM } from "../../programs/go";
 import { calculateCellSize, renderGame } from "./render-game";
-import type { GameViewSnapshot } from "../messages";
+import type { BattleViewSnapshot } from "../messages";
 
-function snapshot(levelId: LevelId, theme: GameViewSnapshot["theme"] = "dark"): GameViewSnapshot {
+function snapshot(levelId: LevelId, theme: BattleViewSnapshot["theme"] = "dark"): BattleViewSnapshot {
   const level = getLevel(levelId);
   return {
-    mode: "game",
+    mode: "battle",
     theme,
     campaignTitle: "Python 沼泽战役",
     languageLabel: "Python",
@@ -152,7 +152,7 @@ describe("game Webview renderer", () => {
       campaignTitle: "Go 沼泽战役",
       languageLabel: "Go",
       playerFileName: "go-marsh-01.go",
-    } as GameViewSnapshot;
+    } as BattleViewSnapshot;
 
     renderGame(root, goSnapshot);
 
@@ -165,7 +165,7 @@ describe("game Webview renderer", () => {
   it("renders the Go tactical manual without changing the five-section layout", () => {
     const root = document.createElement("div");
     const level = getLevel("go-marsh-01");
-    const goSnapshot: GameViewSnapshot = {
+    const goSnapshot: BattleViewSnapshot = {
       ...snapshot("go-marsh-01"),
       campaignTitle: "Go 沼泽战役",
       languageLabel: "Go",
@@ -187,7 +187,7 @@ describe("game Webview renderer", () => {
 
   it("offers a stable local API navigation button for combat reference feedback", () => {
     const level = getLevel("go-marsh-01");
-    const goSnapshot: GameViewSnapshot = {
+    const goSnapshot: BattleViewSnapshot = {
       ...snapshot("go-marsh-01"),
       campaignTitle: "Go 沼泽战役",
       languageLabel: "Go",
@@ -221,7 +221,7 @@ describe("game Webview renderer", () => {
 
   it("keeps view and manual tab controls connected to labelled panels", () => {
     const level = getLevel("go-marsh-01");
-    const goSnapshot: GameViewSnapshot = {
+    const goSnapshot: BattleViewSnapshot = {
       ...snapshot("go-marsh-01"),
       campaignTitle: "Go 沼泽战役",
       languageLabel: "Go",

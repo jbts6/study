@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getLevel } from "../../game/content/levels";
 import { GO_PROGRAM } from "../../programs/go";
-import type { GameViewSnapshot } from "../messages";
+import type { BattleViewSnapshot, ExplorationViewSnapshot, WebviewSnapshot } from "../messages";
 
 type Harness = {
   root: HTMLElement;
@@ -9,10 +9,10 @@ type Harness = {
   stateCalls: unknown[];
 };
 
-function goSnapshot(relatedReferenceIds?: readonly string[]): GameViewSnapshot {
+function goSnapshot(relatedReferenceIds?: readonly string[]): BattleViewSnapshot {
   const level = getLevel("go-marsh-01");
   return {
-    mode: "game",
+    mode: "battle",
     theme: "dark",
     campaignTitle: "Go 沼泽战役",
     languageLabel: "Go",
@@ -58,8 +58,26 @@ async function createHarness(): Promise<Harness> {
   return { root: document.querySelector<HTMLElement>("#game-root")!, posted, stateCalls };
 }
 
-function sendSnapshot(snapshot: GameViewSnapshot): void {
+function sendSnapshot(snapshot: WebviewSnapshot): void {
   window.dispatchEvent(new MessageEvent("message", { data: { type: "snapshot", snapshot } }));
+}
+
+function explorationSnapshot(): ExplorationViewSnapshot {
+  return {
+    mode: "exploration",
+    theme: "dark",
+    campaignTitle: "Python 锈沼战役",
+    languageLabel: "Python",
+    playerFileName: "python-marsh-01.py",
+    chapterId: "python-marsh-01",
+    location: { id: "rust-marsh-camp", name: "锈沼营地", weather: "acid_rain" },
+    npcs: [],
+    objects: [],
+    inventory: [],
+    quests: [{ id: "repair_relay", status: "active", stepId: "talk_to_toma" }],
+    runnerState: "ready",
+    feedback: { layer: "task", kind: "idle", title: "", messages: [], stdout: "", stderr: "" },
+  };
 }
 
 function press(target: HTMLElement, key: string): void {
@@ -141,5 +159,17 @@ describe("webview main local manual interactions", () => {
     sendSnapshot(goSnapshot());
     root.querySelector<HTMLButtonElement>("[data-command='runTurn']")!.click();
     expect(posted).toHaveBeenCalledWith({ type: "runTurn" });
+  });
+
+  it("dispatches exploration and recovery snapshots without reading battle fields", async () => {
+    const { root } = await createHarness();
+    sendSnapshot(explorationSnapshot());
+
+    expect(root.querySelector("h1")?.textContent).toBe("锈沼营地");
+    expect(root.querySelector(".battle-grid")).toBeNull();
+
+    sendSnapshot({ mode: "recovery", theme: "dark", reason: "corrupt", message: "存档损坏", canReset: true });
+    expect(root.textContent).toContain("战役状态无法读取");
+    expect(root.querySelector("[data-command='resetCampaign']")).not.toBeNull();
   });
 });

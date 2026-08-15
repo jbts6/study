@@ -1,6 +1,6 @@
 import type { BattleState, Cell } from "../../game/combat/types";
 import type { LevelGuidance } from "../../game/content/types";
-import type { GameViewSnapshot } from "../messages";
+import type { BattleViewSnapshot } from "../messages";
 import type { ManualViewState } from "./manual-state";
 import { renderHiddenViewPanel, renderManual, renderViewTabs } from "./render-manual";
 import { element, textElement } from "./render-elements";
@@ -21,7 +21,7 @@ export function calculateCellSize(
   return Math.max(1, Math.min(Math.floor(widthFit), Math.floor(heightFit)));
 }
 
-export function renderGame(root: HTMLElement, snapshot: GameViewSnapshot, viewState: ManualViewState = DEFAULT_VIEW_STATE): void {
+export function renderGame(root: HTMLElement, snapshot: BattleViewSnapshot, viewState: ManualViewState = DEFAULT_VIEW_STATE): void {
   root.className = "game-view";
   root.dataset.theme = snapshot.theme;
   root.replaceChildren(
@@ -33,12 +33,12 @@ export function renderGame(root: HTMLElement, snapshot: GameViewSnapshot, viewSt
   );
 }
 
-function renderMain(snapshot: GameViewSnapshot, viewState: ManualViewState): HTMLElement {
+function renderMain(snapshot: BattleViewSnapshot, viewState: ManualViewState): HTMLElement {
   if (snapshot.programReference !== undefined && viewState.view === "manual") return renderManual(snapshot, viewState);
   return renderBattle(snapshot, viewState);
 }
 
-function renderHeader(snapshot: GameViewSnapshot): HTMLElement {
+function renderHeader(snapshot: BattleViewSnapshot): HTMLElement {
   const header = element("header", "game-header");
   const identity = element("div", "game-identity");
   identity.append(
@@ -63,7 +63,7 @@ function renderHeader(snapshot: GameViewSnapshot): HTMLElement {
   return header;
 }
 
-function renderMission(snapshot: GameViewSnapshot): HTMLElement {
+function renderMission(snapshot: BattleViewSnapshot): HTMLElement {
   const mission = element("section", "mission-strip");
   const heading = element("div", "mission-heading");
   heading.append(
@@ -74,7 +74,7 @@ function renderMission(snapshot: GameViewSnapshot): HTMLElement {
   return mission;
 }
 
-function renderBattle(snapshot: GameViewSnapshot, viewState: ManualViewState): HTMLElement {
+function renderBattle(snapshot: BattleViewSnapshot, viewState: ManualViewState): HTMLElement {
   const state = snapshot.battleState;
   const stage = element("section", "battle-stage");
   if (snapshot.programReference !== undefined) {
@@ -144,7 +144,7 @@ function renderLegend(): HTMLElement {
   return legend;
 }
 
-function renderFeedback(snapshot: GameViewSnapshot): HTMLElement {
+function renderFeedback(snapshot: BattleViewSnapshot): HTMLElement {
   const panel = element("section", `feedback-panel feedback-${snapshot.feedback.kind}`);
   panel.setAttribute("aria-live", "polite");
   const heading = element("div", "feedback-heading");
@@ -174,7 +174,7 @@ function renderFeedback(snapshot: GameViewSnapshot): HTMLElement {
   return panel;
 }
 
-function renderGuidance(guidance: LevelGuidance, languageLabel: GameViewSnapshot["languageLabel"]): HTMLElement {
+function renderGuidance(guidance: LevelGuidance, languageLabel: BattleViewSnapshot["languageLabel"]): HTMLElement {
   const details = element("details", "guidance-drawer");
   details.append(textElement("summary", "", "展开本关提示"));
   for (const [title, values] of [
@@ -194,7 +194,7 @@ function renderGuidance(guidance: LevelGuidance, languageLabel: GameViewSnapshot
   return details;
 }
 
-function renderActions(snapshot: GameViewSnapshot): HTMLElement {
+function renderActions(snapshot: BattleViewSnapshot): HTMLElement {
   const actions = element("footer", "action-bar");
   const running = snapshot.runnerState === "running" || snapshot.activeRunId !== undefined;
   if (running) {
@@ -213,7 +213,7 @@ function renderActions(snapshot: GameViewSnapshot): HTMLElement {
   return actions;
 }
 
-function settlementKind(snapshot: GameViewSnapshot): "victory" | "retriable" | "locked" {
+function settlementKind(snapshot: BattleViewSnapshot): "victory" | "retriable" | "locked" {
   const unmet = snapshot.battleState.objectives.filter((objective) => !objective.key && !objective.completed).length;
   if (snapshot.battleState.phase === "lost") return "retriable";
   if (snapshot.battleState.phase !== "won") return "locked";
@@ -248,7 +248,7 @@ function failureText(state: BattleState): string {
   return key === undefined ? `限制：${state.maxRounds} 回合` : `失败：${key.id} 耐久归零`;
 }
 
-function runnerLabel(snapshot: GameViewSnapshot): string {
+function runnerLabel(snapshot: BattleViewSnapshot): string {
   if (snapshot.activeRunId !== undefined || snapshot.runnerState === "running") return "运行中";
   return snapshot.runnerState === "ready" ? "可运行" : snapshot.runnerState === "unavailable" ? "不可用" : "检测中";
 }

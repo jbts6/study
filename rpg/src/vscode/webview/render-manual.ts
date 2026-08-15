@@ -1,5 +1,5 @@
 import type { ProgramReference, ReferenceEntry } from "../../programs/types";
-import type { GameViewSnapshot } from "../messages";
+import type { BattleViewSnapshot } from "../messages";
 import type { ManualSectionId, ManualViewState } from "./manual-state";
 import { element, textElement } from "./render-elements";
 
@@ -33,7 +33,7 @@ export function renderViewTabs(viewState: ManualViewState): HTMLElement {
   return tabs;
 }
 
-export function renderManual(snapshot: GameViewSnapshot, viewState: ManualViewState): HTMLElement {
+export function renderManual(snapshot: BattleViewSnapshot, viewState: ManualViewState): HTMLElement {
   const reference = snapshot.programReference;
   if (reference === undefined) throw new Error("Go reference is required for manual rendering");
   const stage = element("section", "manual-stage");
@@ -77,7 +77,7 @@ function renderManualTabs(sectionId: ManualSectionId): HTMLElement {
   return tabs;
 }
 
-function renderManualPanel(snapshot: GameViewSnapshot, sectionId: ManualSectionId, reference: ProgramReference): HTMLElement {
+function renderManualPanel(snapshot: BattleViewSnapshot, sectionId: ManualSectionId, reference: ProgramReference): HTMLElement {
   const panel = element("article", "manual-content");
   panel.id = "manual-content";
   panel.setAttribute("role", "tabpanel");
@@ -92,7 +92,7 @@ function renderManualPanel(snapshot: GameViewSnapshot, sectionId: ManualSectionI
   return panel;
 }
 
-function renderFocusSection(panel: HTMLElement, snapshot: GameViewSnapshot, reference: ProgramReference): void {
+function renderFocusSection(panel: HTMLElement, snapshot: BattleViewSnapshot, reference: ProgramReference): void {
   const focus = snapshot.level.guidance.apiFocus;
   if (focus === undefined) {
     panel.append(textElement("p", "manual-empty", "本关暂无战术手册内容。"));
