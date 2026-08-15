@@ -1,11 +1,13 @@
 import type { BattleErrorCode, BattleEvent, BattleState } from "../game/combat/types";
 import { getLevel } from "../game/content/levels";
 import type { LevelDefinition, LevelId } from "../game/content/types";
+import type { WorldCommand, WorldCommandError } from "../game/world/campaign-types";
 import type { ImplementedLanguage } from "../programs/types";
 import type { RunResult, RunnerDiagnostic } from "../runners/protocol/types";
 import { formatBattleFeedback } from "./battle-feedback";
 
 export type AppFeedback = Readonly<{
+  layer?: "program" | "task" | "strategy";
   kind: "idle" | "success" | "error" | "info";
   title: string;
   messages: readonly string[];
@@ -30,13 +32,19 @@ const ERROR_REFERENCE_MAP: Partial<Record<BattleErrorCode, readonly string[]>> =
 };
 
 export function idleFeedback(): AppFeedback {
-  return { kind: "idle", title: "", messages: [], stdout: "", stderr: "" };
+  return { layer: "task", kind: "idle", title: "", messages: [], stdout: "", stderr: "" };
 }
 
-export function successFeedback(state: BattleState, events: readonly BattleEvent[], result: RunResult): AppFeedback {
-  const settlement = settlementFeedback(getLevel(state.battleId as LevelId), state);
+export function successFeedback(
+  state: BattleState,
+  events: readonly BattleEvent[],
+  result: RunResult,
+  level: LevelDefinition = getLevel(state.battleId as LevelId),
+): AppFeedback {
+  const settlement = settlementFeedback(level, state);
   if (settlement.kind !== "idle") return { ...settlement, stdout: result.streams.stdout, stderr: result.streams.stderr };
   return {
+    layer: "strategy",
     kind: "success",
     title: "回合已推进",
     messages: formatBattleFeedback(state, events),
@@ -46,13 +54,13 @@ export function successFeedback(state: BattleState, events: readonly BattleEvent
 }
 
 export function settlementFeedback(level: LevelDefinition, state: BattleState): AppFeedback {
-  if (state.phase === "lost") return errorFeedback("任务失败", ["战斗失败。重试本关以保留当前代码。"]);
+  if (state.phase === "lost") return errorFeedback("任务失败", ["战斗失败。重试本关以保留当前代码。"], "strategy");
   const unmet = unmetObjectives(state);
-  if (unmet.length > 0) return errorFeedback("任务失败", unmet.map((reason) => `任务失败：${reason}`));
+  if (unmet.length > 0) return errorFeedback("任务失败", unmet.map((reason) => `任务失败：${reason}`), "strategy");
   if (state.phase !== "won") return idleFeedback();
   return level.reward.type === "ability"
-    ? { kind: "success", title: "关卡完成", messages: [`获得新能力：${level.reward.abilityId}`], stdout: "", stderr: "" }
-    : { kind: "success", title: "战役完成", messages: ["沼心封印已经稳定。"], stdout: "", stderr: "" };
+    ? { layer: "strategy", kind: "success", title: "关卡完成", messages: [`获得新能力：${level.reward.abilityId}`], stdout: "", stderr: "" }
+    : { layer: "strategy", kind: "success", title: "战役完成", messages: ["沼心封印已经稳定。"], stdout: "", stderr: "" };
 }
 
 export function isSuccessfulSettlement(levelId: LevelId, state: BattleState): boolean {
@@ -76,6 +84,21 @@ export function combatErrorFeedback(errors: readonly Readonly<{ code: string; pa
   };
 }
 
+export function worldErrorFeedback(errors: readonly WorldCommandError[]): AppFeedback {
+  return errorFeedback("探索指令无效", errors.map((error) => `[${error.code}] ${error.path} ${error.message}`));
+}
+
+export function worldCommandFeedback(command: WorldCommand, result: RunResult): AppFeedback {
+  return {
+    layer: "task",
+    kind: "success",
+    title: "探索行动已接受",
+    messages: [`已执行世界指令：${command.type}`],
+    stdout: result.streams.stdout,
+    stderr: result.streams.stderr,
+  };
+}
+
 export function feedbackFromRunResult(result: RunResult, language: ImplementedLanguage): AppFeedback {
   const interrupted = result.executionStatus === "interrupted";
   const messages = result.diagnostics.map(formatDiagnostic);
@@ -85,6 +108,7 @@ export function feedbackFromRunResult(result: RunResult, language: ImplementedLa
     ? "运行已中断"
     : result.executionStatus === "compile_error" ? `${languageName} 编译失败` : `${languageName} 运行失败`;
   return {
+    layer: "program",
     kind: interrupted ? "info" : "error",
     title,
     messages,
@@ -93,8 +117,12 @@ export function feedbackFromRunResult(result: RunResult, language: ImplementedLa
   };
 }
 
-export function errorFeedback(title: string, messages: readonly string[]): AppFeedback {
-  return { kind: "error", title, messages, stdout: "", stderr: "" };
+export function errorFeedback(
+  title: string,
+  messages: readonly string[],
+  layer: AppFeedback["layer"] = "task",
+): AppFeedback {
+  return { layer, kind: "error", title, messages, stdout: "", stderr: "" };
 }
 
 function unmetObjectives(state: BattleState): readonly string[] {

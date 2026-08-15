@@ -25,6 +25,7 @@ describe("feedbackFromRunResult", () => {
   it("labels Go compile errors with the Go language", () => {
     const feedback = feedbackFromRunResult(compileErrorResult(), "go");
 
+    expect(feedback.layer).toBe("program");
     expect(feedback.title).toBe("Go 编译失败");
     expect(feedback.messages).toContain("[error] GO_COMPILE_ERROR go-marsh-01.go:2:7 syntax error");
     expect(feedback.relatedReferenceIds).toBeUndefined();
@@ -33,8 +34,9 @@ describe("feedbackFromRunResult", () => {
 
 describe("combatErrorFeedback", () => {
   it("maps invalid commands to the turn command reference", () => {
-    expect(combatErrorFeedback([{ code: "INVALID_COMMAND", path: "$.action", message: "x" }]).relatedReferenceIds)
-      .toEqual(["type.turn-command"]);
+    const feedback = combatErrorFeedback([{ code: "INVALID_COMMAND", path: "$.action", message: "x" }]);
+    expect(feedback.layer).toBe("task");
+    expect(feedback.relatedReferenceIds).toEqual(["type.turn-command"]);
   });
 
   it("maps invalid movement paths to cell and movement action references", () => {

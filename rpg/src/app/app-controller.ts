@@ -28,6 +28,7 @@ import {
 } from "./app-feedback";
 import { RESET_CONFIRMATION } from "./save-store";
 import type { SaveDataV2, SaveStore } from "./save-store";
+import type { GameController } from "./controller-types";
 
 const RUNNER_UNAVAILABLE_MESSAGE: Readonly<Record<ImplementedLanguage, string>> = {
   python: "本地 Python Runner 不可用。启动 Runner 后刷新页面。",
@@ -66,7 +67,7 @@ export type AppControllerRunLimits = Readonly<{
   go: CompiledRunRequest["limits"];
 }>;
 
-export class AppController {
+export class AppController implements GameController {
   private readonly listeners = new Set<(snapshot: AppSnapshot) => void>();
   private readonly runLimits: AppControllerRunLimits;
   private snapshot: AppSnapshot;
@@ -307,7 +308,7 @@ export class AppController {
         runnerState: "unavailable",
         feedback: errorFeedback(`${languageLabel(language)} Runner 不可用`, [
           error instanceof Error ? error.message : RUNNER_UNAVAILABLE_MESSAGE[language],
-        ]),
+        ], "program"),
         diagnostics: [],
       });
     }
@@ -323,6 +324,7 @@ export class AppController {
       feedback: errorFeedback(
         `${languageLabel(this.campaign.program.language)} Runner 不可用`,
         [RUNNER_UNAVAILABLE_MESSAGE[this.campaign.program.language]],
+        "program",
       ),
       diagnostics: [],
     });
