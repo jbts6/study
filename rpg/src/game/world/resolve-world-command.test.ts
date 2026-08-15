@@ -50,4 +50,20 @@ describe("resolveWorldCommand", () => {
       state,
     });
   });
+
+  it("rejects prototype-inherited type names without throwing", () => {
+    const state = createPythonWorldInitialState();
+    for (const type of ["toString", "constructor", "hasOwnProperty"]) {
+      const result = resolveWorldCommand(state, PYTHON_WORLD_CONTENT, {
+        expectedRevision: state.revision,
+        type,
+      });
+      expect(result.accepted).toBe(false);
+      if (!result.accepted) {
+        expect(result.errors).toEqual([
+          { code: "INVALID_COMMAND", path: "type", message: "不支持的世界指令类型" },
+        ]);
+      }
+    }
+  });
 });

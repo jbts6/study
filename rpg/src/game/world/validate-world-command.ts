@@ -41,7 +41,7 @@ export function validateWorldCommand(
   if (input.expectedRevision !== state.revision) {
     return { accepted: false, errors: [error("EXPECTED_REVISION_MISMATCH", "expectedRevision", "状态已更新，请重新运行代码")] };
   }
-  if (typeof type !== "string" || !(type in COMMAND_KEYS)) {
+  if (typeof type !== "string" || !Object.hasOwn(COMMAND_KEYS, type)) {
     return { accepted: false, errors: [error("INVALID_COMMAND", "type", "不支持的世界指令类型")] };
   }
   const keys = Object.keys(input).sort();
