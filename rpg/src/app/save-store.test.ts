@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getLevel } from "../game/content/levels";
-import { LocalSaveStore } from "./save-store";
+import { isSaveDataV2, LocalSaveStore } from "./save-store";
 
 describe("LocalSaveStore", () => {
   beforeEach(() => localStorage.clear());
@@ -65,5 +65,17 @@ describe("LocalSaveStore", () => {
       codeDraft: "draft",
     }));
     expect(new LocalSaveStore(localStorage).load().ok).toBe(false);
+  });
+
+  it("exports the V2 shape guard for legacy world-save recovery", () => {
+    const save = {
+      version: 2 as const,
+      currentLevelId: "python-marsh-01" as const,
+      battleState: getLevel("python-marsh-01").initialBattle,
+      codeDraft: "draft",
+    };
+
+    expect(isSaveDataV2(save)).toBe(true);
+    expect(isSaveDataV2({ ...save, codeDraft: 1 })).toBe(false);
   });
 });
