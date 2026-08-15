@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunResult } from "../runners/protocol/types";
-import { combatErrorFeedback, feedbackFromRunResult } from "./app-feedback";
+import { combatErrorFeedback, feedbackFromRunResult, type AppFeedback } from "./app-feedback";
 
 function compileErrorResult(): RunResult {
   return {
@@ -22,6 +22,13 @@ function compileErrorResult(): RunResult {
 }
 
 describe("feedbackFromRunResult", () => {
+  it("exposes a required feedback layer", () => {
+    const feedback = feedbackFromRunResult(compileErrorResult(), "go");
+    const layer: NonNullable<AppFeedback["layer"]> = feedback.layer;
+
+    expect(layer).toBe("program");
+  });
+
   it("labels Go compile errors with the Go language", () => {
     const feedback = feedbackFromRunResult(compileErrorResult(), "go");
 

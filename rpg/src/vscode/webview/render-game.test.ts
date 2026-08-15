@@ -17,7 +17,7 @@ function snapshot(levelId: LevelId, theme: GameViewSnapshot["theme"] = "dark"): 
     level,
     battleState: structuredClone(level.initialBattle),
     runnerState: "ready",
-    feedback: { kind: "idle", title: "", messages: [], stdout: "", stderr: "" },
+    feedback: { layer: "task", kind: "idle", title: "", messages: [], stdout: "", stderr: "" },
   };
 }
 
@@ -65,6 +65,7 @@ describe("game Webview renderer", () => {
     renderGame(root, {
       ...snapshot("python-marsh-02"),
       feedback: {
+        layer: "task",
         kind: "error",
         title: "指令无效",
         messages: ["[INVALID_COMMAND] $.action 无效"],
@@ -194,6 +195,7 @@ describe("game Webview renderer", () => {
       level,
       programReference: GO_PROGRAM.reference,
       feedback: {
+        layer: "task",
         kind: "error",
         title: "指令无效",
         messages: ["[INVALID_MOVE_PATH] $.movePath 路径无效"],

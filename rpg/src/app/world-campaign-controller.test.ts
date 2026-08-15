@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { JsonValue, RunRequest, RunResult } from "../runners/protocol/types";
+import type { JsonValue, PythonRunRequest, RunRequest, RunResult } from "../runners/protocol/types";
 import type { CampaignDefinition } from "../programs/types";
 import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
 import { PYTHON_WORLD_CONTENT } from "../game/content/python/world-chapter-01";
@@ -14,12 +14,18 @@ class FakeRunner implements RunnerClient {
   readonly requests: RunRequest[] = [];
   private readonly listeners = new Set<(state: RunnerDisplayState) => void>();
 
-  constructor(private readonly results: readonly RunResult[]) {}
+  constructor(
+    private readonly results: readonly RunResult[],
+    private readonly validateEntrypoint = false,
+  ) {}
 
   async connect(): Promise<void> {}
 
   async run(request: RunRequest): Promise<RunResult> {
     this.requests.push(request);
+    if (this.validateEntrypoint && request.language === "python" && !request.files[request.entrypoint.file]?.includes(`def ${request.entrypoint.callable}(`)) {
+      return missingEntrypointResult(request);
+    }
     const result = this.results[this.requests.length - 1];
     if (result === undefined) throw new Error("missing fake runner result");
     return result;
@@ -84,6 +90,24 @@ function syntaxErrorResult(): RunResult {
   };
 }
 
+function missingEntrypointResult(request: PythonRunRequest): RunResult {
+  return {
+    protocolVersion: 1,
+    runId: request.runId,
+    attemptId: request.attemptId,
+    executionStatus: "runtime_error",
+    trace: [],
+    diagnostics: [{
+      code: "PYTHON_ENTRYPOINT_MISSING",
+      severity: "error",
+      message: `callable ${request.entrypoint.callable} not found`,
+      recoveryAction: "补充入口函数后重新运行。",
+    }],
+    streams: { stdout: "", stderr: "", truncated: false },
+    metrics: { durationMs: 1, traceEvents: 0 },
+  };
+}
+
 function createWorldController(
   runner: FakeRunner,
   saveStore: MemoryWorldSaveStore,
@@ -107,6 +131,33 @@ function createWorldController(
 }
 
 describe("WorldCampaignController", () => {
+  it("initializes exploration with world and battle callables in the default draft", async () => {
+    const controller = createWorldController(new FakeRunner([]), new MemoryWorldSaveStore());
+    await controller.start();
+
+    const snapshot = controller.getSnapshot();
+    expect(snapshot.mode).toBe("exploration");
+    if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot");
+    expect(snapshot.codeDraft).toContain("def choose_world_action(world):");
+    expect(snapshot.codeDraft).toContain("def choose_turn(world):");
+  });
+
+  it("runs the default exploration draft without a missing-callable program error", async () => {
+    const runner = new FakeRunner([completed({ expectedRevision: 0, type: "talk", targetId: "toma" })], true);
+    const controller = createWorldController(runner, new MemoryWorldSaveStore());
+    await controller.start();
+    const initial = controller.getSnapshot();
+    if (initial.mode !== "exploration") throw new Error("expected exploration snapshot");
+
+    await controller.runCode(initial.codeDraft);
+
+    const snapshot = controller.getSnapshot();
+    if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot");
+    expect(snapshot.feedback.layer).toBe("task");
+    expect(snapshot.feedback.kind).toBe("success");
+    expect(runner.requests[0]).toMatchObject({ entrypoint: { callable: "choose_world_action" } });
+  });
+
   it("runs an exploration command, saves the accepted state and publishes task feedback", async () => {
     const runner = new FakeRunner([completed({ expectedRevision: 0, type: "talk", targetId: "toma" })]);
     const saveStore = new MemoryWorldSaveStore();

@@ -7,7 +7,7 @@ import type { RunResult, RunnerDiagnostic } from "../runners/protocol/types";
 import { formatBattleFeedback } from "./battle-feedback";
 
 export type AppFeedback = Readonly<{
-  layer?: "program" | "task" | "strategy";
+  layer: "program" | "task" | "strategy";
   kind: "idle" | "success" | "error" | "info";
   title: string;
   messages: readonly string[];

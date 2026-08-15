@@ -302,7 +302,15 @@ export class WorldCampaignController implements GameController {
   private defaultCodeDraft(chapterId: string): string {
     const levelId = this.campaign.levelOrder.find((candidate) => candidate === chapterId) ?? this.campaign.levelOrder[0];
     if (levelId === undefined) throw new Error(`战役没有可用关卡: ${this.campaign.id}`);
-    return getLevel(levelId).starterCode;
+    return `def choose_world_action(world):
+    # 探索时返回 talk / inspect / collect / use / travel / prepareBattle 之一。
+    return {
+        "expectedRevision": world["revision"],
+        "type": "talk",
+        "targetId": "toma",
+    }
+
+${getLevel(levelId).starterCode}`;
   }
 
   private currentWorldSnapshot(): ActiveWorldSnapshot | undefined {

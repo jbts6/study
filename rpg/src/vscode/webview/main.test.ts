@@ -21,6 +21,7 @@ function goSnapshot(relatedReferenceIds?: readonly string[]): GameViewSnapshot {
     battleState: structuredClone(level.initialBattle),
     runnerState: "ready",
     feedback: {
+      layer: "task",
       kind: relatedReferenceIds === undefined ? "idle" : "error",
       title: relatedReferenceIds === undefined ? "" : "指令无效",
       messages: [],
