@@ -2,6 +2,9 @@ import { randomBytes } from "node:crypto";
 import { dirname, normalize } from "node:path";
 import * as vscode from "vscode";
 import { AppController, createDefaultRunLimits } from "../app/app-controller";
+import type { GameController } from "../app/controller-types";
+import { WorldCampaignController } from "../app/world-campaign-controller";
+import { PYTHON_WORLD_CONTENT } from "../game/content/python/world-chapter-01";
 import type { RunnerClient } from "../app/runner-client";
 import { getCampaign } from "../game/content/campaigns";
 import { detectGo } from "../runners/go/go-detector";
@@ -15,6 +18,7 @@ import { GameSession, type SessionDiagnostics } from "./game-session";
 import { DocumentWorkspace, levelFilePath, type WorkspaceDocument, type WorkspaceHost } from "./level-workspace";
 import type { ThemePreference, WebviewCommand } from "./messages";
 import { WorkspaceSaveStore } from "./workspace-save-store";
+import { WorkspaceWorldSaveStore } from "./workspace-world-save-store";
 import type { CampaignDefinition, CampaignId } from "../programs/types";
 
 const THEME_KEY = "python-rpg.theme";
@@ -115,15 +119,13 @@ async function createActiveGame(
   }
 
   const workspace = new DocumentWorkspace(createWorkspaceHost(workspaceFolder.uri), campaign);
-  const saveStore = new WorkspaceSaveStore({
-    get: (key) => context.workspaceState.get(key),
-    update: async (key, value) => { await context.workspaceState.update(key, value); },
-  }, campaign.id);
+  const workspaceState = {
+    get: <T>(key: string) => context.workspaceState.get<T>(key),
+    update: async (key: string, value: unknown | undefined) => {
+      await context.workspaceState.update(key, value);
+    },
+  };
   await workspace.ensureLevelFiles();
-  const loaded = saveStore.load();
-  const firstLevelId = campaign.levelOrder[0];
-  if (firstLevelId === undefined) throw new Error(`战役没有可用关卡: ${campaign.id}`);
-  await workspace.openLevel(loaded.ok && loaded.save !== null ? loaded.save.currentLevelId : firstLevelId);
 
   const panel = vscode.window.createWebviewPanel(
     PANEL_TYPE,
@@ -138,7 +140,18 @@ async function createActiveGame(
   const diagnostics = vscode.languages.createDiagnosticCollection(campaign.id);
   panel.webview.html = loadingHtml(panel.webview, context.extensionUri, campaign);
   const runner = createRunner(context, campaign);
-  const controller = new AppController({ runner, saveStore, runLimits: createDefaultRunLimits() }, campaign);
+  const controller: GameController = campaign.id === "python-rpg"
+    ? new WorldCampaignController({
+        runner,
+        saveStore: new WorkspaceWorldSaveStore(workspaceState, PYTHON_WORLD_CONTENT, campaign.id),
+        content: PYTHON_WORLD_CONTENT,
+        runLimits: createDefaultRunLimits().python,
+      }, campaign)
+    : new AppController({
+        runner,
+        saveStore: new WorkspaceSaveStore(workspaceState, campaign.id),
+        runLimits: createDefaultRunLimits(),
+      }, campaign);
   const session = new GameSession({
     controller,
     workspace,

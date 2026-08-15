@@ -1,10 +1,24 @@
-import type { AppController, AppSnapshot, GameSnapshot } from "../app/app-controller";
+import type { AppSnapshot, GameSnapshot } from "../app/app-controller";
+import type {
+  BattleViewSnapshot,
+  ExplorationViewSnapshot,
+  RecoveryViewSnapshot,
+  ExtensionMessage,
+  ThemePreference,
+  WebviewCommand,
+  WebviewSnapshot,
+} from "./messages";
+import type {
+  ControllerSnapshot,
+  GameController,
+  WorldBattleSnapshot,
+  WorldExplorationSnapshot,
+} from "../app/controller-types";
 import { getLevel } from "../game/content/levels";
 import type { LevelDefinition, LevelId } from "../game/content/types";
 import type { CampaignDefinition } from "../programs/types";
 import type { RunnerDiagnostic } from "../runners/protocol/types";
 import { RESET_CONFIRMATION } from "../app/save-store";
-import type { ExtensionMessage, ThemePreference, WebviewCommand, WebviewSnapshot } from "./messages";
 
 export type SessionWorkspace = Readonly<{
   ensureLevelFiles(): Promise<void>;
@@ -18,7 +32,7 @@ export type SessionDiagnostics = Readonly<{
 }>;
 
 type GameSessionDependencies = Readonly<{
-  controller: AppController;
+  controller: GameController;
   workspace: SessionWorkspace;
   postMessage(message: ExtensionMessage): PromiseLike<boolean | void> | boolean | void;
   getTheme(): ThemePreference;
@@ -28,7 +42,7 @@ type GameSessionDependencies = Readonly<{
 
 export class GameSession {
   private unsubscribe?: () => void;
-  private snapshot: AppSnapshot;
+  private snapshot: ControllerSnapshot;
   private openedLevelId?: LevelId;
 
   constructor(private readonly dependencies: GameSessionDependencies) {
@@ -44,9 +58,10 @@ export class GameSession {
       assertCampaignSnapshot(snapshot, this.dependencies.controller.campaign);
       this.snapshot = snapshot;
       void this.publish(snapshot);
-      if (snapshot.mode === "game" && snapshot.currentLevelId !== this.openedLevelId) {
-        this.openedLevelId = snapshot.currentLevelId;
-        void this.dependencies.workspace.openLevel(snapshot.currentLevelId);
+      const levelId = snapshotDocumentId(snapshot);
+      if (levelId !== undefined && levelId !== this.openedLevelId) {
+        this.openedLevelId = levelId;
+        void this.dependencies.workspace.openLevel(levelId);
       }
     });
   }
@@ -57,9 +72,10 @@ export class GameSession {
         await this.publish(this.snapshot);
         return;
       case "runTurn": {
-        if (this.snapshot.mode !== "game") return;
+        const levelId = snapshotDocumentId(this.snapshot);
+        if (levelId === undefined) return;
         this.dependencies.diagnostics.clear();
-        const code = await this.dependencies.workspace.readLevelCode(this.snapshot.currentLevelId);
+        const code = await this.dependencies.workspace.readLevelCode(levelId);
         await this.dependencies.controller.runCode(code);
         return;
       }
@@ -90,11 +106,12 @@ export class GameSession {
     this.unsubscribe = undefined;
   }
 
-  private async publish(snapshot: AppSnapshot): Promise<void> {
+  private async publish(snapshot: ControllerSnapshot): Promise<void> {
     const campaign = this.dependencies.controller.campaign;
     assertCampaignSnapshot(snapshot, campaign);
-    if (snapshot.mode === "game" && snapshot.diagnostics.length > 0) {
-      this.dependencies.diagnostics.replace(snapshot.currentLevelId, snapshot.diagnostics);
+    const levelId = snapshotDocumentId(snapshot);
+    if (levelId !== undefined && hasDiagnostics(snapshot) && snapshot.diagnostics.length > 0) {
+      this.dependencies.diagnostics.replace(levelId, snapshot.diagnostics);
     }
     await this.dependencies.postMessage({
       type: "snapshot",
@@ -103,14 +120,63 @@ export class GameSession {
   }
 }
 
-function toViewSnapshot(snapshot: AppSnapshot, theme: ThemePreference, campaign: CampaignDefinition): WebviewSnapshot {
-  if (snapshot.mode === "save_recovery") return { ...snapshot, theme };
-  return gameViewSnapshot(snapshot, theme, campaign);
+function toViewSnapshot(snapshot: ControllerSnapshot, theme: ThemePreference, campaign: CampaignDefinition): WebviewSnapshot {
+  switch (snapshot.mode) {
+    case "save_recovery":
+      return recoveryViewSnapshot(theme, "corrupt", snapshot.message);
+    case "world_recovery":
+      return recoveryViewSnapshot(theme, snapshot.reason, snapshot.message);
+    case "exploration":
+      return explorationViewSnapshot(snapshot, theme, campaign);
+    case "battle":
+      return battleViewSnapshot(snapshot, theme, campaign);
+    case "game":
+      return gameViewSnapshot(snapshot, theme, campaign);
+  }
 }
 
-function gameViewSnapshot(snapshot: GameSnapshot, theme: ThemePreference, campaign: CampaignDefinition): WebviewSnapshot {
+function explorationViewSnapshot(
+  snapshot: WorldExplorationSnapshot,
+  theme: ThemePreference,
+  campaign: CampaignDefinition,
+): ExplorationViewSnapshot {
   return {
-    mode: "game",
+    mode: "exploration",
+    theme,
+    campaignTitle: campaign.title,
+    languageLabel: "Python",
+    playerFileName: campaign.program.sourceFileName(snapshot.gameState.chapterId),
+    chapterId: snapshot.gameState.chapterId,
+    ...snapshot.worldView,
+    runnerState: snapshot.runnerState,
+    feedback: snapshot.feedback,
+    ...(snapshot.activeRunId === undefined ? {} : { activeRunId: snapshot.activeRunId }),
+  };
+}
+
+function battleViewSnapshot(
+  snapshot: WorldBattleSnapshot,
+  theme: ThemePreference,
+  campaign: CampaignDefinition,
+): BattleViewSnapshot {
+  return {
+    mode: "battle",
+    theme,
+    campaignTitle: campaign.title,
+    languageLabel: "Python",
+    playerFileName: campaign.program.sourceFileName(snapshot.battleLevelId),
+    level: campaignLevel(campaign, snapshot.battleLevelId),
+    battleState: snapshot.battleState,
+    runnerState: snapshot.runnerState,
+    feedback: snapshot.feedback,
+    ...(campaign.program.reference === undefined ? {} : { programReference: campaign.program.reference }),
+    ...(snapshot.activeRunId === undefined ? {} : { activeRunId: snapshot.activeRunId }),
+  };
+}
+
+function gameViewSnapshot(snapshot: GameSnapshot, theme: ThemePreference, campaign: CampaignDefinition): BattleViewSnapshot {
+  return {
+    mode: "battle",
     theme,
     campaignTitle: campaign.title,
     languageLabel: campaign.program.language === "python" ? "Python" : "Go",
@@ -124,11 +190,36 @@ function gameViewSnapshot(snapshot: GameSnapshot, theme: ThemePreference, campai
   };
 }
 
-function assertCampaignSnapshot(snapshot: AppSnapshot, campaign: CampaignDefinition): void {
+function recoveryViewSnapshot(
+  theme: ThemePreference,
+  reason: RecoveryViewSnapshot["reason"],
+  message: string,
+): RecoveryViewSnapshot {
+  return { mode: "recovery", theme, reason, message, canReset: true };
+}
+
+function assertCampaignSnapshot(snapshot: ControllerSnapshot, campaign: CampaignDefinition): void {
   if (snapshot.mode === "game") campaignLevel(campaign, snapshot.currentLevelId);
+  if (snapshot.mode === "exploration") campaignLevel(campaign, snapshot.gameState.chapterId as LevelId);
+  if (snapshot.mode === "battle") campaignLevel(campaign, snapshot.battleLevelId);
 }
 
 function campaignLevel(campaign: CampaignDefinition, levelId: LevelId): LevelDefinition {
   if (!campaign.levelOrder.includes(levelId)) throw new Error(`关卡不属于当前战役: ${levelId}`);
   return getLevel(levelId);
+}
+
+function snapshotDocumentId(snapshot: ControllerSnapshot): LevelId | undefined {
+  if (snapshot.mode === "game") return snapshot.currentLevelId;
+  if (snapshot.mode === "exploration") return snapshot.gameState.chapterId as LevelId;
+  if (snapshot.mode === "battle") return snapshot.battleLevelId;
+  return undefined;
+}
+
+function hasDiagnostics(
+  snapshot: ControllerSnapshot,
+): snapshot is AppSnapshot & { diagnostics: readonly RunnerDiagnostic[] }
+  | WorldExplorationSnapshot
+  | WorldBattleSnapshot {
+  return snapshot.mode === "game" || snapshot.mode === "exploration" || snapshot.mode === "battle";
 }

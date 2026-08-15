@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { RunRequest, RunnerDiagnostic, RunResult } from "../runners/protocol/types";
 import type { RunnerClient, RunnerDisplayState } from "../app/runner-client";
 import type { SaveDataV2, SaveLoadResult, SaveStore } from "../app/save-store";
+import type { LocalSaveDataV3, WorldSaveLoadResult, WorldSaveStore } from "../app/world-save-store";
 import { AppController } from "../app/app-controller";
+import { WorldCampaignController } from "../app/world-campaign-controller";
 import type { GameSnapshot } from "../app/app-controller";
 import { GameSession } from "./game-session";
 import type { ExtensionMessage, ThemePreference } from "./messages";
 import { getLevel } from "../game/content/levels";
 import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
+import { PYTHON_WORLD_CONTENT, createPythonWorldInitialState } from "../game/content/python/world-chapter-01";
 import { GO_RPG_CAMPAIGN } from "../game/content/go/levels";
 import type { CampaignDefinition } from "../programs/types";
 import { idleFeedback } from "../app/app-feedback";
@@ -63,6 +66,14 @@ class MemorySaveStore implements SaveStore {
   remove(): void { this.value = undefined; }
 }
 
+class MemoryWorldSaveStore implements WorldSaveStore {
+  value?: LocalSaveDataV3;
+  constructor(private readonly initial: WorldSaveLoadResult = { ok: true, save: null }) {}
+  load(): WorldSaveLoadResult { return this.initial; }
+  save(value: LocalSaveDataV3): void { this.value = value; }
+  remove(): void { this.value = undefined; }
+}
+
 function staticController(snapshot: GameSnapshot, campaign: CampaignDefinition): AppController {
   return {
     campaign,
@@ -107,17 +118,154 @@ describe("GameSession", () => {
     expect(runner.lastRequest?.files["main.py"]).toBe(unsavedCode);
     expect(messages.at(-1)?.type).toBe("snapshot");
     const afterRun = messages.at(-1);
-    expect(afterRun?.type === "snapshot" && afterRun.snapshot.mode === "game" && afterRun.snapshot.battleState.revision).toBe(2);
+    expect(afterRun?.type === "snapshot" && afterRun.snapshot.mode === "battle" && afterRun.snapshot.battleState.revision).toBe(2);
 
     messages.length = 0;
     await session.handle({ type: "ready" });
     expect(messages).toHaveLength(1);
-    expect(messages[0]?.type === "snapshot" && messages[0].snapshot.mode === "game" && messages[0].snapshot.battleState.revision).toBe(2);
+    expect(messages[0]?.type === "snapshot" && messages[0].snapshot.mode === "battle" && messages[0].snapshot.battleState.revision).toBe(2);
 
     await session.handle({ type: "setTheme", theme: "dark" });
     expect(theme).toBe("dark");
     expect(opened).toEqual(["python-marsh-01"]);
     session.dispose();
+  });
+
+  it("restores a Python world exploration snapshot and opens its chapter file", async () => {
+    const gameState = createPythonWorldInitialState();
+    const controller = new WorldCampaignController({
+      runner: new FakeRunner(),
+      saveStore: new MemoryWorldSaveStore({
+        ok: true,
+        save: { version: 3, gameState, codeDrafts: { [gameState.chapterId]: "restored world code" } },
+      }),
+    }, PYTHON_RPG_CAMPAIGN, PYTHON_WORLD_CONTENT);
+    const messages: ExtensionMessage[] = [];
+    const openedLevelIds: string[] = [];
+    const session = new GameSession({
+      controller,
+      workspace: {
+        ensureLevelFiles: async () => undefined,
+        readLevelCode: async () => "",
+        openLevel: async (levelId) => { openedLevelIds.push(levelId); },
+      },
+      postMessage: (message) => { messages.push(message); },
+      getTheme: () => "system",
+      setTheme: async () => undefined,
+      diagnostics: { clear: () => undefined, replace: () => undefined },
+    });
+
+    await session.start();
+
+    const postedMessage = messages.at(-1);
+    const postedSnapshot = postedMessage?.type === "snapshot" ? postedMessage.snapshot : undefined;
+    expect(postedSnapshot).toMatchObject({
+      mode: "exploration",
+      chapterId: "python-marsh-01",
+      playerFileName: "python-marsh-01.py",
+      location: { id: "rust-marsh-camp" },
+    });
+    expect(openedLevelIds).toEqual(["python-marsh-01"]);
+    session.dispose();
+  });
+
+  it("restores a Python world battle snapshot through its battle level", async () => {
+    const gameState = {
+      ...createPythonWorldInitialState(),
+      battle: {
+        encounterId: "marsh_guardian",
+        state: PYTHON_WORLD_CONTENT.encounters.marsh_guardian!.initialBattle,
+      },
+    };
+    const controller = new WorldCampaignController({
+      runner: new FakeRunner(),
+      saveStore: new MemoryWorldSaveStore({
+        ok: true,
+        save: { version: 3, gameState, codeDrafts: {} },
+      }),
+    }, PYTHON_RPG_CAMPAIGN, PYTHON_WORLD_CONTENT);
+    const messages: ExtensionMessage[] = [];
+    const openedLevelIds: string[] = [];
+    const session = new GameSession({
+      controller,
+      workspace: {
+        ensureLevelFiles: async () => undefined,
+        readLevelCode: async () => "",
+        openLevel: async (levelId) => { openedLevelIds.push(levelId); },
+      },
+      postMessage: (message) => { messages.push(message); },
+      getTheme: () => "system",
+      setTheme: async () => undefined,
+      diagnostics: { clear: () => undefined, replace: () => undefined },
+    });
+
+    await session.start();
+
+    const postedMessage = messages.at(-1);
+    const postedSnapshot = postedMessage?.type === "snapshot" ? postedMessage.snapshot : undefined;
+    expect(postedSnapshot).toMatchObject({
+      mode: "battle",
+      level: { id: "python-marsh-01" },
+      battleState: gameState.battle.state,
+    });
+    expect(openedLevelIds).toEqual(["python-marsh-01"]);
+    session.dispose();
+  });
+
+  it("maps legacy and world recovery snapshots to the shared recovery view", async () => {
+    const legacyMessages: ExtensionMessage[] = [];
+    const legacySession = new GameSession({
+      controller: new AppController({
+        runner: new FakeRunner(),
+        saveStore: new MemorySaveStore({ ok: false, message: "legacy" }),
+      }, PYTHON_RPG_CAMPAIGN),
+      workspace: {
+        ensureLevelFiles: async () => undefined,
+        readLevelCode: async () => "",
+        openLevel: async () => undefined,
+      },
+      postMessage: (message) => { legacyMessages.push(message); },
+      getTheme: () => "dark",
+      setTheme: async () => undefined,
+      diagnostics: { clear: () => undefined, replace: () => undefined },
+    });
+    await legacySession.start();
+    const legacyMessage = legacyMessages.at(-1);
+    const legacySnapshot = legacyMessage?.type === "snapshot" ? legacyMessage.snapshot : undefined;
+    expect(legacySnapshot).toMatchObject({
+      mode: "recovery",
+      reason: "corrupt",
+      message: "legacy",
+      canReset: true,
+    });
+    legacySession.dispose();
+
+    const worldMessages: ExtensionMessage[] = [];
+    const worldSession = new GameSession({
+      controller: new WorldCampaignController({
+        runner: new FakeRunner(),
+        saveStore: new MemoryWorldSaveStore({ ok: false, reason: "corrupt", message: "broken" }),
+      }, PYTHON_RPG_CAMPAIGN, PYTHON_WORLD_CONTENT),
+      workspace: {
+        ensureLevelFiles: async () => undefined,
+        readLevelCode: async () => "",
+        openLevel: async () => undefined,
+      },
+      postMessage: (message) => { worldMessages.push(message); },
+      getTheme: () => "dark",
+      setTheme: async () => undefined,
+      diagnostics: { clear: () => undefined, replace: () => undefined },
+    });
+    await worldSession.start();
+    const worldMessage = worldMessages.at(-1);
+    const worldSnapshot = worldMessage?.type === "snapshot" ? worldMessage.snapshot : undefined;
+    expect(worldSnapshot).toMatchObject({
+      mode: "recovery",
+      reason: "corrupt",
+      message: "broken",
+      canReset: true,
+    });
+    worldSession.dispose();
   });
 
   it("clears stale diagnostics before a run and projects Python locations onto the current level", async () => {
@@ -222,7 +370,7 @@ describe("GameSession", () => {
 
     expect(opened).toEqual(["go-marsh-01"]);
     const message = messages.at(-1);
-    expect(message?.type === "snapshot" && message.snapshot.mode === "game"
+    expect(message?.type === "snapshot" && message.snapshot.mode === "battle"
       ? message.snapshot.level.id
       : undefined).toBe("go-marsh-01");
     expect(message?.type === "snapshot" ? message.snapshot : undefined).toMatchObject({
@@ -230,10 +378,10 @@ describe("GameSession", () => {
       languageLabel: "Go",
       playerFileName: "go-marsh-01.go",
     });
-    expect(message?.type === "snapshot" && message.snapshot.mode === "game"
+    expect(message?.type === "snapshot" && message.snapshot.mode === "battle"
       ? message.snapshot.programReference?.entrypoint.signature
       : undefined).toBe(GO_RPG_CAMPAIGN.program.reference?.entrypoint.signature);
-    expect(message?.type === "snapshot" && message.snapshot.mode === "game"
+    expect(message?.type === "snapshot" && message.snapshot.mode === "battle"
       ? message.snapshot.level.guidance.apiFocus?.referenceIds
       : undefined).toEqual(getLevel("go-marsh-01").guidance.apiFocus?.referenceIds);
     session.dispose();
