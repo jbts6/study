@@ -2,6 +2,7 @@ import type { GameState } from "../../world/campaign-types";
 import type { WorldCampaignContent } from "../world/types";
 import { PYTHON_MARSH_01 } from "./python-marsh-01";
 import { createVenomForkContent } from "./world-chapter-02";
+import { createSurveyRidgeContent } from "./world-chapter-03";
 
 const MARSH_GUARDIAN_BATTLE = {
   ...PYTHON_MARSH_01.initialBattle,
@@ -9,6 +10,7 @@ const MARSH_GUARDIAN_BATTLE = {
 };
 
 const venomFork = createVenomForkContent();
+const surveyRidge = createSurveyRidgeContent();
 
 export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
   chapters: {
@@ -35,19 +37,21 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
       },
     },
     ...venomFork.chapters,
+    ...surveyRidge.chapters,
   },
   locations: {
     "rust-marsh-camp": {
       id: "rust-marsh-camp",
       name: "锈沼营地",
       weather: "acid_rain",
-      connectedLocationIds: ["old_foundry", "venom-fork"],
+      connectedLocationIds: ["old_foundry", "venom-fork", "survey-ridge"],
       npcIds: ["toma"],
       objectIds: ["scrap_pile", "weather_station"],
       itemSourceIds: ["copper_wire_source"],
       travelRequirements: {
         old_foundry: { safe_route_known: true },
         "venom-fork": { chapter_02_unlocked: true },
+        "survey-ridge": { venom_fork_cleared: true },
       },
     },
     old_foundry: {
@@ -59,6 +63,7 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
       itemSourceIds: [],
     },
     ...venomFork.locations,
+    ...surveyRidge.locations,
   },
   npcs: {
     toma: {
@@ -86,6 +91,7 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
       requiredItemId: "copper_wire",
     },
     ...venomFork.objects,
+    ...surveyRidge.objects,
   },
   itemSources: {
     copper_wire_source: {
@@ -105,6 +111,7 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
       prerequisiteFlags: { relay_repaired: true },
     },
     ...venomFork.encounters,
+    ...surveyRidge.encounters,
   },
 };
 

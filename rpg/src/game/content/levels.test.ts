@@ -158,8 +158,12 @@ describe("campaign levels", () => {
     expect(first.guidance.commandExamples.some((hint) => hint.includes('"attack"'))).toBe(true);
     expect(first.guidance.commandExamples.some((hint) => hint.includes('skillId') && hint.includes('targetId'))).toBe(true);
     expect(second.starterCode).toContain("if ");
-    expect(third.starterCode).not.toContain("def choose_turn");
+    expect(third.starterCode).toContain("def choose_world_action");
+    expect(third.starterCode).toContain("def choose_turn");
+    expect(third.starterCode).toContain("for ");
+    expect(third.starterCode).toContain('world["objects"]');
     expect(third.starterCode).toContain('world["units"]');
+    expect(third.starterCode).toContain("scout-mark");
     expect(fourth.starterCode).toMatch(/example\s*=\s*\w+\s+and\s+\(\w+\s+or\s+not\s+\w+\)/);
     expect(fourth.starterCode).not.toContain("def choose_turn");
     expect(fifth.starterCode).toContain("辅助函数");
