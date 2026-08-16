@@ -36,7 +36,9 @@ export function settleEncounter(
   };
 
   const victory = chapter.victory;
-  if (activeBattle.state.phase === "won") {
+  const wonAllObjectives = activeBattle.state.phase === "won"
+    && !hasIncompleteRequiredObjective(activeBattle.state);
+  if (wonAllObjectives) {
     return {
       ...next,
       locationId: victory.returnLocationId,
@@ -51,6 +53,14 @@ export function settleEncounter(
     ...next,
     battle: { encounterId: encounter.id, state: cloneBattle(encounter.initialBattle) },
   };
+}
+
+function hasIncompleteRequiredObjective(
+  state: NonNullable<GameState["battle"]>["state"],
+): boolean {
+  return state.objectives.some(
+    (objective) => !objective.key && !objective.completed,
+  );
 }
 
 function advanceQuestTo(quests: readonly QuestState[], toStep: string): readonly QuestState[] {

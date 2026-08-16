@@ -45,6 +45,36 @@ describe("settleEncounter", () => {
     expect(settled.revision).toBe(state.revision + 1);
   });
 
+  it("retries a nominal win when a required objective is incomplete", () => {
+    const prepared = prepareGuardianBattle();
+    const nominalWin = {
+      ...prepared,
+      battle: {
+        ...prepared.battle!,
+        state: {
+          ...prepared.battle!.state,
+          phase: "won" as const,
+          objectives: [
+            ...prepared.battle!.state.objectives,
+            {
+              id: "required-mark",
+              cell: { x: 1, y: 1 },
+              durability: 1,
+              completed: false,
+              key: false,
+            },
+          ],
+        },
+      },
+    };
+
+    const retried = settleEncounter(nominalWin, PYTHON_WORLD_CONTENT);
+
+    expect(retried.battle?.state.phase).toBe("in_progress");
+    expect(retried.worldFlags.marsh_guardian_defeated).toBeUndefined();
+    expect(retried.quests).toEqual(nominalWin.quests);
+  });
+
   it("resets a lost guardian battle without changing exploration progress", () => {
     const prepared = prepareGuardianBattle();
     const lost = {
