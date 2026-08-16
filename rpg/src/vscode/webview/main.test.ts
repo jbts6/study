@@ -71,6 +71,10 @@ function explorationSnapshot(): ExplorationViewSnapshot {
     languageLabel: "Python",
     playerFileName: "python-marsh-01.py",
     chapterId: "python-marsh-01",
+    chapters: [
+      { id: "python-marsh-01", title: "唤醒中继器" },
+      { id: "python-marsh-02", title: "毒沼岔路" },
+    ],
     location: { id: "rust-marsh-camp", name: "锈沼营地", weather: "acid_rain" },
     npcs: [],
     objects: [],

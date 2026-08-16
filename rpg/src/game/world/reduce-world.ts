@@ -36,7 +36,7 @@ function cloneBattle(state: NonNullable<GameState["battle"]>["state"]): NonNulla
   };
 }
 
-function initialQuest(content: WorldCampaignContent, chapterId: string): readonly QuestState[] {
+export function initialQuest(content: WorldCampaignContent, chapterId: string): readonly QuestState[] {
   const chapter = content.chapters[chapterId];
   if (chapter === undefined) throw new Error(`遭遇尚未注册的章节: ${chapterId}`);
   const firstStep = chapter.questChain[0];

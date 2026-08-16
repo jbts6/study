@@ -212,6 +212,16 @@ function renderActions(snapshot: ExplorationViewSnapshot): HTMLElement {
     run.title = run.disabled ? runnerLabel(snapshot) : `运行 ${snapshot.playerFileName}`;
     actions.append(run);
   }
+  const chapters = element("div", "chapter-switch");
+  chapters.setAttribute("aria-label", "章节切换");
+  for (const [index, chapter] of snapshot.chapters.entries()) {
+    const button = commandButton("switchChapter", `第${index + 1}章`);
+    button.dataset.chapterId = chapter.id;
+    button.title = chapter.title;
+    button.disabled = chapter.id === snapshot.chapterId || running;
+    chapters.append(button);
+  }
+  actions.append(chapters);
   actions.append(
     textElement("span", "action-context", `代码来源：${snapshot.playerFileName}`),
     textElement("span", "keyboard-hint", "Ctrl+Enter"),

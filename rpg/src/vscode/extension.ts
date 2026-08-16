@@ -333,6 +333,7 @@ function isWebviewCommand(value: unknown): value is WebviewCommand {
   if (value === null || typeof value !== "object" || !("type" in value)) return false;
   const record = value as Record<string, unknown>;
   if (record.type === "setTheme") return record.theme === "light" || record.theme === "dark" || record.theme === "system";
+  if (record.type === "switchChapter") return typeof record.chapterId === "string";
   return record.type === "ready" || record.type === "runTurn" || record.type === "interruptRun"
     || record.type === "retryLevel" || record.type === "advanceLevel" || record.type === "resetCampaign";
 }

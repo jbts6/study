@@ -14,6 +14,7 @@ import type { GameState } from "../game/world/campaign-types";
 import { projectCampaignWorldView } from "../game/world/project-campaign-world-view";
 import { resolveWorldCommand } from "../game/world/resolve-world-command";
 import { encounterBattleLevel, resetEncounterBattle, settleEncounter } from "../game/world/settle-encounter";
+import { initialQuest } from "../game/world/reduce-world";
 import {
   combatErrorFeedback,
   errorFeedback,
@@ -136,6 +137,32 @@ export class WorldCampaignController implements GameController {
     this.saveWorld(state, codeDraft);
     this.replaceSnapshot(this.createWorldSnapshot(state, codeDraft, idleFeedback()));
     void this.connectRunner();
+  }
+
+  switchChapter(chapterId: string): void {
+    const chapter = this.content.chapters[chapterId];
+    if (chapter === undefined) return;
+    const current = this.currentWorldSnapshot();
+    if (current === undefined) return;
+    const state: GameState = {
+      ...current.gameState,
+      chapterId,
+      locationId: chapter.startLocationId,
+      quests: initialQuest(this.content, chapterId),
+      battle: null,
+    };
+    this.battleLog = [];
+    const codeDraft = this.codeDrafts[chapterId] ?? this.defaultCodeDraft(chapterId);
+    this.codeDrafts[chapterId] = codeDraft;
+    this.saveWorld(state, codeDraft);
+    this.replaceSnapshot(this.createWorldSnapshot(state, codeDraft, {
+      layer: "task",
+      kind: "info",
+      title: "已切换章节",
+      messages: [`已切换到 ${getLevel(chapterId).title}，任务链与练习代码已就位。`],
+      stdout: "",
+      stderr: "",
+    }));
   }
 
   retryLevel(): void {}

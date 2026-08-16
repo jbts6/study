@@ -98,6 +98,11 @@ root.addEventListener("click", (event) => {
     if (theme !== undefined) vscode.postMessage({ type: "setTheme", theme });
     return;
   }
+  if (command === "switchChapter") {
+    const chapterId = button.dataset.chapterId;
+    if (chapterId !== undefined) vscode.postMessage({ type: "switchChapter", chapterId });
+    return;
+  }
   if (isSimpleCommand(command)) vscode.postMessage({ type: command });
 });
 
@@ -260,7 +265,7 @@ function downloadLegacyCodeButton(code: string): HTMLButtonElement {
   return button;
 }
 
-function isSimpleCommand(value: string | undefined): value is Exclude<WebviewCommand["type"], "setTheme"> {
+function isSimpleCommand(value: string | undefined): value is Exclude<WebviewCommand["type"], "setTheme" | "switchChapter"> {
   return value === "ready"
     || value === "runTurn"
     || value === "interruptRun"

@@ -246,3 +246,8 @@ body.vscode-high-contrast .game-view.exploration-view[data-theme="system"] {
   .zone-meta { grid-column: 1 / -1; text-align: left; }
   .exploration-actions .action-context { display: none; }
 }
+
+.chapter-switch {
+  display: inline-flex;
+  gap: 4px;
+}

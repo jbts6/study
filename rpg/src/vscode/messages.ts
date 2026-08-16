@@ -14,7 +14,10 @@ export type WebviewCommand =
   | Readonly<{ type: "retryLevel" }>
   | Readonly<{ type: "advanceLevel" }>
   | Readonly<{ type: "resetCampaign" }>
+  | Readonly<{ type: "switchChapter"; chapterId: string }>
   | Readonly<{ type: "setTheme"; theme: ThemePreference }>;
+
+export type ChapterOption = Readonly<{ id: string; title: string }>;
 
 export type ExplorationViewSnapshot = Readonly<{
   mode: "exploration";
@@ -23,6 +26,7 @@ export type ExplorationViewSnapshot = Readonly<{
   languageLabel: "Python";
   playerFileName: string;
   chapterId: string;
+  chapters: readonly ChapterOption[];
   location: CampaignWorldView["location"];
   npcs: CampaignWorldView["npcs"];
   objects: CampaignWorldView["objects"];

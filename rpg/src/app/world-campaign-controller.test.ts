@@ -285,6 +285,33 @@ function chapterOneCompletedSave(): LocalSaveDataV3 {
 }
 
 describe("WorldCampaignController chapter two", () => {
+  it("switches chapters freely and resets the chapter state", async () => {
+    const controller = createWorldController(new FakeRunner([]), new MemoryWorldSaveStore());
+    await controller.start();
+
+    controller.switchChapter("python-marsh-02");
+
+    const snapshot = controller.getSnapshot();
+    if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot");
+    expect(snapshot.gameState.chapterId).toBe("python-marsh-02");
+    expect(snapshot.gameState.locationId).toBe("venom-fork");
+    expect(snapshot.gameState.quests[0]).toEqual({ id: "venom_fork", status: "active", stepId: "read_waysign" });
+    expect(snapshot.codeDraft).toBe(getLevel("python-marsh-02").starterCode);
+  });
+
+  it("ignores an unknown chapter id without changing state", async () => {
+    const controller = createWorldController(new FakeRunner([]), new MemoryWorldSaveStore());
+    await controller.start();
+    const before = controller.getSnapshot();
+    if (before.mode !== "exploration") throw new Error("expected exploration snapshot");
+
+    controller.switchChapter("no-such-chapter");
+
+    const after = controller.getSnapshot();
+    if (after.mode !== "exploration") throw new Error("expected exploration snapshot");
+    expect(after.gameState).toEqual(before.gameState);
+  });
+
   it("switches to chapter two by traveling and walks to the encounter", async () => {
     const runner = new EchoRunner([
       { type: "travel", locationId: "venom-fork" },

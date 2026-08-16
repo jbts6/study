@@ -16,6 +16,7 @@ import type {
 } from "../app/controller-types";
 import { getLevel } from "../game/content/levels";
 import type { LevelDefinition, LevelId } from "../game/content/types";
+import type { ChapterOption } from "./messages";
 import type { CampaignDefinition } from "../programs/types";
 import type { RunnerDiagnostic } from "../runners/protocol/types";
 import { RESET_CONFIRMATION } from "../app/save-store";
@@ -95,6 +96,10 @@ export class GameSession {
       case "resetCampaign":
         this.dependencies.diagnostics.clear();
         this.dependencies.controller.resetSave(RESET_CONFIRMATION);
+        return;
+      case "switchChapter":
+        this.dependencies.diagnostics.clear();
+        this.dependencies.controller.switchChapter?.(command.chapterId);
         return;
       case "setTheme":
         await this.dependencies.setTheme(command.theme);
@@ -177,11 +182,16 @@ function explorationViewSnapshot(
     languageLabel: "Python",
     playerFileName: campaign.program.sourceFileName(snapshot.gameState.chapterId),
     chapterId: snapshot.gameState.chapterId,
+    chapters: chapterOptions(campaign),
     ...snapshot.worldView,
     runnerState: snapshot.runnerState,
     feedback: snapshot.feedback,
     ...(snapshot.activeRunId === undefined ? {} : { activeRunId: snapshot.activeRunId }),
   };
+}
+
+function chapterOptions(campaign: CampaignDefinition): readonly ChapterOption[] {
+  return campaign.levelOrder.map((levelId) => ({ id: levelId, title: getLevel(levelId as LevelId).title }));
 }
 
 function battleViewSnapshot(

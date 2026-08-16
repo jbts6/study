@@ -50,6 +50,8 @@ export interface GameController {
   resetSave(confirmation: string): void;
   retryLevel(): void;
   advanceLevel(): void;
+  /** World controllers support free chapter switching; tactical controllers do not. */
+  switchChapter?(chapterId: string): void;
   subscribe(listener: (snapshot: ControllerSnapshot) => void): () => void;
   getSnapshot(): ControllerSnapshot;
 }
