@@ -33,10 +33,12 @@ travel / use / prepareBattle），标注 travel 用 `locationId` 而非 `targetI
 - type 不合法：列出全部支持的 type。
 - TRAVEL_LOCKED / INVALID_TARGET：附带当前地点实际可用的 id 列表。
 
-### 改动 3：界面帮助行
+### 改动 3：界面帮助行（计划阶段取消）
 
-`rpg/src/app/render-world-app.ts` 的"world 字段"帮助组加一行命令 type
-清单。
+原计划在 `rpg/src/app/render-world-app.ts` 的"world 字段"帮助组加命令 type
+清单。核对代码后发现折叠的"探索 API 提示"里已有 `WORLD_HELP`
+（`render-world-app.ts:4-10`）列全 6 种 type 及字段，再加一行是冗余，
+按 YAGNI 取消。
 
 ## 交付与送达
 
