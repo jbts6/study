@@ -219,7 +219,7 @@ function renderActions(snapshot: BattleViewSnapshot): HTMLElement {
   if (running) {
     actions.append(commandButton("interruptRun", "中断运行"));
   } else if (snapshot.battleState.phase === "in_progress") {
-    actions.append(commandButton("runTurn", "运行回合"));
+    actions.append(commandButton("runTurn", "运行回合（自动连续）"));
   } else {
     const kind = settlementKind(snapshot);
     if (kind === "victory") {

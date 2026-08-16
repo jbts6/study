@@ -40,42 +40,39 @@ export const STARTER_CODE = `def choose_world_action(world):
 
 
 def choose_turn(world):
-    # world 包含当前行动者、战场、单位和目标。
-    # 返回值必须是一个 Python 字典。
-    # 顶层只能有 actorId、expectedRevision、movePath 和 action。
-    # movePath 是可选字段。
-    # actorId：字符串，通常直接填 world["activeUnitId"]。
-    # expectedRevision：整数，直接填 world["revision"]。
-    # movePath 是顶层字段，是坐标对象数组。
-    # 它不是 [[1, 0]] 这样的二维数组。
-    # 例如：[{"x": 1, "y": 0}, {"x": 1, "y": 1}]。
-    # 每个对象代表一步，x/y 都是整数。
-    # 第一步从当前格出发，后续元素填要到达的目标格。
-    # 每一步必须正交相邻（上下左右一格）。
-    # scout 最多走 2 步；不移动时可省略 movePath 或写 []。
-    # action 是字典，type 可填 attack、cast、interact、guard、wait。
-    # 攻击格式：{"type": "attack", "targetId": "golem"}
-    # 施法格式：
-    # {
-    #     "type": "cast",
-    #     "skillId": "spark",
-    #     "targetId": "golem",
-    # }
-    # 完整施法命令中的 action：
-    # {
-    #     "action": {
-    #         "type": "cast",
-    #         "skillId": "spark",
-    #         "targetId": "golem",
-    #     },
-    # }
-    # 一条可直接运行的“移动后攻击”命令：
-    # {
+    # 点一次“运行回合”后，本函数会被连续调用，
+    # 直到战斗分出胜负、命令被拒或你点“中断运行”。
+    # 每回合 world 都在变（血量、位置、revision），
+    # 写死的命令在目标死后会报错——要读状态做选择。
+    # world["units"] 是单位列表，每个单位有 id、team、
+    # hp、disabled 和 cell（{"x": 整数, "y": 整数}）。
+    # 选第一个活着的敌人并攻击：
+    # target = None
+    # for unit in world["units"]:
+    #     if unit["team"] != "enemies":
+    #         continue
+    #     if not unit["disabled"]:
+    #         target = unit
+    #         break
+    # return {
     #     "actorId": world["activeUnitId"],
     #     "expectedRevision": world["revision"],
-    #     "movePath": [{"x": 1, "y": 0}, {"x": 1, "y": 1}],
-    #     "action": {"type": "attack", "targetId": "golem"},
+    #     "action": {
+    #         "type": "attack",
+    #         "targetId": target["id"],
+    #     },
     # }
+    # 命令顶层字段：actorId、expectedRevision、
+    # movePath（可选）和 action。
+    # action 的 type 可填 attack、cast、interact、guard、wait。
+    # 施法格式（spark 有冷却，读 remainingCooldown）：
+    # "action": {
+    #     "type": "cast",
+    #     "skillId": "spark",
+    #     "targetId": target["id"],
+    # }
+    # 移动路径 movePath 是坐标对象数组，每步正交相邻：
+    # "movePath": [{"x": 1, "y": 0}, {"x": 1, "y": 1}]
     return {
         "actorId": world["activeUnitId"],
         "expectedRevision": world["revision"],
@@ -100,6 +97,7 @@ export const PYTHON_MARSH_01: LevelDefinition = {
       "探索：{\"expectedRevision\": world[\"revision\"], \"type\": \"talk\", \"targetId\": \"toma\"}。",
       "探索旅行：{\"expectedRevision\": world[\"revision\"], \"type\": \"travel\", \"locationId\": \"old_foundry\"}。",
       "探索进入战斗：{\"expectedRevision\": world[\"revision\"], \"type\": \"prepareBattle\", \"encounterId\": \"marsh_guardian\"}。",
+      "战斗：一次运行会连续调用 choose_turn 直到分出胜负，每回合都要重新读取 world。",
       "返回值顶层只允许 actorId、expectedRevision、movePath（可选）和 action。",
       "movePath 必须是坐标对象数组，例如 [{\"x\": 1, \"y\": 0}, {\"x\": 2, \"y\": 0}]；单步不能写成 [[1, 0]]，完整路径不能写成 [[1, 0], [2, 0]]。",
       "攻击：{\"action\": {\"type\": \"attack\", \"targetId\": \"golem\"}}。",

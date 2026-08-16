@@ -146,13 +146,13 @@ describe("campaign levels", () => {
 
     expect(first.starterCode).toContain("def choose_turn");
     expect(first.starterCode).toContain('"movePath": [{"x": 1, "y": 0}, {"x": 1, "y": 1}]');
-    expect(first.starterCode).toContain("movePath 是顶层字段");
-    expect(first.starterCode).toContain("不是 [[1, 0]]");
-    expect(first.starterCode).toContain('"action": {"type": "attack", "targetId": "golem"}');
+    expect(first.starterCode).toContain("movePath（可选）和 action");
+    expect(first.starterCode).toContain("每步正交相邻");
+    expect(first.starterCode).toContain('"type": "attack"');
+    expect(first.starterCode).toContain("for unit in world[\"units\"]:");
     expect(first.starterCode).toContain('"action": {');
     expect(first.starterCode).toContain('"type": "cast"');
     expect(first.starterCode).toContain('"skillId": "spark"');
-    expect(first.starterCode).toContain('"targetId": "golem"');
     expect(first.guidance.commandExamples.some((hint) => hint.includes("坐标对象数组"))).toBe(true);
     expect(first.guidance.commandExamples.some((hint) => hint.includes('不能写成 [[1, 0], [2, 0]]'))).toBe(true);
     expect(first.guidance.commandExamples.some((hint) => hint.includes('"attack"'))).toBe(true);
