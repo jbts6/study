@@ -12,7 +12,7 @@ import type { ExecutionLimits, RunResult } from "../runners/protocol/types";
 import type { GameState } from "../game/world/campaign-types";
 import { projectCampaignWorldView } from "../game/world/project-campaign-world-view";
 import { resolveWorldCommand } from "../game/world/resolve-world-command";
-import { encounterBattleLevel, settleEncounter } from "../game/world/settle-encounter";
+import { encounterBattleLevel, resetEncounterBattle, settleEncounter } from "../game/world/settle-encounter";
 import {
   combatErrorFeedback,
   errorFeedback,
@@ -42,7 +42,10 @@ export type WorldCampaignControllerDependencies = Readonly<{
   content?: WorldCampaignContent;
   createId?: () => string;
   runLimits?: ExecutionLimits;
+  turnDelayMs?: number;
 }>;
+
+const AUTO_TURN_DELAY_MS = 800;
 
 type ActiveWorldSnapshot = WorldExplorationSnapshot | WorldBattleSnapshot;
 
@@ -50,6 +53,8 @@ export class WorldCampaignController implements GameController {
   private readonly listeners = new Set<(snapshot: ControllerSnapshot) => void>();
   private readonly runLimits: ExecutionLimits;
   private readonly content: WorldCampaignContent;
+  private readonly turnDelayMs: number;
+  private battleLog: BattleEvent[] = [];
   private codeDrafts: Record<string, string> = {};
   private snapshot: ControllerSnapshot;
 
@@ -60,6 +65,7 @@ export class WorldCampaignController implements GameController {
   ) {
     this.content = content;
     this.runLimits = dependencies.runLimits ?? createDefaultRunLimits().python;
+    this.turnDelayMs = dependencies.turnDelayMs ?? AUTO_TURN_DELAY_MS;
     const state = createPythonWorldInitialState();
     const codeDraft = this.defaultCodeDraft(state.chapterId);
     this.snapshot = this.createWorldSnapshot(state, codeDraft, idleFeedback());
@@ -144,34 +150,45 @@ export class WorldCampaignController implements GameController {
   private async runCurrent(snapshot: ActiveWorldSnapshot): Promise<void> {
     if (!canRun(snapshot)) return;
     const runId = (this.dependencies.createId ?? createId)();
-    const running = { ...snapshot, activeRunId: runId, diagnostics: [] };
+    let base = snapshot;
+    if (snapshot.mode === "battle") {
+      // 每次运行都从遭遇初始局面完整模拟（方案 B）。
+      const state = resetEncounterBattle(snapshot.gameState, this.content);
+      this.battleLog = [];
+      base = { ...snapshot, gameState: state, battleState: state.battle!.state };
+    }
+    const running = { ...base, activeRunId: runId, diagnostics: [] };
     this.replaceSnapshot(running);
 
-    let result: RunResult;
-    try {
-      result = await this.dependencies.runner.run(createWorldRunRequest({
-        campaign: this.campaign,
-        content: this.content,
-        state: snapshot.gameState,
-        codeDraft: snapshot.codeDraft,
-        runId,
-        limits: this.runLimits,
-      }));
-    } catch {
-      this.reportRunnerUnavailable(runId);
-      return;
-    }
+    let state = running.gameState;
+    while (true) {
+      let result: RunResult;
+      try {
+        result = await this.dependencies.runner.run(createWorldRunRequest({
+          campaign: this.campaign,
+          content: this.content,
+          state,
+          codeDraft: running.codeDraft,
+          runId,
+          limits: this.runLimits,
+        }));
+      } catch {
+        this.reportRunnerUnavailable(runId);
+        return;
+      }
 
-    try {
-      this.resolveResult(result, runId);
-    } finally {
-      this.clearActiveRun(runId);
+      const outcome = this.resolveResult(result, runId);
+      const current = this.activeWorldSnapshot(runId);
+      if (current === undefined || outcome !== "continue") return;
+      state = current.gameState;
+      if (this.turnDelayMs > 0) await delay(this.turnDelayMs);
+      if (this.activeWorldSnapshot(runId) === undefined) return;
     }
   }
 
-  private resolveResult(result: RunResult, runId: string): void {
+  private resolveResult(result: RunResult, runId: string): "continue" | "stopped" {
     const snapshot = this.activeWorldSnapshot(runId);
-    if (snapshot === undefined) return;
+    if (snapshot === undefined) return "stopped";
     if (result.executionStatus !== "completed") {
       this.replaceSnapshot({
         ...snapshot,
@@ -179,14 +196,14 @@ export class WorldCampaignController implements GameController {
         feedback: feedbackFromRunResult(result, "python"),
         diagnostics: result.diagnostics,
       });
-      return;
+      return "stopped";
     }
 
     if (snapshot.mode === "exploration") {
       this.resolveExplorationResult(snapshot, result);
-      return;
+      return "stopped";
     }
-    this.resolveBattleResult(snapshot, result);
+    return this.resolveBattleResult(snapshot, result);
   }
 
   private resolveExplorationResult(snapshot: WorldExplorationSnapshot, result: RunResult): void {
@@ -210,9 +227,9 @@ export class WorldCampaignController implements GameController {
     ));
   }
 
-  private resolveBattleResult(snapshot: WorldBattleSnapshot, result: RunResult): void {
+  private resolveBattleResult(snapshot: WorldBattleSnapshot, result: RunResult): "continue" | "stopped" {
     const activeBattle = snapshot.gameState.battle;
-    if (activeBattle === null) return;
+    if (activeBattle === null) return "stopped";
     const level = encounterBattleLevel(this.content, activeBattle.encounterId);
     const player = resolvePlayerCommand(level, activeBattle.state, result.returnValue);
     if (!player.accepted) {
@@ -222,28 +239,39 @@ export class WorldCampaignController implements GameController {
         feedback: combatErrorFeedback(player.errors),
         diagnostics: [],
       });
-      return;
+      return "stopped";
     }
 
     const enemyTurns = this.advanceEnemyTurns(level, player.state);
     const events = [...player.events, ...enemyTurns.events];
+    this.battleLog = [...this.battleLog, ...events];
     const battleState = enemyTurns.state;
+    const continueAutoPlay = battleState.phase === "in_progress";
     let nextState: GameState = {
       ...snapshot.gameState,
       battle: { encounterId: activeBattle.encounterId, state: battleState },
     };
     let feedback: AppFeedback = successFeedback(battleState, events, result, level);
-    if (battleState.phase !== "in_progress") {
+    if (!continueAutoPlay) {
       feedback = {
         ...settlementFeedback(level, battleState),
         stdout: result.streams.stdout,
         stderr: result.streams.stderr,
       };
-      nextState = settleEncounter(nextState, this.content);
     }
 
+    const turnSnapshot = this.createWorldSnapshot(nextState, snapshot.codeDraft, feedback);
+    this.replaceSnapshot(continueAutoPlay && snapshot.activeRunId !== undefined
+      ? { ...turnSnapshot, activeRunId: snapshot.activeRunId }
+      : turnSnapshot);
+    if (!continueAutoPlay) {
+      nextState = settleEncounter(nextState, this.content);
+    }
     this.saveWorld(nextState, snapshot.codeDraft);
-    this.replaceSnapshot(this.createWorldSnapshot(nextState, snapshot.codeDraft, feedback));
+    if (!continueAutoPlay) {
+      this.replaceSnapshot(this.createWorldSnapshot(nextState, snapshot.codeDraft, feedback));
+    }
+    return continueAutoPlay ? "continue" : "stopped";
   }
 
   private advanceEnemyTurns(
@@ -293,6 +321,7 @@ export class WorldCampaignController implements GameController {
       gameState: state,
       battleState: state.battle.state,
       battleLevelId: encounterBattleLevel(this.content, state.battle.encounterId).id,
+      battleLog: [...this.battleLog],
       codeDraft,
       runnerState: this.dependencies.runner.state,
       feedback,
@@ -324,11 +353,6 @@ export class WorldCampaignController implements GameController {
       feedback: errorFeedback("Python Runner 不可用", ["本地 Python Runner 不可用。启动 Runner 后刷新页面。"], "program"),
       diagnostics: [],
     });
-  }
-
-  private clearActiveRun(runId: string): void {
-    const snapshot = this.activeWorldSnapshot(runId);
-    if (snapshot !== undefined) this.replaceSnapshot({ ...snapshot, activeRunId: undefined });
   }
 
   private async connectRunner(): Promise<void> {
@@ -389,4 +413,8 @@ function canRun(snapshot: ActiveWorldSnapshot): boolean {
 
 function createId(): string {
   return globalThis.crypto.randomUUID();
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

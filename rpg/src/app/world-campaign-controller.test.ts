@@ -55,6 +55,11 @@ class ChapterFlowRunner implements RunnerClient {
   readonly state: RunnerDisplayState = "ready";
   readonly requests: RunRequest[] = [];
   private worldStep = 0;
+  private battleTarget: (turn: number) => string = (turn) => turn <= 2 ? "golem" : "lurker";
+
+  retarget(target: (turn: number) => string): void {
+    this.battleTarget = target;
+  }
 
   async connect(): Promise<void> {}
 
@@ -64,11 +69,33 @@ class ChapterFlowRunner implements RunnerClient {
     const revision = requestRevision(request);
     if (request.entrypoint.callable === "choose_turn") {
       const battleTurn = this.requests.filter((item) => item.language === "python" && item.entrypoint.callable === "choose_turn").length;
-      const targetId = battleTurn <= 2 ? "golem" : "lurker";
+      const targetId = this.battleTarget(battleTurn);
+      const scout = request.worldView.units.find((unit) => unit.id === "scout");
+      const target = request.worldView.units.find((unit) => unit.id === targetId);
+      let movePath: { x: number; y: number }[] | undefined;
+      if (scout !== undefined && target !== undefined) {
+        const board = request.worldView.board;
+        const blocked = (cell: { x: number; y: number }) => request.worldView.units.some((unit) => unit.id !== "scout" && unit.cell.x === cell.x && unit.cell.y === cell.y);
+        const inBoard = (cell: { x: number; y: number }) => cell.x >= 0 && cell.y >= 0 && cell.x < board.width && cell.y < board.height;
+        const distance = (cell: { x: number; y: number }) => Math.abs(cell.x - target.cell.x) + Math.abs(cell.y - target.cell.y);
+        const start = { x: scout.cell.x, y: scout.cell.y };
+        const steps: readonly { x: number; y: number }[] = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({ dx, dy }));
+        let best: { x: number; y: number }[] | undefined;
+        const consider = (path: { x: number; y: number }[]) => {
+          if (!path.every((cell) => inBoard(cell) && !blocked(cell))) return;
+          if (best === undefined || distance(path[path.length - 1]!) < distance(best[best.length - 1]!)) best = path;
+        };
+        for (const first of steps) {
+          const p1 = { x: start.x + first.dx, y: start.y + first.dy };
+          consider([p1]);
+          for (const second of steps) consider([p1, { x: p1.x + second.dx, y: p1.y + second.dy }]);
+        }
+        movePath = best !== undefined && distance(best[best.length - 1]!) < distance(start) ? best : undefined;
+      }
       return completed({
         actorId: "scout",
         expectedRevision: revision,
-        ...(battleTurn === 1 ? { movePath: [{ x: 1, y: 0 }, { x: 1, y: 1 }] } : {}),
+        ...(movePath === undefined ? {} : { movePath }),
         action: { type: "attack", targetId },
       });
     }
@@ -176,6 +203,7 @@ function createWorldController(
     runner,
     saveStore,
     createId: () => "world-run",
+    turnDelayMs: 0,
     runLimits: {
       timeoutMs: 5_000,
       interruptGraceMs: 500,
@@ -188,6 +216,79 @@ function createWorldController(
     },
   }, campaign, PYTHON_WORLD_CONTENT);
 }
+
+async function driveToWorldBattle(controller: WorldCampaignController): Promise<void> {
+  for (let step = 0; step < 7; step += 1) {
+    const snapshot = controller.getSnapshot();
+    if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot before battle");
+    await controller.runCode(snapshot.codeDraft);
+  }
+  const snapshot = controller.getSnapshot();
+  if (snapshot.mode !== "battle") throw new Error("expected battle snapshot after prepareBattle");
+}
+
+describe("WorldCampaignController autonomous battle", () => {
+  it("auto-plays the guardian battle to settlement within one runCode call", async () => {
+    const runner = new ChapterFlowRunner();
+    const controller = createWorldController(runner, new MemoryWorldSaveStore());
+    await controller.start();
+    await driveToWorldBattle(controller);
+    const requestsBefore = runner.requests.length;
+
+    await controller.runCode(controller.getSnapshot().mode === "battle" ? controller.getSnapshot().codeDraft : "");
+
+    const snapshot = controller.getSnapshot();
+    expect(snapshot.mode).toBe("exploration");
+    expect(runner.requests.length - requestsBefore).toBe(4);
+  });
+
+  it("stops the auto sequence on a rejected command and restarts from the initial battle", async () => {
+    const runner = new ChapterFlowRunner();
+    runner.retarget(() => "golem");
+    const controller = createWorldController(runner, new MemoryWorldSaveStore());
+    await controller.start();
+    await driveToWorldBattle(controller);
+
+    await controller.runCode(controller.getSnapshot().mode === "battle" ? controller.getSnapshot().codeDraft : "");
+
+    const stopped = controller.getSnapshot();
+    expect(stopped.mode).toBe("battle");
+    if (stopped.mode !== "battle") throw new Error("expected stopped battle snapshot");
+    expect(stopped.battleState.phase).toBe("in_progress");
+    expect(stopped.feedback.kind).toBe("error");
+    const turnRequests = runner.requests.filter((request) => request.language === "python" && request.entrypoint.callable === "choose_turn");
+    expect(turnRequests).toHaveLength(3);
+    const revisionAtRejection = requestRevision(turnRequests[2]!);
+
+    runner.retarget((turn) => turn <= 5 ? "golem" : "lurker");
+    await controller.runCode(controller.getSnapshot().mode === "battle" ? controller.getSnapshot().codeDraft : "");
+
+    expect(controller.getSnapshot().mode).toBe("exploration");
+    const requestsAfterRestart = runner.requests.filter((request) => request.language === "python" && request.entrypoint.callable === "choose_turn");
+    expect(requestRevision(requestsAfterRestart[3]!)).toBeLessThan(revisionAtRejection);
+    expect(requestsAfterRestart).toHaveLength(7);
+  });
+
+  it("accumulates battle events across auto-played turns", async () => {
+    const runner = new ChapterFlowRunner();
+    const controller = createWorldController(runner, new MemoryWorldSaveStore());
+    await controller.start();
+    await driveToWorldBattle(controller);
+    const battleLogs: (readonly import("../game/combat/types").BattleEvent[])[] = [];
+    controller.subscribe((snapshot) => {
+      if (snapshot.mode === "battle") battleLogs.push(snapshot.battleLog);
+    });
+
+    await controller.runCode(controller.getSnapshot().mode === "battle" ? controller.getSnapshot().codeDraft : "");
+
+    const last = battleLogs.at(-1);
+    expect(last).toBeDefined();
+    if (last === undefined) throw new Error("expected battle snapshots during auto-play");
+    expect(last.some((event) => event.type === "damaged" && event.payload.targetId === "golem")).toBe(true);
+    expect(last.some((event) => event.type === "damaged" && event.payload.targetId === "lurker")).toBe(true);
+    expect(last.filter((event) => event.type === "battle_finished")).toHaveLength(1);
+  });
+});
 
 describe("WorldCampaignController", () => {
   it("initializes exploration with world and battle callables in the default draft", async () => {

@@ -52,6 +52,14 @@ function advanceQuest(quests: readonly QuestState[], fromStep: string, toStep: s
   return quests.map((quest, index) => index === 0 && quest.stepId === fromStep ? { ...quest, stepId: toStep } : quest);
 }
 
+/** Resets an active battle back to its encounter's initial state (used at the start of every run). */
+export function resetEncounterBattle(state: Readonly<GameState>, content: WorldCampaignContent): GameState {
+  if (state.battle === null) return state;
+  const encounter = content.encounters[state.battle.encounterId];
+  if (encounter === undefined) throw new Error(`遭遇尚未注册: ${state.battle.encounterId}`);
+  return { ...state, battle: { encounterId: encounter.id, state: cloneBattle(encounter.initialBattle) } };
+}
+
 function cloneBattle(state: NonNullable<GameState["battle"]>["state"]): NonNullable<GameState["battle"]>["state"] {
   return {
     ...state,

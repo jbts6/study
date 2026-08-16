@@ -1,4 +1,4 @@
-import type { BattleState } from "../game/combat/types";
+import type { BattleEvent, BattleState } from "../game/combat/types";
 import type { CampaignWorldView, GameState } from "../game/world/campaign-types";
 import type { LevelId } from "../game/content/types";
 import type { CampaignDefinition } from "../programs/types";
@@ -23,6 +23,7 @@ export type WorldBattleSnapshot = Readonly<{
   gameState: GameState;
   battleState: BattleState;
   battleLevelId: LevelId;
+  battleLog: readonly BattleEvent[];
   codeDraft: string;
   runnerState: RunnerDisplayState;
   feedback: AppFeedback;
