@@ -1,6 +1,6 @@
-# 世界战役自动战斗 — 设计
+# 世界战役自动战斗 + 事件动画 — 设计
 
-日期：2026-08-16
+日期：2026-08-16（当日修订：加入结构化战斗事件与动画渲染）
 分支：`feat/autonomous-battle`（基于 master）
 
 ## 问题与目标
@@ -10,9 +10,10 @@
 starter 注释里的建议而非通关必要条件，教学能力接近零。
 
 目标：把概念变成硬需求。战斗时一次运行自动打到结束，玩家代码成为一份
-完整策略而非每回合的手柄。
+完整策略而非每回合的手柄；并且战斗过程全程可见——事件日志 + 单位动画，
+"看着自己的程序打完整场仗"。
 
-## 机制（方案 B：每次运行从头模拟）
+## 一、运行机制（方案 B：每次运行从头模拟）
 
 `WorldCampaignController` 的战斗运行改为：
 
@@ -20,19 +21,60 @@ starter 注释里的建议而非通关必要条件，教学能力接近零。
    `{encounterId, state: cloneBattle(encounter.initialBattle)}`（复用
    `settle-encounter.ts` 战败重置的既有语义，将其扩展到每次运行）。
 2. **自动循环**：执行 Python（`choose_turn`）→ 应用命令 → 敌方回合由引擎
-   结算 → 若战斗仍在进行且轮到玩家单位，立即用同一份 `codeDraft` 再次
-   执行，直到战斗分出胜负、命令被拒、Python 运行错误或玩家中断。
-3. **中途报错停在当前局面显示反馈**；但下次运行会按第 1 步从初始局面重新
-   模拟——修复 bug 后整个程序重跑，进度感来自"这次比上次多推进了几回合"。
+   结算 → 若战斗仍在进行且轮到玩家单位，等待节奏间隔后用同一份
+   `codeDraft` 再次执行，直到战斗分出胜负、命令被拒、Python 运行错误或
+   玩家中断。
+3. **中途报错停在当前局面显示反馈**；下次运行按第 1 步从初始局面重新模
+   拟——修复 bug 后整个程序重跑，进度感来自"这次比上次多推进了几回合"。
 4. **中断**：整个自动序列持有同一个 `activeRunId`，现有中断按钮可停。
 5. **探索层不变**：非战斗状态仍一次运行返回一条世界命令。
 6. **胜负结算**：沿用 `settleEncounter` 现有逻辑（胜利回营地推任务；战败
    重置到初始局面）。
+7. **节奏**：回合间隔约 800ms（常量），给动画留出演完时间。
 
-中间局面照常持久化（现有 `replaceSnapshot` 机制不变），保证 webview 实时
-显示；重置只发生在运行开始时。
+中间局面照常持久化（现有 `replaceSnapshot` 机制不变）；重置只发生在运行
+开始时。
 
-## 教学配套
+## 二、结构化战斗事件（日志与动画的统一契约）
+
+```ts
+type BattleEvent =
+  | { kind: "move"; unitId: string; from: Cell; to: Cell }
+  | { kind: "attack"; actorId: string; targetId: string }
+  | { kind: "damage"; targetId: string; amount: number; hpRemaining: number }
+  | { kind: "heal"; targetId: string; amount: number; hpRemaining: number }
+  | { kind: "guard"; unitId: string }
+  | { kind: "defeat"; unitId: string }
+  | { kind: "objective"; objectiveId: string };
+```
+
+- 玩家回合：命令本身给出完整归因（attack/cast/guard/movePath）。
+- 敌方回合：从结算前后 `BattleState` 差分导出（hp 增减 → damage/heal、
+  位置变化 → move、disabled → defeat、objective.completed → objective）。
+  敌方攻击者不做归因推断，只演出受击方效果。
+- `WorldBattleSnapshot` 增加 `battleLog: readonly BattleEvent[]`（控制器内
+  存态，不进世界存档；重载窗口后清空）。每次运行开始清空重建。
+- 战斗视图新增可滚动日志面板：事件渲染为可读文案（如"hunter-a 受到 4
+  点伤害，剩余 2 血"），新条目在底部、自动滚动。
+
+## 三、动画渲染（纯 CSS，无新依赖）
+
+| 事件 | 动画 |
+|---|---|
+| move | 单位元素 300ms 缓动滑到新格 |
+| attack | 攻击者向目标方向扑击 150ms（去回） |
+| damage | 受击者红色闪烁 + 浮动 "-4" 伤害数字升起淡出 |
+| heal | 绿色闪烁 + "+3" 浮动 |
+| guard | 本回合护盾描边 |
+| defeat | 单位灰化淡出，留在场上 |
+| objective | 目标格脉冲高亮 |
+
+渲染器改造（`render-game.ts` 战斗棋盘）：从每次快照全量重绘改为**按
+unitId 键控差分更新**——单位元素保持 DOM 身份，位置变化走 CSS
+transition，事件批次触发一次性动画 class，动画结束后移除。伤害数字为附
+加到受击单位的临时元素，动画结束自移除。
+
+## 四、教学配套
 
 - `python-marsh-01.ts` 的 `choose_turn` 注释重写：说明一次运行会连续调用
   本函数直到战斗结束、每回合 `world` 都在变、目标死后静态命令会报错；示例
@@ -42,17 +84,31 @@ starter 注释里的建议而非通关必要条件，教学能力接近零。
 第一章守卫战数值不动：scout 静态攻击在首个敌人死亡后必然 INVALID_TARGET
 中断，天然强制"读状态 + 条件选目标"。
 
-## 测试
+## 五、测试
 
 `world-campaign-controller.test.ts`（FakeRunner 适配多次执行）：
 
 - 正常路径：一次 `runCode` 消费多条命令直至战斗胜利并结算。
 - 关键失败路径：序列中途命令被拒 → 循环停止、反馈显示错误；再次运行从遭
   遇初始局面重新开始。
+- 事件差分：结算前后状态对比产出正确的 damage/move/defeat 事件。
 - 探索运行不受影响（单命令）。
+
+渲染侧（`render-game` 相关测试）：单位元素按 id 复用（位置更新不重建节
+点）、事件触发对应动画 class、日志面板追加条目。
+
+## 六、实施顺序
+
+一份计划、两段任务，各自独立可验收：
+
+1. **控制器机制段**：自动循环 + 重置语义 + 事件生成 + 日志面板 + 节奏。
+   完成即是可用版本（文本日志 + 棋盘逐步刷新）。
+2. **渲染动画段**：键控差分渲染 + 全套事件动画。
 
 ## 非目标
 
 - 不改 AppController（go 战役 / 浏览器六关阶梯路径）。
 - 不加概念检测器；不做第二章内容；不加每关开关。
 - 不改探索层任务设计。
+- 不为敌方攻击做归因推断（不做敌方扑击动画的攻击者侧演出）。
+- 日志不持久化到世界存档。
