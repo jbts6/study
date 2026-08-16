@@ -80,8 +80,12 @@ transition，事件批次触发一次性动画 class，动画结束后移除。�
   给出读 `world["units"]` + if 选存活敌人的写法。
 - 战斗视图"运行回合"按钮文案改为"运行回合（自动连续）"。
 
-第一章守卫战数值不动：scout 静态攻击在首个敌人死亡后必然 INVALID_TARGET
-中断，天然强制"读状态 + 条件选目标"。
+第一章守卫战调整（仅 python-marsh-01，不动共享的 `marsh-slice.ts` 工厂，
+go 战役不受影响）：lurker 激活——`disabled: false`、`visibility:
+"revealed"`、起始格 (2,0)、加入 `turnOrder`，行为 `hunt-player`。推演结
+果：静态 attack golem 在第 3 回合（golem 已死）必然 INVALID_TARGET 中断，
+强制"读状态 + 条件选目标"；分支策略 4 回合获胜、scout 剩 1 血，mend 留
+作容错。
 
 ## 五、测试
 
