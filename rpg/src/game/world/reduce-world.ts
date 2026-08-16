@@ -46,21 +46,33 @@ function initialQuest(content: WorldCampaignContent, chapterId: string): readonl
 
 /** Applies the effects of the chapter quest step that validateQuestStep already matched. */
 export function reduceWorld(state: Readonly<GameState>, content: WorldCampaignContent, command: WorldCommand): GameState {
-  const chapter = content.chapters[state.chapterId];
-  const quest = state.quests[0];
-  if (chapter === undefined || quest === undefined) return { ...state, revision: state.revision + 1 };
-  const step: QuestStep | undefined = chapter.questChain.find((candidate) => candidate.stepId === quest.stepId);
-  if (step === undefined) return { ...state, revision: state.revision + 1 };
-
   const next: { -readonly [K in keyof GameState]: GameState[K] } = {
     ...state,
     worldFlags: { ...state.worldFlags },
     inventory: state.inventory.map((item) => ({ ...item })),
-    quests: state.quests.map((item) => ({ ...item })),
+    quests: state.quests.map((quest) => ({ ...quest })),
     discoveredClues: [...state.discoveredClues],
     battle: state.battle === null ? null : { encounterId: state.battle.encounterId, state: cloneBattle(state.battle.state) },
     revision: state.revision + 1,
   };
+
+  if (command.type === "travel") {
+    next.locationId = command.locationId;
+    const targetChapter = Object.values(content.chapters)
+      .find((chapter) => chapter.startLocationId === command.locationId && chapter.id !== state.chapterId);
+    if (targetChapter !== undefined) {
+      next.chapterId = targetChapter.id;
+      next.quests = initialQuest(content, targetChapter.id);
+      return next as GameState;
+    }
+  }
+
+  const chapter = content.chapters[state.chapterId];
+  const quest = state.quests[0];
+  const step: QuestStep | undefined = chapter !== undefined && quest !== undefined && quest.status !== "completed"
+    ? chapter.questChain.find((candidate) => candidate.stepId === quest.stepId)
+    : undefined;
+  if (step === undefined) return next as GameState;
 
   const effects = step.effects;
   if (effects.flags !== undefined) Object.assign(next.worldFlags, effects.flags);
@@ -73,7 +85,6 @@ export function reduceWorld(state: Readonly<GameState>, content: WorldCampaignCo
     }
   }
   if (command.type === "use") next.inventory = removeItem(next.inventory, command.itemId, 1);
-  if (command.type === "travel") next.locationId = command.locationId;
   if (effects.enterBattle !== undefined) {
     const encounter = content.encounters[effects.enterBattle];
     if (encounter !== undefined) next.battle = { encounterId: encounter.id, state: cloneBattle(encounter.initialBattle) };

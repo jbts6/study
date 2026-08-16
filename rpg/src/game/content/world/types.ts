@@ -1,5 +1,6 @@
 import type { BattleState } from "../../combat/types";
 import type { GameState, WorldFlagValue } from "../../world/campaign-types";
+import type { EnemyBehaviorSpec } from "../shared/types";
 import type { LevelId } from "../shared/types";
 
 export type FlagRequirements = Readonly<Record<string, WorldFlagValue>>;
@@ -68,6 +69,7 @@ export type EncounterDefinition = Readonly<{
   battleId: string;
   initialBattle: BattleState;
   prerequisiteFlags: FlagRequirements;
+  enemyBehaviors?: Readonly<Record<string, EnemyBehaviorSpec>>;
 }>;
 export type WorldCampaignContent = Readonly<{
   chapters: Readonly<Record<string, ChapterDefinition>>;

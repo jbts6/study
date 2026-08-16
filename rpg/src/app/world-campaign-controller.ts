@@ -7,6 +7,7 @@ import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
 import { createPythonWorldInitialState, PYTHON_WORLD_CONTENT } from "../game/content/python/world-chapter-01";
 import type { WorldCampaignContent } from "../game/content/world/types";
 import type { LevelDefinition } from "../game/content/types";
+import type { EnemyBehaviorSpec } from "../game/content/shared/types";
 import type { CampaignDefinition } from "../programs/types";
 import type { ExecutionLimits, RunResult } from "../runners/protocol/types";
 import type { GameState } from "../game/world/campaign-types";
@@ -283,7 +284,7 @@ export class WorldCampaignController implements GameController {
       return "stopped";
     }
 
-    const enemyTurns = this.advanceEnemyTurns(level, player.state);
+    const enemyTurns = this.advanceEnemyTurns(level, this.content.encounters[activeBattle.encounterId]?.enemyBehaviors, player.state);
     const events = [...player.events, ...enemyTurns.events];
     this.battleLog = [...this.battleLog, ...events];
     const battleState = enemyTurns.state;
@@ -317,15 +318,17 @@ export class WorldCampaignController implements GameController {
 
   private advanceEnemyTurns(
     level: LevelDefinition,
+    encounterBehaviors: Readonly<Record<string, EnemyBehaviorSpec>> | undefined,
     initialState: BattleState,
   ): Readonly<{ state: BattleState; events: readonly BattleEvent[] }> {
     let state = initialState;
     const events: BattleEvent[] = [];
+    const encounterLevel = encounterBehaviors === undefined ? level : { ...level, enemyBehaviors: { ...level.enemyBehaviors, ...encounterBehaviors } };
     while (state.phase === "in_progress") {
       const enemy = activeUnit(state);
       if (enemy?.team !== "enemies" || enemy.disabled) break;
-      const command = enemyCommand(level, state);
-      const validation = validateLevelCommand(level, state, command);
+      const command = enemyCommand(encounterLevel, state);
+      const validation = validateLevelCommand(encounterLevel, state, command);
       if (!validation.accepted) throw new Error("应用预设的敌方指令被关卡规则拒绝。");
       const resolution = resolveTurn(state, validation.command);
       if (!resolution.accepted) throw new Error("应用预设的敌方指令被战斗内核拒绝。");

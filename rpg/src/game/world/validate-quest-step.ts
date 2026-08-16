@@ -5,6 +5,12 @@ export type QuestStepValidation =
   | Readonly<{ ok: true; step: QuestStep }>
   | Readonly<{ ok: false; error: WorldCommandError }>;
 
+const FREE_EXPLORATION_STEP: QuestStep = {
+  stepId: "__free_exploration__",
+  accept: { type: "talk" },
+  effects: { advanceTo: "__free_exploration__" },
+};
+
 /** Validates a structurally valid world command against the current chapter quest step. */
 export function validateQuestStep(
   state: Readonly<GameState>,
@@ -14,7 +20,8 @@ export function validateQuestStep(
   const chapter = content.chapters[state.chapterId];
   const quest = state.quests[0];
   if (chapter === undefined || quest === undefined || quest.status === "completed") {
-    return { ok: false, error: { code: "TASK_CONDITION_UNMET", path: "type", message: "当前没有进行中的任务" } };
+    // 章节完成后的自由探索：命令放行，位移与切章由 reduce 处理。
+    return { ok: true, step: FREE_EXPLORATION_STEP };
   }
   const step = chapter.questChain.find((candidate) => candidate.stepId === quest.stepId);
   if (step === undefined) {

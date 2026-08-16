@@ -15,10 +15,6 @@ export function resolveWorldCommand(
 ): WorldCommandResolution {
   const validation = validateWorldCommand(state, content, input);
   if (!validation.accepted) return { accepted: false, errors: validation.errors, state };
-  const quest = state.quests[0];
-  if (quest === undefined || quest.status === "completed") {
-    return { accepted: true, command: validation.command, state: { ...state, revision: state.revision + 1 } };
-  }
   const step = validateQuestStep(state, content, validation.command);
   if (!step.ok) return { accepted: false, errors: [step.error], state };
   return { accepted: true, command: validation.command, state: reduceWorld(state, content, validation.command) };

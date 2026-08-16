@@ -7,6 +7,8 @@ import { PYTHON_WORLD_CONTENT } from "../game/content/python/world-chapter-01";
 import { createPythonWorldInitialState } from "../game/content/python/world-chapter-01";
 import { getLevel } from "../game/content/levels";
 import type { GameState } from "../game/world/campaign-types";
+import { resolveWorldCommand } from "../game/world/resolve-world-command";
+import { settleEncounter } from "../game/world/settle-encounter";
 import { WorldCampaignController } from "./world-campaign-controller";
 import type { LocalSaveDataV3, WorldSaveLoadResult, WorldSaveStore } from "./world-save-store";
 import type { RunnerClient, RunnerDisplayState } from "./runner-client";
@@ -116,6 +118,28 @@ class ChapterFlowRunner implements RunnerClient {
     if (command === undefined) throw new Error("chapter flow has no remaining world command");
     this.worldStep += 1;
     return completed(command);
+  }
+
+  interrupt(): void {}
+  onStateChange(): () => void { return () => undefined; }
+  close(): void {}
+}
+
+class EchoRunner implements RunnerClient {
+  readonly state: RunnerDisplayState = "ready";
+  readonly requests: RunRequest[] = [];
+  private step = 0;
+
+  constructor(private readonly commands: readonly JsonValue[]) {}
+
+  async connect(): Promise<void> {}
+
+  async run(request: RunRequest): Promise<RunResult> {
+    this.requests.push(request);
+    const command = this.commands[this.step];
+    this.step += 1;
+    if (command === undefined) throw new Error("echo runner has no remaining command");
+    return completed({ ...(command as Record<string, unknown>), expectedRevision: requestRevision(request as PythonRunRequest) } as JsonValue);
   }
 
   interrupt(): void {}
@@ -241,6 +265,66 @@ function worldCommands(): readonly JsonValue[] {
     { expectedRevision: 6, type: "prepareBattle", encounterId: "marsh_guardian" },
   ];
 }
+
+function chapterOneCompletedSave(): LocalSaveDataV3 {
+  let state = createPythonWorldInitialState();
+  for (const command of worldCommands()) {
+    const resolved = resolveWorldCommand(state, PYTHON_WORLD_CONTENT, command);
+    if (!resolved.accepted) throw new Error("chapter one completion prep failed");
+    state = resolved.state;
+  }
+  state = settleEncounter({
+    ...state,
+    battle: { encounterId: "marsh_guardian", state: { ...state.battle!.state, phase: "won" as const } },
+  }, PYTHON_WORLD_CONTENT);
+  const report = resolveWorldCommand(state, PYTHON_WORLD_CONTENT, {
+    expectedRevision: state.revision, type: "talk", targetId: "toma",
+  });
+  if (!report.accepted) throw new Error("chapter one completion prep failed");
+  return { version: 3, gameState: report.state, codeDrafts: { "python-marsh-01": getLevel("python-marsh-01").starterCode } };
+}
+
+describe("WorldCampaignController chapter two", () => {
+  it("switches to chapter two by traveling and walks to the encounter", async () => {
+    const runner = new EchoRunner([
+      { type: "travel", locationId: "venom-fork" },
+      { type: "inspect", targetId: "waysign" },
+      { type: "inspect", targetId: "signal-tower-b" },
+      { type: "prepareBattle", encounterId: "venom_guardian" },
+    ]);
+    const controller = createWorldController(runner, new MemoryWorldSaveStore({ ok: true, save: chapterOneCompletedSave() }));
+    await controller.start();
+
+    await controller.runCode(getLevel("python-marsh-02").starterCode);
+
+    const snapshot = controller.getSnapshot();
+    expect(snapshot.mode).toBe("battle");
+    if (snapshot.mode !== "battle") throw new Error("expected venom guardian battle");
+    expect(snapshot.gameState.chapterId).toBe("python-marsh-02");
+    expect(snapshot.battleLevelId).toBe("python-marsh-02");
+    expect(snapshot.gameState.quests[0]?.stepId).toBe("defeat_venom_guardian");
+    expect(runner.requests).toHaveLength(4);
+  });
+
+  it("rejects the wrong signal tower for the current inventory state", async () => {
+    const runner = new EchoRunner([
+      { type: "travel", locationId: "venom-fork" },
+      { type: "inspect", targetId: "waysign" },
+      { type: "inspect", targetId: "signal-tower-a" },
+    ]);
+    const controller = createWorldController(runner, new MemoryWorldSaveStore({ ok: true, save: chapterOneCompletedSave() }));
+    await controller.start();
+
+    await controller.runCode(getLevel("python-marsh-02").starterCode);
+
+    const snapshot = controller.getSnapshot();
+    expect(snapshot.mode).toBe("exploration");
+    if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot");
+    expect(snapshot.gameState.quests[0]?.stepId).toBe("pick_signal_tower");
+    expect(snapshot.feedback.kind).toBe("error");
+    expect(snapshot.feedback.messages.join(" ")).toContain("signal-tower-b");
+  });
+});
 
 describe("WorldCampaignController exploration auto-walk", () => {
   it("auto-walks the exploration chain to the encounter checkpoint in one run", async () => {
