@@ -6,7 +6,21 @@ const MARSH_SLICE = createMarshSlice(CURRENT_LEVEL_ID, "python-slice-1");
 
 export const STARTER_CODE = `def choose_world_action(world):
     # 探索阶段读取 location、npcs、objects 和 inventory。
-    # quests 给出任务；revision 必须原样回传。
+    # quests 给出任务；revision 必须原样回传到 expectedRevision。
+    # 命令是字典，type 决定其余字段，六种命令格式：
+    # 交谈：{"type": "talk", "targetId": "toma"}
+    # 调查：{"type": "inspect", "targetId": "weather_station"}
+    # 收集：{"type": "collect",
+    #        "targetId": "copper_wire_source"}
+    # 移动：{"type": "travel",
+    #        "locationId": "old_foundry"}
+    # <- travel 用 locationId，不是 targetId。
+    # 使用：{"type": "use", "itemId": "copper_wire",
+    #        "targetId": "relay"}
+    # 备战：{"type": "prepareBattle",
+    #        "encounterId": "marsh_guardian"}
+    # 可用 id 看 world["npcs"]、world["objects"]、
+    # world["availableTravel"]。
     return {
         "expectedRevision": world["revision"],
         "type": "talk",

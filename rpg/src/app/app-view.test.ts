@@ -119,7 +119,7 @@ describe("mountApp", () => {
       snapshot.battleState.board.width * snapshot.battleState.board.height,
     );
     expect(root.textContent).toContain("保护 relay");
-    expect(root.textContent).not.toContain("prepareBattle");
+    expect(root.querySelector("[data-testid='api-hints']")?.textContent).not.toContain("prepareBattle");
     expect(root.querySelector("[data-testid='unit-scout']")).not.toBeNull();
 
     unmount();
