@@ -52,6 +52,36 @@ describe("resolveWorldCommand", () => {
     });
   });
 
+  it("rejects a command that does not match the current quest step", () => {
+    const state = createPythonWorldInitialState();
+    const result = resolveWorldCommand(state, PYTHON_WORLD_CONTENT, {
+      expectedRevision: state.revision,
+      type: "inspect",
+      targetId: "scrap_pile",
+    });
+
+    expect(result.accepted).toBe(false);
+    if (!result.accepted) {
+      expect(result.errors[0]?.message).toContain("当前步骤是 talk_to_toma");
+    }
+  });
+
+  it("rejects a structurally valid but wrong target for the current step", () => {
+    let state = createPythonWorldInitialState();
+    state = apply(state, { type: "talk", targetId: "toma" });
+    const result = resolveWorldCommand(state, PYTHON_WORLD_CONTENT, {
+      expectedRevision: state.revision,
+      type: "inspect",
+      targetId: "weather_station",
+    });
+
+    expect(result.accepted).toBe(false);
+    if (!result.accepted) {
+      expect(result.errors[0]?.message).toContain("scrap_pile");
+      expect(result.errors[0]?.message).toContain("inspect_scrap_pile");
+    }
+  });
+
   it("rejects prototype-inherited type names without throwing", () => {
     const state = createPythonWorldInitialState();
     for (const type of ["toString", "constructor", "hasOwnProperty"]) {

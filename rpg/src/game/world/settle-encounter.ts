@@ -22,6 +22,8 @@ export function settleEncounter(
 
   const encounter = content.encounters[activeBattle.encounterId];
   if (encounter === undefined) throw new Error(`遭遇尚未注册: ${activeBattle.encounterId}`);
+  const chapter = content.chapters[state.chapterId];
+  if (chapter === undefined) throw new Error(`遭遇尚未注册的章节: ${state.chapterId}`);
 
   const next: GameState = {
     ...state,
@@ -33,12 +35,15 @@ export function settleEncounter(
     revision: state.revision + 1,
   };
 
+  const victory = chapter.victory;
   if (activeBattle.state.phase === "won") {
     return {
       ...next,
-      locationId: "rust-marsh-camp",
-      worldFlags: { ...next.worldFlags, marsh_guardian_defeated: true },
-      quests: advanceQuest(next.quests, "defeat_guardian", "submit_report"),
+      locationId: victory.returnLocationId,
+      worldFlags: victory.setFlags === undefined ? next.worldFlags : { ...next.worldFlags, ...victory.setFlags },
+      quests: victory.reportStep === undefined
+        ? advanceQuestTo(next.quests, "completed")
+        : advanceQuestTo(next.quests, victory.reportStep),
     };
   }
 
@@ -48,8 +53,10 @@ export function settleEncounter(
   };
 }
 
-function advanceQuest(quests: readonly QuestState[], fromStep: string, toStep: string): readonly QuestState[] {
-  return quests.map((quest, index) => index === 0 && quest.stepId === fromStep ? { ...quest, stepId: toStep } : quest);
+function advanceQuestTo(quests: readonly QuestState[], toStep: string): readonly QuestState[] {
+  return quests.map((quest, index) => index === 0
+    ? { ...quest, status: toStep === "completed" ? "completed" : quest.status, stepId: toStep }
+    : quest);
 }
 
 /** Resets an active battle back to its encounter's initial state (used at the start of every run). */

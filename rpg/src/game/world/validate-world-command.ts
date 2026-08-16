@@ -91,8 +91,6 @@ export function validateWorldCommand(
   }
   if (type === "inspect") {
     if (!location.objectIds.includes(input.targetId) || content.objects[input.targetId] === undefined) return { accepted: false, errors: [error("INVALID_TARGET", "targetId", `对象不在当前地点；此处对象：${location.objectIds.join("、") || "无"}`)] };
-    if (input.targetId === "scrap_pile" && state.worldFlags.talked_to_toma !== true) return { accepted: false, errors: [error("TASK_CONDITION_UNMET", "targetId", "需要先与托玛交谈")] };
-    if (input.targetId === "weather_station" && state.worldFlags.scrap_pile_inspected !== true) return { accepted: false, errors: [error("TASK_CONDITION_UNMET", "targetId", "需要先调查废料堆")] };
     return { accepted: true, command: input as WorldCommand };
   }
   if (type === "collect") {

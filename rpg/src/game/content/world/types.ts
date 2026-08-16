@@ -1,13 +1,42 @@
 import type { BattleState } from "../../combat/types";
-import type { WorldFlagValue } from "../../world/campaign-types";
+import type { GameState, WorldFlagValue } from "../../world/campaign-types";
 import type { LevelId } from "../shared/types";
 
 export type FlagRequirements = Readonly<Record<string, WorldFlagValue>>;
+
+export type QuestStep = Readonly<{
+  stepId: string;
+  accept: Readonly<{
+    type: "talk" | "inspect" | "collect" | "use" | "travel" | "prepareBattle";
+    targetId?: string;
+    itemId?: string;
+    encounterId?: string;
+    targetFromState?: (state: Readonly<GameState>) => string;
+  }>;
+  effects: Readonly<{
+    flags?: Readonly<Record<string, WorldFlagValue>>;
+    addClue?: string;
+    advanceTo: string;
+    enterBattle?: string;
+    switchChapter?: string;
+  }>;
+}>;
+
+export type ChapterVictory = Readonly<{
+  returnLocationId: string;
+  setFlags?: Readonly<Record<string, WorldFlagValue>>;
+  reportStep?: string;
+  campaignComplete?: boolean;
+}>;
+
 export type ChapterDefinition = Readonly<{
   id: string;
+  questId: string;
   startLocationId: string;
   locationIds: readonly string[];
   encounterIds: readonly string[];
+  questChain: readonly QuestStep[];
+  victory: ChapterVictory;
 }>;
 export type LocationDefinition = Readonly<{
   id: string;

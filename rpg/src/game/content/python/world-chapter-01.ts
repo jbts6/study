@@ -11,9 +11,25 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
   chapters: {
     "python-marsh-01": {
       id: "python-marsh-01",
+      questId: "repair_relay",
       startLocationId: "rust-marsh-camp",
       locationIds: ["rust-marsh-camp", "old_foundry"],
       encounterIds: ["marsh_guardian"],
+      questChain: [
+        { stepId: "talk_to_toma", accept: { type: "talk", targetId: "toma" }, effects: { flags: { talked_to_toma: true }, advanceTo: "inspect_scrap_pile" } },
+        { stepId: "inspect_scrap_pile", accept: { type: "inspect", targetId: "scrap_pile" }, effects: { flags: { scrap_pile_inspected: true }, addClue: "scrap_contains_copper", advanceTo: "collect_copper_wire" } },
+        { stepId: "collect_copper_wire", accept: { type: "collect", targetId: "copper_wire_source" }, effects: { advanceTo: "inspect_weather" } },
+        { stepId: "inspect_weather", accept: { type: "inspect", targetId: "weather_station" }, effects: { flags: { safe_route_known: true }, addClue: "acid_rain_safe_route", advanceTo: "travel_to_relay" } },
+        { stepId: "travel_to_relay", accept: { type: "travel", targetId: "old_foundry" }, effects: { advanceTo: "repair_relay" } },
+        { stepId: "repair_relay", accept: { type: "use", targetId: "relay", itemId: "copper_wire" }, effects: { flags: { relay_repaired: true }, advanceTo: "prepare_guardian_battle" } },
+        { stepId: "prepare_guardian_battle", accept: { type: "prepareBattle", encounterId: "marsh_guardian" }, effects: { enterBattle: "marsh_guardian", advanceTo: "defeat_guardian" } },
+        { stepId: "submit_report", accept: { type: "talk", targetId: "toma" }, effects: { flags: { talked_to_toma: true, chapter_01_completed: true, chapter_02_unlocked: true }, advanceTo: "completed" } },
+      ],
+      victory: {
+        returnLocationId: "rust-marsh-camp",
+        setFlags: { marsh_guardian_defeated: true },
+        reportStep: "submit_report",
+      },
     },
   },
   locations: {
