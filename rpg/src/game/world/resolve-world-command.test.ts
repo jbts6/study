@@ -62,9 +62,24 @@ describe("resolveWorldCommand", () => {
       expect(result.accepted).toBe(false);
       if (!result.accepted) {
         expect(result.errors).toEqual([
-          { code: "INVALID_COMMAND", path: "type", message: "不支持的世界指令类型" },
+          { code: "INVALID_COMMAND", path: "type", message: "不支持的世界指令类型；可用：talk、inspect、collect、use、travel、prepareBattle" },
         ]);
       }
+    }
+  });
+
+  it("tells the player the correct travel format when targetId is misused", () => {
+    const state = createPythonWorldInitialState();
+    const result = resolveWorldCommand(state, PYTHON_WORLD_CONTENT, {
+      expectedRevision: state.revision,
+      type: "travel",
+      targetId: "old_foundry",
+    });
+    expect(result.accepted).toBe(false);
+    if (!result.accepted) {
+      expect(result.errors[0]?.code).toBe("UNKNOWN_FIELD");
+      expect(result.errors[0]?.message).toContain("正确格式");
+      expect(result.errors[0]?.message).toContain("locationId");
     }
   });
 
