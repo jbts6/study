@@ -17,6 +17,7 @@ import { GameLauncher } from "./game-launcher";
 import { GameSession, type SessionDiagnostics } from "./game-session";
 import { DocumentWorkspace, levelFilePath, type WorkspaceDocument, type WorkspaceHost } from "./level-workspace";
 import type { ThemePreference, WebviewCommand } from "./messages";
+import { ensureCurrentPlayerFiles } from "./player-fileset-migration";
 import { WorkspaceSaveStore } from "./workspace-save-store";
 import { WorkspaceWorldSaveStore } from "./workspace-world-save-store";
 import type { CampaignDefinition, CampaignId } from "../programs/types";
@@ -125,7 +126,21 @@ async function createActiveGame(
       await context.workspaceState.update(key, value);
     },
   };
+  let reset = false;
+  if (campaign.id === "python-rpg") {
+    try {
+      reset = await ensureCurrentPlayerFiles(workspace, workspaceState, campaign);
+    } catch (error) {
+      await vscode.window.showErrorMessage(`重置练习代码失败：${errorMessage(error)}`);
+      return undefined;
+    }
+  }
   await workspace.ensureLevelFiles();
+  if (reset) {
+    await vscode.window.showInformationMessage(
+      "练习代码已按当前版本重置，python-rpg/ 目录下原有文件（含自建草稿）已被新模板替换。",
+    );
+  }
 
   const panel = vscode.window.createWebviewPanel(
     PANEL_TYPE,
@@ -213,6 +228,9 @@ function createWorkspaceHost(root: vscode.Uri): WorkspaceHost {
         await vscode.workspace.fs.createDirectory(vscode.Uri.file(dirname(filePath)));
         await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), new TextEncoder().encode(content));
       },
+      deleteDirectory: async (filePath) => {
+        await vscode.workspace.fs.delete(vscode.Uri.file(filePath), { recursive: true, useTrash: false });
+      },
     },
     getOpenDocument: (filePath) => wrapDocument(vscode.workspace.textDocuments.find((document) => samePath(document.uri.fsPath, filePath))),
     openTextDocument: async (filePath) => wrapDocument(await vscode.workspace.openTextDocument(vscode.Uri.file(filePath)))!,
@@ -220,6 +238,13 @@ function createWorkspaceHost(root: vscode.Uri): WorkspaceHost {
       const textDocument = vscode.workspace.textDocuments.find((candidate) => samePath(candidate.uri.fsPath, document.path))
         ?? await vscode.workspace.openTextDocument(vscode.Uri.file(document.path));
       await vscode.window.showTextDocument(textDocument, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
+    },
+    replaceOpenDocument: async (filePath, content) => {
+      const document = vscode.workspace.textDocuments.find((candidate) => samePath(candidate.uri.fsPath, filePath));
+      if (document === undefined) return;
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), content);
+      if (!await vscode.workspace.applyEdit(edit)) throw new Error(`无法更新已打开的玩家文件：${filePath}`);
     },
   };
 }
