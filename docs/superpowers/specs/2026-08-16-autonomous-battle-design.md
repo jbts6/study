@@ -35,39 +35,38 @@ starter 注释里的建议而非通关必要条件，教学能力接近零。
 中间局面照常持久化（现有 `replaceSnapshot` 机制不变）；重置只发生在运行
 开始时。
 
-## 二、结构化战斗事件（日志与动画的统一契约）
+## 二、战斗日志（复用引擎既有事件，不新造契约）
 
-```ts
-type BattleEvent =
-  | { kind: "move"; unitId: string; from: Cell; to: Cell }
-  | { kind: "attack"; actorId: string; targetId: string }
-  | { kind: "damage"; targetId: string; amount: number; hpRemaining: number }
-  | { kind: "heal"; targetId: string; amount: number; hpRemaining: number }
-  | { kind: "guard"; unitId: string }
-  | { kind: "defeat"; unitId: string }
-  | { kind: "objective"; objectiveId: string };
-```
+战斗内核已产出带完整归因的结构化事件（`game/combat/types.ts` 的
+`BattleEvent`，protocolVersion 1）：
 
-- 玩家回合：命令本身给出完整归因（attack/cast/guard/movePath）。
-- 敌方回合：从结算前后 `BattleState` 差分导出（hp 增减 → damage/heal、
-  位置变化 → move、disabled → defeat、objective.completed → objective）。
-  敌方攻击者不做归因推断，只演出受击方效果。
-- `WorldBattleSnapshot` 增加 `battleLog: readonly BattleEvent[]`（控制器内
-  存态，不进世界存档；重载窗口后清空）。每次运行开始清空重建。
-- 战斗视图新增可滚动日志面板：事件渲染为可读文案（如"hunter-a 受到 4
-  点伤害，剩余 2 血"），新条目在底部、自动滚动。
+- `moved {actorId, from, to}`
+- `damaged {sourceId, targetId, amount, hpAfter, coverBonus}`（sourceId 为
+  "hazard" 时表示地形伤害）
+- `healed {sourceId, targetId, amount, hpAfter}`
+- `status_added / status_removed {unitId, statusId, ...}`
+- `interacted / objective_progressed {actorId/targetId, durabilityAfter, completed}`
+- `unit_disabled {unitId}`、`turn_advanced {round, ...}`、`battle_finished {outcome}`
+
+玩家回合与敌方回合的事件在控制器里已汇集（`resolveBattleResult` 的
+`events`）。新增：
+
+- `WorldBattleSnapshot` 增加 `battleLog: readonly BattleEvent[]`——自动序
+  列期间跨回合累积，每次运行开始清空；控制器内存态，不进世界存档。
+- 战斗视图新增可滚动日志面板：事件渲染为可读文案（复用
+  `battle-feedback.ts` 的格式化思路），新条目在底部、自动滚动。
+- 无需状态差分：所有动画数据都来自引擎事件本身。
 
 ## 三、动画渲染（纯 CSS，无新依赖）
 
 | 事件 | 动画 |
 |---|---|
-| move | 单位元素 300ms 缓动滑到新格 |
-| attack | 攻击者向目标方向扑击 150ms（去回） |
-| damage | 受击者红色闪烁 + 浮动 "-4" 伤害数字升起淡出 |
-| heal | 绿色闪烁 + "+3" 浮动 |
-| guard | 本回合护盾描边 |
-| defeat | 单位灰化淡出，留在场上 |
-| objective | 目标格脉冲高亮 |
+| moved | 单位元素 300ms 缓动滑到新格 |
+| damaged | 攻击者（sourceId，含敌方）向目标扑击 150ms + 受击者红色闪烁 + 浮动 "-4" 伤害数字升起淡出；sourceId 为 hazard 时只演受击 |
+| healed | 绿色闪烁 + "+3" 浮动 |
+| status_added | 防御类状态（defenseBonus>0）护盾描边，本回合生效 |
+| interacted / objective_progressed | 目标格脉冲高亮 |
+| unit_disabled | 单位灰化淡出，留在场上 |
 
 渲染器改造（`render-game.ts` 战斗棋盘）：从每次快照全量重绘改为**按
 unitId 键控差分更新**——单位元素保持 DOM 身份，位置变化走 CSS
@@ -91,7 +90,7 @@ transition，事件批次触发一次性动画 class，动画结束后移除。�
 - 正常路径：一次 `runCode` 消费多条命令直至战斗胜利并结算。
 - 关键失败路径：序列中途命令被拒 → 循环停止、反馈显示错误；再次运行从遭
   遇初始局面重新开始。
-- 事件差分：结算前后状态对比产出正确的 damage/move/defeat 事件。
+- 事件累积：自动序列的 `battleLog` 依次包含各回合引擎事件。
 - 探索运行不受影响（单命令）。
 
 渲染侧（`render-game` 相关测试）：单位元素按 id 复用（位置更新不重建节
@@ -110,5 +109,4 @@ transition，事件批次触发一次性动画 class，动画结束后移除。�
 - 不改 AppController（go 战役 / 浏览器六关阶梯路径）。
 - 不加概念检测器；不做第二章内容；不加每关开关。
 - 不改探索层任务设计。
-- 不为敌方攻击做归因推断（不做敌方扑击动画的攻击者侧演出）。
 - 日志不持久化到世界存档。
