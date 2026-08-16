@@ -704,3 +704,14 @@ summary:focus-visible {
 .battle-log-empty {
   opacity: .7;
 }
+
+.cell-coordinate {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  z-index: 1;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--game-muted, #7d8590);
+  pointer-events: none;
+}

@@ -82,6 +82,17 @@ describe("game Webview renderer", () => {
     expect(lines).toContain("golem 被消灭");
   });
 
+  it("labels each grid cell with its coordinates", () => {
+    const root = document.createElement("div");
+    renderGame(root, snapshot("python-marsh-01"));
+
+    const coordinates = [...root.querySelectorAll(".cell-coordinate")].map((item) => item.textContent);
+    expect(coordinates).toHaveLength(3 * 2);
+    expect(coordinates).toContain("0,0");
+    expect(coordinates).toContain("1,1");
+    expect(coordinates).toContain("2,1");
+  });
+
   it("keeps unit token identity across snapshots and animates fresh events", () => {
     const root = document.createElement("div");
     const initial = snapshot("python-marsh-01");

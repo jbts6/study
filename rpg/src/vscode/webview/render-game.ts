@@ -148,6 +148,9 @@ function renderCell(state: BattleState, x: number, y: number): HTMLElement {
   if (hasCell(state.board.hazardCells, x, y)) cell.classList.add("cell-hazard");
   if (hasCell(state.board.coverCells, x, y)) cell.classList.add("cell-cover");
   if (hasCell(state.board.blockedCells, x, y)) cell.classList.add("cell-blocked");
+  const coordinate = textElement("span", "cell-coordinate", `${x},${y}`);
+  coordinate.setAttribute("aria-hidden", "true");
+  cell.append(coordinate);
   const labels = [`格位 ${x},${y}`];
   for (const objective of state.objectives.filter((item) => item.cell.x === x && item.cell.y === y)) {
     const token = textElement("span", objective.key ? "token token-key" : "token token-objective", objective.id);
