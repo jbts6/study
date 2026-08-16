@@ -21,6 +21,19 @@ export class DocumentWorkspace {
     for (const levelId of this.campaign.levelOrder) await this.ensureLevelFile(levelId);
   }
 
+  async resetLevelFiles(): Promise<void> {
+    const directory = join(this.host.workspaceRoot, this.campaign.program.workspaceDirectory);
+    if (await this.host.fileSystem.exists(directory)) {
+      await this.host.fileSystem.deleteDirectory(directory);
+    }
+    for (const levelId of this.campaign.levelOrder) {
+      const starterCode = getLevel(levelId).starterCode;
+      const path = levelFilePath(this.host.workspaceRoot, this.campaign, levelId);
+      await this.host.fileSystem.writeFile(path, starterCode);
+      await this.host.replaceOpenDocument(path, starterCode);
+    }
+  }
+
   async readLevelCode(levelId: LevelId): Promise<string> {
     const path = levelFilePath(this.host.workspaceRoot, this.campaign, levelId);
     const openDocument = this.host.getOpenDocument(path);

@@ -7,6 +7,7 @@ export interface WorkspaceFileSystem {
   exists(path: string): boolean | Promise<boolean>;
   readFile(path: string): string | Promise<string>;
   writeFile(path: string, content: string): void | Promise<void>;
+  deleteDirectory(path: string): void | Promise<void>;
 }
 
 export interface WorkspaceHost {
@@ -18,6 +19,7 @@ export interface WorkspaceHost {
     document: WorkspaceDocument,
     options: { readonly viewColumn: 1 },
   ): void | Promise<void>;
+  replaceOpenDocument(path: string, content: string): void | Promise<void>;
 }
 
 export interface WorkspaceState {

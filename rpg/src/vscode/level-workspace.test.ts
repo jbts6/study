@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { DocumentWorkspace, levelFilePath } from "./level-workspace";
 import { GO_PROGRAM } from "../programs/go";
 import { PYTHON_RPG_CAMPAIGN } from "../game/content/python/levels";
+import { getLevel } from "../game/content/levels";
 import type { CampaignDefinition } from "../programs/types";
 import type {
   WorkspaceDocument,
@@ -13,9 +14,10 @@ import type {
 class MemoryFileSystem implements WorkspaceFileSystem {
   readonly files = new Map<string, string>();
   readonly writes: string[] = [];
+  readonly deletedDirectories: string[] = [];
 
   exists(path: string): boolean {
-    return this.files.has(path);
+    return [...this.files.keys()].some((filePath) => filePath === path || filePath.startsWith(path + sep));
   }
 
   readFile(path: string): string {
@@ -28,11 +30,19 @@ class MemoryFileSystem implements WorkspaceFileSystem {
     this.writes.push(path);
     this.files.set(path, content);
   }
+
+  deleteDirectory(path: string): void {
+    this.deletedDirectories.push(path);
+    for (const filePath of this.files.keys()) {
+      if (filePath === path || filePath.startsWith(path + sep)) this.files.delete(filePath);
+    }
+  }
 }
 
 class MemoryHost implements WorkspaceHost {
   readonly openDocuments = new Map<string, WorkspaceDocument>();
   readonly shown: Array<{ document: WorkspaceDocument; viewColumn: 1 }> = [];
+  readonly replacedOpenDocuments: Array<{ path: string; content: string }> = [];
 
   constructor(
     readonly workspaceRoot: string,
@@ -54,6 +64,13 @@ class MemoryHost implements WorkspaceHost {
 
   async showTextDocument(document: WorkspaceDocument, options: { viewColumn: 1 }): Promise<void> {
     this.shown.push({ document, viewColumn: options.viewColumn });
+  }
+
+  replaceOpenDocument(path: string, content: string): void {
+    this.replacedOpenDocuments.push({ path, content });
+    if (this.openDocuments.has(path)) {
+      this.openDocuments.set(path, { path, getText: () => content });
+    }
   }
 }
 
@@ -102,5 +119,47 @@ describe("DocumentWorkspace", () => {
 
     expect(document.path).toBe(levelFilePath("/workspace", PYTHON_RPG_CAMPAIGN, "python-marsh-01"));
     expect(host.shown).toEqual([{ document, viewColumn: 1 }]);
+  });
+
+  it("重置已有玩家目录，删除自建文件并替换已打开文档", async () => {
+    const fileSystem = new MemoryFileSystem();
+    const host = new MemoryHost("/workspace", fileSystem);
+    const firstLevelId = PYTHON_RPG_CAMPAIGN.levelOrder[0];
+    const firstLevelPath = levelFilePath("/workspace", PYTHON_RPG_CAMPAIGN, firstLevelId);
+    const customPath = join("/workspace", PYTHON_RPG_CAMPAIGN.program.workspaceDirectory, "scratch.py");
+    fileSystem.files.set(firstLevelPath, "old saved code");
+    fileSystem.files.set(customPath, "custom code");
+    host.openDocuments.set(firstLevelPath, { path: firstLevelPath, getText: () => "old unsaved code" });
+    const workspace = new DocumentWorkspace(host, PYTHON_RPG_CAMPAIGN);
+
+    await workspace.resetLevelFiles();
+
+    const directory = join("/workspace", PYTHON_RPG_CAMPAIGN.program.workspaceDirectory);
+    expect(fileSystem.deletedDirectories).toEqual([directory]);
+    expect(fileSystem.files.has(customPath)).toBe(false);
+    expect(host.replacedOpenDocuments).toContainEqual({
+      path: firstLevelPath,
+      content: getLevel(firstLevelId).starterCode,
+    });
+    for (const levelId of PYTHON_RPG_CAMPAIGN.levelOrder) {
+      const path = levelFilePath("/workspace", PYTHON_RPG_CAMPAIGN, levelId);
+      expect(fileSystem.files.get(path)).toBe(getLevel(levelId).starterCode);
+    }
+    await expect(workspace.readLevelCode(firstLevelId)).resolves.toBe(getLevel(firstLevelId).starterCode);
+  });
+
+  it("在新工作区重置时跳过删除并生成全部玩家模板", async () => {
+    const fileSystem = new MemoryFileSystem();
+    const host = new MemoryHost("/workspace", fileSystem);
+    const workspace = new DocumentWorkspace(host, PYTHON_RPG_CAMPAIGN);
+
+    await expect(workspace.resetLevelFiles()).resolves.toBeUndefined();
+
+    expect(fileSystem.deletedDirectories).toEqual([]);
+    expect(fileSystem.writes).toHaveLength(PYTHON_RPG_CAMPAIGN.levelOrder.length);
+    for (const levelId of PYTHON_RPG_CAMPAIGN.levelOrder) {
+      const path = levelFilePath("/workspace", PYTHON_RPG_CAMPAIGN, levelId);
+      expect(fileSystem.files.get(path)).toBe(getLevel(levelId).starterCode);
+    }
   });
 });
