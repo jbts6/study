@@ -43,9 +43,11 @@ export type WorldCampaignControllerDependencies = Readonly<{
   createId?: () => string;
   runLimits?: ExecutionLimits;
   turnDelayMs?: number;
+  explorationStepLimit?: number;
 }>;
 
 const AUTO_TURN_DELAY_MS = 800;
+const EXPLORATION_STEP_LIMIT = 30;
 
 type ActiveWorldSnapshot = WorldExplorationSnapshot | WorldBattleSnapshot;
 
@@ -54,6 +56,7 @@ export class WorldCampaignController implements GameController {
   private readonly runLimits: ExecutionLimits;
   private readonly content: WorldCampaignContent;
   private readonly turnDelayMs: number;
+  private readonly explorationStepLimit: number;
   private battleLog: BattleEvent[] = [];
   private codeDrafts: Record<string, string> = {};
   private snapshot: ControllerSnapshot;
@@ -66,6 +69,7 @@ export class WorldCampaignController implements GameController {
     this.content = content;
     this.runLimits = dependencies.runLimits ?? createDefaultRunLimits().python;
     this.turnDelayMs = dependencies.turnDelayMs ?? AUTO_TURN_DELAY_MS;
+    this.explorationStepLimit = dependencies.explorationStepLimit ?? EXPLORATION_STEP_LIMIT;
     const state = createPythonWorldInitialState();
     const codeDraft = this.defaultCodeDraft(state.chapterId);
     this.snapshot = this.createWorldSnapshot(state, codeDraft, idleFeedback());
@@ -161,6 +165,7 @@ export class WorldCampaignController implements GameController {
     this.replaceSnapshot(running);
 
     let state = running.gameState;
+    let explorationSteps = 0;
     while (true) {
       let result: RunResult;
       try {
@@ -180,6 +185,23 @@ export class WorldCampaignController implements GameController {
       const outcome = this.resolveResult(result, runId);
       const current = this.activeWorldSnapshot(runId);
       if (current === undefined || outcome !== "continue") return;
+      if (current.mode === "exploration") {
+        explorationSteps += 1;
+        if (explorationSteps >= this.explorationStepLimit) {
+          this.replaceSnapshot({
+            ...current,
+            activeRunId: undefined,
+            feedback: {
+              ...current.feedback,
+              layer: "task",
+              kind: "info",
+              title: "探索步数达到上限",
+              messages: [`一次运行最多自动执行 ${this.explorationStepLimit} 步探索。检查 choose_world_action 是否会在当前步骤上原地循环，修正后再次运行。`],
+            },
+          });
+          return;
+        }
+      }
       state = current.gameState;
       if (this.turnDelayMs > 0) await delay(this.turnDelayMs);
       if (this.activeWorldSnapshot(runId) === undefined) return;
@@ -200,13 +222,12 @@ export class WorldCampaignController implements GameController {
     }
 
     if (snapshot.mode === "exploration") {
-      this.resolveExplorationResult(snapshot, result);
-      return "stopped";
+      return this.resolveExplorationResult(snapshot, result);
     }
     return this.resolveBattleResult(snapshot, result);
   }
 
-  private resolveExplorationResult(snapshot: WorldExplorationSnapshot, result: RunResult): void {
+  private resolveExplorationResult(snapshot: WorldExplorationSnapshot, result: RunResult): "continue" | "stopped" {
     const resolution = resolveWorldCommand(snapshot.gameState, this.content, result.returnValue);
     if (!resolution.accepted) {
       this.replaceSnapshot({
@@ -215,16 +236,36 @@ export class WorldCampaignController implements GameController {
         feedback: worldErrorFeedback(resolution.errors),
         diagnostics: [],
       });
-      return;
+      return "stopped";
     }
 
     const nextState = resolution.state;
     this.saveWorld(nextState, snapshot.codeDraft);
-    this.replaceSnapshot(this.createWorldSnapshot(
-      nextState,
-      snapshot.codeDraft,
-      worldCommandFeedback(resolution.command, result),
-    ));
+    if (nextState.battle !== null) {
+      this.replaceSnapshot(this.createWorldSnapshot(nextState, snapshot.codeDraft, {
+        layer: "task",
+        kind: "info",
+        title: "遭遇开始",
+        messages: ["任务链推进到战斗遭遇。再次运行进入自动战斗，编辑 choose_turn 后点“运行回合（自动连续）”。"],
+        stdout: result.streams.stdout,
+        stderr: result.streams.stderr,
+      }));
+      return "stopped";
+    }
+    const feedback = worldCommandFeedback(resolution.command, result);
+    if (nextState.quests[0]?.status === "completed") {
+      this.replaceSnapshot(this.createWorldSnapshot(nextState, snapshot.codeDraft, {
+        ...feedback,
+        title: "章节完成",
+        messages: [...feedback.messages, "本章任务已完成。探索新的地点开启下一章。"],
+      }));
+      return "stopped";
+    }
+    this.replaceSnapshot({
+      ...this.createWorldSnapshot(nextState, snapshot.codeDraft, feedback),
+      activeRunId: snapshot.activeRunId,
+    });
+    return "continue";
   }
 
   private resolveBattleResult(snapshot: WorldBattleSnapshot, result: RunResult): "continue" | "stopped" {

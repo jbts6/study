@@ -206,6 +206,7 @@ function createWorldController(
     saveStore,
     createId: () => "world-run",
     turnDelayMs: 0,
+    explorationStepLimit: 30,
     runLimits: {
       timeoutMs: 5_000,
       interruptGraceMs: 500,
@@ -220,14 +221,106 @@ function createWorldController(
 }
 
 async function driveToWorldBattle(controller: WorldCampaignController): Promise<void> {
-  for (let step = 0; step < 7; step += 1) {
+  for (let step = 0; step < 10; step += 1) {
     const snapshot = controller.getSnapshot();
+    if (snapshot.mode === "battle") return;
     if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot before battle");
     await controller.runCode(snapshot.codeDraft);
   }
-  const snapshot = controller.getSnapshot();
-  if (snapshot.mode !== "battle") throw new Error("expected battle snapshot after prepareBattle");
+  throw new Error("battle was not reached");
 }
+
+function worldCommands(): readonly JsonValue[] {
+  return [
+    { expectedRevision: 0, type: "talk", targetId: "toma" },
+    { expectedRevision: 1, type: "inspect", targetId: "scrap_pile" },
+    { expectedRevision: 2, type: "collect", targetId: "copper_wire_source" },
+    { expectedRevision: 3, type: "inspect", targetId: "weather_station" },
+    { expectedRevision: 4, type: "travel", locationId: "old_foundry" },
+    { expectedRevision: 5, type: "use", itemId: "copper_wire", targetId: "relay" },
+    { expectedRevision: 6, type: "prepareBattle", encounterId: "marsh_guardian" },
+  ];
+}
+
+describe("WorldCampaignController exploration auto-walk", () => {
+  it("auto-walks the exploration chain to the encounter checkpoint in one run", async () => {
+    const runner = new FakeRunner(worldCommands().map((command) => completed(command)));
+    const controller = createWorldController(runner, new MemoryWorldSaveStore());
+    await controller.start();
+
+    await controller.runCode(getLevel("python-marsh-01").starterCode);
+
+    const snapshot = controller.getSnapshot();
+    expect(snapshot.mode).toBe("battle");
+    expect(runner.requests).toHaveLength(7);
+    if (snapshot.mode === "battle") expect(snapshot.feedback.messages.join(" ")).toContain("遭遇");
+  });
+
+  it("stops the walk on a rejected command and resumes from the same step", async () => {
+    const interrupted = [
+      worldCommands()[0]!,
+      { expectedRevision: 1, type: "inspect", targetId: "weather_station" },
+    ];
+    const runner = new FakeRunner(interrupted.map((command) => completed(command)));
+    const controller = createWorldController(runner, new MemoryWorldSaveStore());
+    await controller.start();
+
+    await controller.runCode(getLevel("python-marsh-01").starterCode);
+
+    const stopped = controller.getSnapshot();
+    expect(stopped.mode).toBe("exploration");
+    expect(runner.requests).toHaveLength(2);
+
+    const resume = [worldCommands()[1]!, ...worldCommands().slice(2)];
+    (runner as unknown as { results: readonly RunResult[] }).results = [
+      ...interrupted.map((command) => completed(command)),
+      ...resume.map((command) => completed(command)),
+    ];
+    await controller.runCode(getLevel("python-marsh-01").starterCode);
+
+    expect(controller.getSnapshot().mode).toBe("battle");
+    expect(runner.requests).toHaveLength(8);
+    expect(runner.requests[2]?.worldView).toMatchObject({ revision: 1 });
+  });
+
+  it("stops the walk at the exploration step limit", async () => {
+    const pingPongContent: typeof PYTHON_WORLD_CONTENT = {
+      ...PYTHON_WORLD_CONTENT,
+      chapters: {
+        ...PYTHON_WORLD_CONTENT.chapters,
+        "python-marsh-01": {
+          ...PYTHON_WORLD_CONTENT.chapters["python-marsh-01"]!,
+          questChain: [
+            { stepId: "talk_to_toma", accept: { type: "talk", targetId: "toma" }, effects: { advanceTo: "loop_two" } },
+            { stepId: "loop_two", accept: { type: "talk", targetId: "toma" }, effects: { advanceTo: "talk_to_toma" } },
+          ],
+        },
+      },
+    };
+    const loop = Array.from({ length: 10 }, (_, index) => completed({ expectedRevision: index, type: "talk", targetId: "toma" }));
+    const runner = new FakeRunner(loop);
+    const starter = getLevel("python-marsh-01").starterCode;
+    const controller = new WorldCampaignController({
+      runner,
+      saveStore: new MemoryWorldSaveStore(),
+      createId: () => "world-run",
+      turnDelayMs: 0,
+      explorationStepLimit: 3,
+      runLimits: {
+        timeoutMs: 5_000, interruptGraceMs: 500, maxFiles: 10, maxFileBytes: 65_536,
+        maxSourceBytes: 65_536, maxOutputBytes: 16_384, maxTraceEvents: 1_000, maxValueDepth: 4,
+      },
+    }, PYTHON_RPG_CAMPAIGN, pingPongContent);
+    await controller.start();
+
+    await controller.runCode(starter);
+
+    expect(runner.requests).toHaveLength(3);
+    const snapshot = controller.getSnapshot();
+    if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot");
+    expect(snapshot.feedback.messages.join(" ")).toContain("最多自动执行");
+  });
+});
 
 describe("WorldCampaignController autonomous battle", () => {
   it("auto-plays the guardian battle to settlement within one runCode call", async () => {
@@ -316,7 +409,7 @@ describe("WorldCampaignController", () => {
   });
 
   it("runs the default exploration draft without a missing-callable program error", async () => {
-    const runner = new FakeRunner([completed({ expectedRevision: 0, type: "talk", targetId: "toma" })], true);
+    const runner = new FakeRunner(worldCommands().map((command) => completed(command)), true);
     const controller = createWorldController(runner, new MemoryWorldSaveStore());
     await controller.start();
     const initial = controller.getSnapshot();
@@ -325,14 +418,16 @@ describe("WorldCampaignController", () => {
     await controller.runCode(initial.codeDraft);
 
     const snapshot = controller.getSnapshot();
-    if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot");
+    if (snapshot.mode !== "battle") throw new Error("expected battle checkpoint snapshot");
     expect(snapshot.feedback.layer).toBe("task");
-    expect(snapshot.feedback.kind).toBe("success");
     expect(runner.requests[0]).toMatchObject({ entrypoint: { callable: "choose_world_action" } });
   });
 
   it("runs an exploration command, saves the accepted state and publishes task feedback", async () => {
-    const runner = new FakeRunner([completed({ expectedRevision: 0, type: "talk", targetId: "toma" })]);
+    const runner = new FakeRunner([
+      completed({ expectedRevision: 0, type: "talk", targetId: "toma" }),
+      completed({ expectedRevision: 1, type: "inspect", targetId: "weather_station" }),
+    ]);
     const saveStore = new MemoryWorldSaveStore();
     const controller = createWorldController(runner, saveStore);
     await controller.start();
@@ -342,8 +437,7 @@ describe("WorldCampaignController", () => {
     expect(snapshot.mode).toBe("exploration");
     if (snapshot.mode !== "exploration") throw new Error("expected exploration snapshot");
     expect(snapshot.gameState.revision).toBe(1);
-    expect(snapshot.feedback.layer).toBe("task");
-    expect(snapshot.worldView).toEqual(snapshot.worldView);
+    expect(snapshot.feedback.kind).toBe("error");
     expect(runner.requests[0]).toMatchObject({ entrypoint: { callable: "choose_world_action" } });
     expect(saveStore.saved.at(-1)?.gameState.revision).toBe(1);
   });
