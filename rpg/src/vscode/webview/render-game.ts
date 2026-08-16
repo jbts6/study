@@ -22,6 +22,20 @@ export function calculateCellSize(
   return Math.max(1, Math.min(Math.floor(widthFit), Math.floor(heightFit)));
 }
 
+type BattleRenderState = {
+  battleId: string;
+  unitTokens: Map<string, HTMLSpanElement>;
+  appliedEvents: number;
+};
+let battleRender: BattleRenderState | undefined;
+
+function battleRenderFor(state: BattleState): BattleRenderState {
+  if (battleRender?.battleId !== state.battleId) {
+    battleRender = { battleId: state.battleId, unitTokens: new Map(), appliedEvents: 0 };
+  }
+  return battleRender;
+}
+
 export function renderGame(root: HTMLElement, snapshot: BattleViewSnapshot, viewState: ManualViewState = DEFAULT_VIEW_STATE): void {
   root.className = "game-view";
   root.dataset.theme = snapshot.theme;
@@ -116,6 +130,10 @@ function renderBattle(snapshot: BattleViewSnapshot, viewState: ManualViewState):
   for (let y = 0; y < state.board.height; y += 1) {
     for (let x = 0; x < state.board.width; x += 1) grid.append(renderCell(state, x, y));
   }
+  const unitsLayer = element("div", "units-layer");
+  grid.append(unitsLayer);
+  renderUnits(state, unitsLayer);
+  applyBattleEvents(snapshot, unitsLayer);
   frame.append(grid, renderLegend());
   stage.append(frame);
   if (snapshot.programReference !== undefined) stage.append(renderHiddenViewPanel("manual-panel", "manual", "manual-tab"));
@@ -136,14 +154,74 @@ function renderCell(state: BattleState, x: number, y: number): HTMLElement {
     cell.append(token);
     labels.push(`目标 ${objective.id}，耐久 ${objective.durability}`);
   }
-  for (const unit of state.units.filter((item) => item.visibility === "revealed" && item.cell.x === x && item.cell.y === y)) {
-    const token = textElement("span", `token token-${unit.team}`, unit.id);
-    if (unit.disabled) token.classList.add("token-disabled");
-    cell.append(token, textElement("span", "token-health", `${unit.hp} / ${unit.maxHp}`));
-    labels.push(`${unit.team === "allies" ? "友方" : "敌方"} ${unit.id}，生命 ${unit.hp}/${unit.maxHp}`);
-  }
   cell.setAttribute("aria-label", labels.join("；"));
   return cell;
+}
+
+function renderUnits(state: BattleState, layer: HTMLElement): void {
+  const render = battleRenderFor(state);
+  for (const unit of state.units.filter((item) => item.visibility === "revealed")) {
+    let token = render.unitTokens.get(unit.id);
+    if (token === undefined) {
+      token = element("span", "battle-unit-token");
+      token.dataset.unitId = unit.id;
+      token.append(
+        textElement("span", `token token-${unit.team}`, unit.id),
+        textElement("span", "token-health", `${unit.hp} / ${unit.maxHp}`),
+      );
+      render.unitTokens.set(unit.id, token);
+    }
+    layer.append(token);
+    token.classList.toggle("token-disabled", unit.disabled);
+    token.style.left = `calc((var(--cell-size) + 5px) * ${unit.cell.x})`;
+    token.style.top = `calc((var(--cell-size) + 5px) * ${unit.cell.y})`;
+    token.setAttribute("aria-label", `${unit.team === "allies" ? "友方" : "敌方"} ${unit.id}，生命 ${unit.hp}/${unit.maxHp}${unit.disabled ? "，已阵亡" : ""}`);
+    token.querySelector(".token-health")!.textContent = `${unit.hp} / ${unit.maxHp}`;
+    token.querySelector(".token")!.classList.toggle("token-disabled", unit.disabled);
+  }
+}
+
+function applyBattleEvents(snapshot: BattleViewSnapshot, layer: HTMLElement): void {
+  const render = battleRenderFor(snapshot.battleState);
+  const log = snapshot.battleLog;
+  const fresh = log.length >= render.appliedEvents ? log.slice(render.appliedEvents) : log;
+  render.appliedEvents = log.length;
+  for (const token of render.unitTokens.values()) {
+    token.classList.remove("anim-hit", "anim-lunge", "anim-heal", "anim-defeat");
+  }
+  const cellAt = (x: number, y: number) => layer.parentElement?.querySelector<HTMLElement>(`.battle-cell[data-x='${x}'][data-y='${y}']`);
+  const unitCell = (id: string) => snapshot.battleState.units.find((unit) => unit.id === id)?.cell;
+  for (const event of fresh) {
+    const payload = event.payload;
+    if (event.type === "damaged" || event.type === "healed") {
+      const target = render.unitTokens.get(String(payload.targetId));
+      if (target !== undefined) {
+        target.classList.add(event.type === "damaged" ? "anim-hit" : "anim-heal");
+        const float = textElement("span", `damage-float ${event.type === "healed" ? "float-heal" : ""}`, `${event.type === "damaged" ? "-" : "+"}${payload.amount}`);
+        float.style.left = target.style.left;
+        float.style.top = target.style.top;
+        layer.append(float);
+      }
+      if (event.type === "damaged" && payload.sourceId !== "hazard") {
+        const actor = render.unitTokens.get(String(payload.sourceId));
+        const from = unitCell(String(payload.sourceId));
+        const to = unitCell(String(payload.targetId));
+        if (actor !== undefined && from !== undefined && to !== undefined) {
+          const span = Math.abs(to.x - from.x) + Math.abs(to.y - from.y) || 1;
+          actor.style.setProperty("--lx", String((to.x - from.x) / span));
+          actor.style.setProperty("--ly", String((to.y - from.y) / span));
+          actor.classList.add("anim-lunge");
+        }
+      }
+    } else if (event.type === "unit_disabled") {
+      render.unitTokens.get(String(payload.unitId))?.classList.add("anim-defeat");
+    } else if (event.type === "objective_progressed" || event.type === "interacted") {
+      const cell = unitCell(String(payload.targetId)) ?? (event.type === "interacted" ? unitCell(String(payload.targetId)) : undefined);
+      const objective = snapshot.battleState.objectives.find((item) => item.id === payload.targetId);
+      const target = objective !== undefined ? cellAt(objective.cell.x, objective.cell.y) : cell !== undefined ? cellAt(cell.x, cell.y) : undefined;
+      target?.classList.add("anim-objective");
+    }
+  }
 }
 
 function renderLegend(): HTMLElement {

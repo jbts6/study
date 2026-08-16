@@ -82,6 +82,40 @@ describe("game Webview renderer", () => {
     expect(lines).toContain("golem 被消灭");
   });
 
+  it("keeps unit token identity across snapshots and animates fresh events", () => {
+    const root = document.createElement("div");
+    const initial = snapshot("python-marsh-01");
+    renderGame(root, initial);
+    const scoutToken = root.querySelector<HTMLElement>(".battle-unit-token[data-unit-id='scout']");
+    const golemToken = root.querySelector<HTMLElement>(".battle-unit-token[data-unit-id='golem']");
+    expect(scoutToken).not.toBeNull();
+    expect(golemToken).not.toBeNull();
+    expect(root.querySelector(".units-layer .token-allies")?.textContent).toContain("scout");
+
+    renderGame(root, {
+      ...initial,
+      battleState: {
+        ...initial.battleState,
+        units: initial.battleState.units.map((unit) => unit.id === "scout"
+          ? { ...unit, cell: { x: 1, y: 1 } }
+          : unit.id === "golem" ? { ...unit, hp: 3 } : unit),
+      },
+      battleLog: [
+        { protocolVersion: 1, seq: 1, stateRevision: 1, type: "moved", payload: { actorId: "scout", from: { x: 0, y: 0 }, to: { x: 1, y: 1 } } },
+        { protocolVersion: 1, seq: 2, stateRevision: 1, type: "damaged", payload: { sourceId: "scout", targetId: "golem", amount: 3, hpAfter: 3, coverBonus: 0 } },
+      ],
+    });
+
+    expect(root.querySelector(".battle-unit-token[data-unit-id='scout']")).toBe(scoutToken);
+    expect(root.querySelector(".battle-unit-token[data-unit-id='golem']")).toBe(golemToken);
+    expect(scoutToken!.style.left).toContain("* 1");
+    expect(golemToken!.classList.contains("anim-hit")).toBe(true);
+    expect(scoutToken!.classList.contains("anim-lunge")).toBe(true);
+    const float = root.querySelector(".damage-float");
+    expect(float?.textContent).toBe("-3");
+    expect(golemToken!.querySelector(".token-health")?.textContent).toContain("3 / 6");
+  });
+
   it("does not show a manual navigation button for Python combat feedback", () => {
     const root = document.createElement("div");
     renderGame(root, {

@@ -605,3 +605,102 @@ summary:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+.battle-grid {
+  position: relative;
+}
+
+.units-layer {
+  position: absolute;
+  inset: 6px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.battle-unit-token {
+  position: absolute;
+  width: var(--cell-size);
+  height: var(--cell-size);
+  transition: left .3s ease, top .3s ease;
+}
+
+.battle-unit-token .token-health {
+  position: absolute;
+  left: 2px;
+  bottom: 1px;
+  font-size: clamp(10px, calc(var(--cell-size) * .16), 15px);
+}
+
+@keyframes battle-lunge {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(calc(var(--lx, 0) * 40%), calc(var(--ly, 0) * 40%)); }
+  100% { transform: translate(0, 0); }
+}
+
+.anim-lunge { animation: battle-lunge .18s ease-out; }
+
+@keyframes battle-hit {
+  0%, 100% { filter: none; }
+  50% { filter: brightness(1.7) sepia(1) hue-rotate(-50deg); }
+}
+
+.anim-hit { animation: battle-hit .45s ease-out; }
+
+@keyframes battle-heal {
+  0%, 100% { filter: none; }
+  50% { filter: brightness(1.3) sepia(1) hue-rotate(90deg); }
+}
+
+.anim-heal { animation: battle-heal .45s ease-out; }
+
+@keyframes battle-float-up {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-26px); }
+}
+
+.damage-float {
+  position: absolute;
+  font-weight: 700;
+  color: var(--game-danger);
+  animation: battle-float-up .65s ease-out forwards;
+}
+
+.float-heal { color: var(--game-allies); }
+
+@keyframes battle-defeat {
+  to { opacity: .35; filter: grayscale(1); }
+}
+
+.anim-defeat { animation: battle-defeat .35s ease-out forwards; }
+
+@keyframes battle-objective-pulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--game-allies) 70%, transparent); }
+}
+
+.anim-objective { animation: battle-objective-pulse .6s ease-out; }
+
+.battle-log {
+  border-top: 1px solid var(--game-border-strong);
+  padding: 6px 12px;
+  max-height: 130px;
+  overflow-y: auto;
+}
+
+.battle-log h2 {
+  font-size: 12px;
+  margin: 2px 0 4px;
+  opacity: .8;
+}
+
+.battle-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.battle-log-empty {
+  opacity: .7;
+}
