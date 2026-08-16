@@ -164,7 +164,10 @@ const marsh06Solution: ReferenceSolution = (world) => {
 };
 
 const REFERENCE_SOLUTIONS: Readonly<Record<LevelId, ReferenceSolution>> = {
-  "python-marsh-01": (world) => castOrAttack(world, "golem", ["spark"]),
+  "python-marsh-01": (world) => {
+    if (!findUnit(world, "golem").disabled) return castOrAttack(world, "golem", ["spark"]);
+    return castOrAttack(world, "lurker", ["spark"]);
+  },
   "python-marsh-02": marsh02Solution,
   "python-marsh-03": marsh03Solution,
   "python-marsh-04": marsh04Solution,

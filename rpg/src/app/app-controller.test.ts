@@ -205,7 +205,7 @@ describe("AppController", () => {
     expect(runner.lastRequest?.files["main.py"]).toBe(unsaved);
     const snapshot = controller.getSnapshot();
     expect(snapshot.mode).toBe("game");
-    expect(snapshot.mode === "game" && snapshot.battleState.revision).toBe(2);
+    expect(snapshot.mode === "game" && snapshot.battleState.revision).toBe(3);
   });
 
   it("creates a compiled Go request from the active campaign program", async () => {
@@ -281,7 +281,9 @@ describe("AppController", () => {
     const first = getLevel("python-marsh-01");
     const victoryBattle = {
       ...first.initialBattle,
-      units: first.initialBattle.units.map((unit) => unit.id === "golem" ? { ...unit, cell: { x: 1, y: 0 }, hp: 1 } : unit),
+      units: first.initialBattle.units.map((unit) => unit.id === "golem" ? { ...unit, cell: { x: 1, y: 0 }, hp: 1 }
+        : unit.id === "lurker" ? { ...unit, disabled: true, visibility: "hidden" as const }
+        : unit),
     };
     const runner = new FakeRunner(completed({ actorId: "scout", expectedRevision: 0, action: { type: "attack", targetId: "golem" } }));
     const saves = new MemorySaveStore({ ok: true, save: { version: 2, currentLevelId: "python-marsh-01", battleState: victoryBattle, codeDraft: "my code" } });

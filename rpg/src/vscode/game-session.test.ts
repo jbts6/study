@@ -118,12 +118,12 @@ describe("GameSession", () => {
     expect(runner.lastRequest?.files["main.py"]).toBe(unsavedCode);
     expect(messages.at(-1)?.type).toBe("snapshot");
     const afterRun = messages.at(-1);
-    expect(afterRun?.type === "snapshot" && afterRun.snapshot.mode === "battle" && afterRun.snapshot.battleState.revision).toBe(2);
+    expect(afterRun?.type === "snapshot" && afterRun.snapshot.mode === "battle" && afterRun.snapshot.battleState.revision).toBe(3);
 
     messages.length = 0;
     await session.handle({ type: "ready" });
     expect(messages).toHaveLength(1);
-    expect(messages[0]?.type === "snapshot" && messages[0].snapshot.mode === "battle" && messages[0].snapshot.battleState.revision).toBe(2);
+    expect(messages[0]?.type === "snapshot" && messages[0].snapshot.mode === "battle" && messages[0].snapshot.battleState.revision).toBe(3);
 
     await session.handle({ type: "setTheme", theme: "dark" });
     expect(theme).toBe("dark");

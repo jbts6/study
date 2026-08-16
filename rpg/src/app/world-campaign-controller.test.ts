@@ -64,11 +64,12 @@ class ChapterFlowRunner implements RunnerClient {
     const revision = requestRevision(request);
     if (request.entrypoint.callable === "choose_turn") {
       const battleTurn = this.requests.filter((item) => item.language === "python" && item.entrypoint.callable === "choose_turn").length;
+      const targetId = battleTurn <= 2 ? "golem" : "lurker";
       return completed({
         actorId: "scout",
         expectedRevision: revision,
-        movePath: battleTurn === 1 ? [{ x: 1, y: 0 }, { x: 2, y: 0 }] : [{ x: 1, y: 0 }],
-        action: { type: "attack", targetId: "golem" },
+        ...(battleTurn === 1 ? { movePath: [{ x: 1, y: 0 }, { x: 1, y: 1 }] } : {}),
+        action: { type: "attack", targetId },
       });
     }
 
@@ -258,9 +259,10 @@ describe("WorldCampaignController", () => {
     const controller = createWorldController(runner, saveStore);
     await controller.start();
 
-    for (let step = 0; step < 10; step += 1) {
+    for (let step = 0; step < 12; step += 1) {
       const current = controller.getSnapshot();
       if (current.mode !== "exploration" && current.mode !== "battle") throw new Error("expected active chapter snapshot");
+      if (current.mode === "exploration" && current.gameState.quests[0]?.status === "completed") break;
       await controller.runCode(current.codeDraft);
     }
 
@@ -282,6 +284,8 @@ describe("WorldCampaignController", () => {
         "choose_world_action",
         "choose_world_action",
         "choose_world_action",
+        "choose_turn",
+        "choose_turn",
         "choose_turn",
         "choose_turn",
         "choose_world_action",

@@ -1,8 +1,19 @@
 import type { LevelDefinition } from "../shared/types";
 import { createMarshSlice } from "../shared/marsh-slice";
+import type { BattleState } from "../../combat/types";
 
 export const CURRENT_LEVEL_ID = "python-marsh-01" as const;
 const MARSH_SLICE = createMarshSlice(CURRENT_LEVEL_ID, "python-slice-1");
+
+// 激活潜伏者：静态攻击序列在 golem 死后必然报错，
+// 迫使玩家读取 world["units"] 并用条件选择存活目标。
+const GUARDIAN_BATTLE: BattleState = {
+  ...MARSH_SLICE.initialBattle,
+  turnOrder: ["scout", "golem", "lurker"],
+  units: MARSH_SLICE.initialBattle.units.map((unit) => unit.id === "lurker"
+    ? { ...unit, cell: { x: 2, y: 0 }, disabled: false, visibility: "revealed" as const }
+    : unit),
+};
 
 export const STARTER_CODE = `def choose_world_action(world):
     # 探索阶段读取 location、npcs、objects 和 inventory。
@@ -100,7 +111,7 @@ export const PYTHON_MARSH_01: LevelDefinition = {
       "战斗 action.type 可用 attack、cast、interact、guard、wait；本关不能交互关键目标 relay。",
     ],
   },
-  initialBattle: MARSH_SLICE.initialBattle,
-  enemyBehaviors: MARSH_SLICE.enemyBehaviors,
+  initialBattle: GUARDIAN_BATTLE,
+  enemyBehaviors: { ...MARSH_SLICE.enemyBehaviors, lurker: { type: "hunt-player" } },
   reward: { type: "ability", abilityId: "ward" },
 };
