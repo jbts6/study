@@ -16,6 +16,7 @@ function snapshot(levelId: LevelId, theme: BattleViewSnapshot["theme"] = "dark")
     playerFileName: `${levelId}.py`,
     level,
     battleState: structuredClone(level.initialBattle),
+    battleLog: [],
     runnerState: "ready",
     feedback: { layer: "task", kind: "idle", title: "", messages: [], stdout: "", stderr: "" },
   };
@@ -49,6 +50,7 @@ describe("game Webview renderer", () => {
       "game-header",
       "mission-strip",
       "battle-stage",
+      "battle-log",
       "feedback-panel feedback-idle",
       "action-bar",
     ]);
@@ -58,6 +60,26 @@ describe("game Webview renderer", () => {
     expect(root.querySelector("details.guidance-drawer")?.hasAttribute("open")).toBe(false);
     expect(root.querySelector("[data-command='runTurn']")?.textContent).toContain("运行回合");
     expect(root.querySelector("[data-view-tabs]")).toBeNull();
+  });
+
+  it("renders battle log entries from accumulated events", () => {
+    const root = document.createElement("div");
+    const withLog = snapshot("python-marsh-01");
+    renderGame(root, {
+      ...withLog,
+      battleLog: [
+        { protocolVersion: 1, seq: 1, stateRevision: 1, type: "moved", payload: { actorId: "scout", from: { x: 0, y: 0 }, to: { x: 1, y: 1 } } },
+        { protocolVersion: 1, seq: 2, stateRevision: 1, type: "damaged", payload: { sourceId: "scout", targetId: "golem", amount: 3, hpAfter: 3, coverBonus: 0 } },
+        { protocolVersion: 1, seq: 3, stateRevision: 2, type: "unit_disabled", payload: { unitId: "golem" } },
+      ],
+    });
+
+    const panel = root.querySelector(".battle-log ul");
+    expect(panel).not.toBeNull();
+    const lines = [...panel!.querySelectorAll("li")].map((item) => item.textContent);
+    expect(lines).toContain("scout 移动到 (1, 1)");
+    expect(lines).toContain("scout 对 golem 造成 3 点伤害（剩余 3）");
+    expect(lines).toContain("golem 被消灭");
   });
 
   it("does not show a manual navigation button for Python combat feedback", () => {
@@ -175,7 +197,7 @@ describe("game Webview renderer", () => {
 
     renderGame(root, goSnapshot, { view: "manual", sectionId: "focus" });
 
-    expect(root.children).toHaveLength(5);
+    expect(root.children).toHaveLength(6);
     expect(root.querySelector("[role='tablist'][data-view-tabs]")).not.toBeNull();
     expect(root.querySelector("[role='tabpanel'][data-view='manual']")).not.toBeNull();
     expect(root.querySelector("[role='tab'][aria-selected='true']")?.textContent).toContain("本关重点");

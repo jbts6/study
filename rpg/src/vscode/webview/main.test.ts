@@ -19,6 +19,7 @@ function goSnapshot(relatedReferenceIds?: readonly string[]): BattleViewSnapshot
     playerFileName: "go-marsh-01.go",
     level,
     battleState: structuredClone(level.initialBattle),
+    battleLog: [],
     runnerState: "ready",
     feedback: {
       layer: "task",

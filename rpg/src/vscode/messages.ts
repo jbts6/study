@@ -1,6 +1,6 @@
 import type { AppFeedback } from "../app/app-controller";
 import type { RunnerDisplayState } from "../app/runner-client";
-import type { BattleState } from "../game/combat/types";
+import type { BattleEvent, BattleState } from "../game/combat/types";
 import type { LevelDefinition } from "../game/content/types";
 import type { CampaignWorldView } from "../game/world/campaign-types";
 import type { ProgramReference } from "../programs/types";
@@ -42,6 +42,7 @@ export type BattleViewSnapshot = Readonly<{
   playerFileName: string;
   level: LevelDefinition;
   battleState: BattleState;
+  battleLog: readonly BattleEvent[];
   runnerState: RunnerDisplayState;
   feedback: AppFeedback;
   programReference?: ProgramReference;

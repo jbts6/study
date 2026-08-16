@@ -4,6 +4,7 @@ import type { BattleViewSnapshot } from "../messages";
 import type { ManualViewState } from "./manual-state";
 import { renderHiddenViewPanel, renderManual, renderViewTabs } from "./render-manual";
 import { element, textElement } from "./render-elements";
+import { formatBattleEvents } from "./battle-log";
 
 const CELL_GAP = 5;
 const DEFAULT_VIEW_STATE: ManualViewState = { view: "battle", sectionId: "focus" };
@@ -28,9 +29,26 @@ export function renderGame(root: HTMLElement, snapshot: BattleViewSnapshot, view
     renderHeader(snapshot),
     renderMission(snapshot),
     renderMain(snapshot, viewState),
+    renderBattleLog(snapshot),
     renderFeedback(snapshot),
     renderActions(snapshot),
   );
+}
+
+function renderBattleLog(snapshot: BattleViewSnapshot): HTMLElement {
+  const panel = element("section", "battle-log");
+  panel.setAttribute("aria-label", "战斗日志");
+  panel.append(textElement("h2", "", "战斗日志"));
+  const list = element("ul", "battle-log-list");
+  const lines = formatBattleEvents(snapshot.battleLog);
+  if (lines.length === 0) {
+    list.append(textElement("li", "battle-log-empty", "尚未开始自动战斗。点“运行回合”后，这里会逐条显示每个回合发生的事件。"));
+  } else {
+    for (const line of lines) list.append(textElement("li", "", line));
+  }
+  panel.append(list);
+  panel.scrollTop = panel.scrollHeight;
+  return panel;
 }
 
 function renderMain(snapshot: BattleViewSnapshot, viewState: ManualViewState): HTMLElement {
