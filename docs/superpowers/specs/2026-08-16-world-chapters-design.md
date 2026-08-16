@@ -55,10 +55,13 @@ type ChapterDefinition = {
 
 type QuestStep = {
   stepId: string;
-  accept: { type: "talk" | "inspect" | "collect" | "use" | "travel";
-            targetId?: string; itemId?: string };
+  accept: { type: "talk" | "inspect" | "collect" | "use" | "travel" | "prepareBattle";
+            targetId?: string; itemId?: string; encounterId?: string;
+            // 数据步：正确目标由世界状态计算（如按库存数量二选一）
+            targetFromState?: (state: Readonly<GameState>) => string };
   effects: { flags?: Record<string, WorldFlagValue>; addClue?: string;
              addItem?: { itemId: string; amount: number };
+             consumeItem?: { itemId: string; amount: number };
              advanceTo: string; enterBattle?: string;
              switchChapter?: string };
 };
