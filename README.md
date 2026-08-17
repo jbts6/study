@@ -1,6 +1,27 @@
-# 奥术工业幻想 Python RPG
+# 本地编程学习工坊
 
-这是一个单人、本机运行的回合制战术 RPG 学习项目。玩家编写 Python 代码来施法、读取战场状态并返回回合指令；当前主项目位于 [`rpg/`](rpg/)。
+这是一个面向个人、本机运行的编程学习仓库。当前学习主线按 Python、Go、Rust 依次推进；奥术工业幻想 Python RPG 保留为可选的项目化练习，不再限定全部课程形态。
+
+## 多语言学习工坊
+
+- [`learning/`](learning/)：三门语言的学习顺序、阶段、来源和启动入口。
+- [`python/interactive-course/`](python/interactive-course/)：当前可运行的 Python 基础与自动化课程。
+- [`go/interactive-course/`](go/interactive-course/)：现有 Go 工程与并发课程。
+- [`rust/interactive-course/`](rust/interactive-course/)：现有 Rust 系统建模课程。
+- [`rpg/`](rpg/)：使用 Python 完成六关战术任务的可选综合练习。
+
+启动当前 Python 课程：
+
+```bash
+cd python/interactive-course
+npm start
+```
+
+然后打开 <http://127.0.0.1:8010>。课程要求 Node.js `24.15.0` 和 CPython `3.12+`；详细说明见 [`python/README.md`](python/README.md)。
+
+## 奥术工业幻想 Python RPG
+
+这是一个单人、本机运行的回合制战术 RPG 学习项目。玩家编写 Python 代码来施法、读取战场状态并返回回合指令；项目位于 [`rpg/`](rpg/)。
 
 ## 核心前提
 
@@ -86,6 +107,10 @@ npm run build
 
 ## 目录
 
+- `learning/`：Python、Go、Rust 的公共学习目录。
+- `python/interactive-course/`：独立的本地 Python 交互课程。
+- `go/interactive-course/`：现有 Go 交互课程。
+- `rust/interactive-course/`：现有 Rust 交互课程。
 - `rpg/src/game/`：战斗规则、状态和测试夹具。
 - `rpg/src/runners/local/`：本地 WebSocket 服务、Python 检测、运行适配器和单次进程管理。
 - `rpg/src/runners/python/runtime/`：玩家文件加载、模块白名单、执行、追踪和结果序列化。

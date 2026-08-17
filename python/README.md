@@ -1,83 +1,43 @@
-# Python 本地课程
+# Python 基础与自动化
 
-这是一个面向个人学习的本地 Python 课程入口。主线课程来自
-[Asabeneh/30-Days-Of-Python](https://github.com/Asabeneh/30-Days-Of-Python)，优先使用仓库中的中文目录，并保留英文内容作为缺失章节的回退。
+这是多语言学习工坊的第一阶段。学习顺序、课程来源和各语言入口统一记录在 [`learning/`](../learning/)；当前可运行内容是一个独立于 RPG 的本地 Python 交互课程。
 
-课程页面支持：
+主线默认参考 [Helsinki Python Programming MOOC](https://programming-26.mooc.fi/)，适合按练习逐步建立基础。偏好视频讲解时，可用 [CS50P](https://cs50.harvard.edu/python/) 作为替代。仓库只保存能力映射、原创课节和来源链接，不复制外部课程全文。
 
-- 30 天章节导航和完成进度保存；
-- Markdown 阅读、Python 代码编辑和浏览器内运行；
-- `trekhleb/learn-python` 与 `gregmalcolm/python_koans` 补充练习。
+## 当前范围
 
-## 首次同步
+首版只有“用函数汇总日志”一个代表课节，用于验证课程契约、本机 CPython 执行、错误反馈和学习进度。它不是完整 Python 课程，也不复用 RPG 的战斗执行器。
 
-上游源码和生成文件只供本地学习使用，不会进入父仓库：
+页面支持：
 
-- `python/upstream/`：本地上游仓库，已被 `.gitignore` 忽略；
-- `python/basics-course/generated/`：页面使用的生成课程数据，已被忽略；
-- `python/basics-course/legacy/index.html`：原有课程页面的本地备份。
+- 阅读目标、讲解和参考示例；
+- 编辑并运行本地 Python 代码；
+- 查看测试失败、语法错误和运行时错误；
+- 分别记录“练习通过”和“独立重建完成”；
+- 在浏览器刷新后恢复当前草稿和进度。
 
-在仓库根目录执行：
+## 环境要求
 
-```bash
-cd python
-node basics-course/sync-course.mjs
-```
+- Node.js `24.15.0`
+- CPython `3.12+`
 
-同步脚本会在 `python/upstream/30-Days-Of-Python` 不存在时克隆上游，之后更新上游并生成 `basics-course/generated/lessons.js`。上游目录名、中文目录结构或网络访问发生变化时，脚本会保留已有生成文件并报告错误。
+代码只在本机运行，服务只监听 `127.0.0.1`。
 
 ## 启动课程
 
-课程页面需要通过静态服务器打开，不能直接双击 HTML 文件：
-
 ```bash
-cd python
-python -m http.server 8000 --bind 127.0.0.1
+cd python/interactive-course
+npm start
 ```
 
-然后打开：
+打开 <http://127.0.0.1:8010>。
 
-<http://127.0.0.1:8000/basics-course/>
-
-页面首次运行代码时会从 CDN 加载 Pyodide 0.26.2，因此需要网络访问。课程阅读和进度保存不依赖运行器；如果 CDN 不可用，页面仍会显示课程内容和错误状态。浏览器运行器不访问本机文件，也不会回退到本机 Python。
-
-若页面提示缺少课程数据，先停止静态服务器，在 `python/` 目录重新执行：
+## 核心验证
 
 ```bash
-node basics-course/sync-course.mjs
+cd python/interactive-course
+npm test
 ```
 
-再刷新页面。
-
-## 确定性检查
-
-在仓库根目录执行：
-
-```bash
-node --check python/basics-course/sync-course.mjs
-node --check python/basics-course/app.js
-node --check python/basics-course/runner.js
-node --check python/basics-course/store.js
-node --test python/basics-course/*.test.mjs
-```
-
-## 浏览器验收清单
-
-桌面 1440x900：
-
-- 第 1 天可以加载，切换第 15 天和第 30 天；
-- Python 代码可以运行并显示输出；
-- 标记完成后刷新页面，当前章节和完成进度仍在；
-- 编辑代码、切换章节再返回，草稿仍然恢复。
-
-移动 390x844：
-
-- 可以打开和关闭课程目录；
-- 可以切换章节，代码区在视口内滚动，不撑破页面；
-- 运行按钮保持可点击，输出区不会遮挡正文。
-
-错误状态：
-
-- 临时移走 `basics-course/generated/lessons.js` 后刷新，应显示同步命令；
-- 禁止 CDN 请求后刷新，应显示 Python 运行时错误，但课程正文仍可阅读。
+平台回归测试固定为 2 个文件、5 个用例。课程目录另有 1 个 `unittest` 验收脚本和 1 个用例，因此本阶段测试代码总预算固定为 3 个文件、6 个用例。
 
