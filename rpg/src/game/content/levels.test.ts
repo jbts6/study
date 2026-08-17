@@ -171,6 +171,7 @@ describe("campaign levels", () => {
     expect(fourth.starterCode).toContain("not ");
     expect(fourth.starterCode).toContain("gate-a");
     expect(fourth.starterCode).toContain("gate-b");
+    expect(fourth.starterCode).not.toContain("worldFlags");
     expect(fourth.starterCode).not.toContain("pass");
     expect(fifth.starterCode).toContain("辅助函数");
     expect(fifth.starterCode).not.toContain("def choose_turn");

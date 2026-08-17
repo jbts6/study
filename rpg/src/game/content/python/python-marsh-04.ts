@@ -4,17 +4,14 @@ import type { LevelDefinition } from "../shared/types";
 export const STARTER_CODE_04 = `def choose_world_action(world):
     step = world["quests"][0]["stepId"]
     base = {"expectedRevision": world["revision"]}
-    flags = world.get("worldFlags", {})
+    # 进入第四章已代表 venom_fork_cleared。
     has_wire = any(
         item["id"] == "copper_wire"
         and item["amount"] >= 1
         for item in world["inventory"]
     )
-    venom_ready = flags.get("venom_fork_cleared") is True
     if step == "pick_lock_gate":
-        gate = "gate-b"
-        if has_wire and venom_ready:
-            gate = "gate-a"
+        gate = "gate-a" if has_wire else "gate-b"
         return {**base, "type": "inspect", "targetId": gate}
     if step == "prepare_lockdown_battle":
         return {**base, "type": "prepareBattle",

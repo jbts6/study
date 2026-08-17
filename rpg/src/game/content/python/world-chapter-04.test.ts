@@ -48,16 +48,31 @@ function runBattle(strategy: (state: BattleState) => TurnCommand): BattleState {
     const activeId = state.turnOrder[state.turnIndex];
     const command = activeId === "scout" ? strategy(state) : enemyCommand(level, state);
     const validation = validateLevelCommand(level, state, command);
-    if (!validation.accepted) return { ...state, phase: "lost" };
+    if (!validation.accepted) throw new Error(validation.errors[0]?.message ?? "命令验证失败");
     const resolution = resolveTurn(state, validation.command);
-    if (!resolution.accepted) return { ...state, phase: "lost" };
+    if (!resolution.accepted) throw new Error(resolution.errors[0]?.message ?? "回合结算失败");
     state = resolution.state;
   }
   return state;
 }
 
 function chaseGuardOnly(state: BattleState): TurnCommand {
-  return battleCommand(state, { type: "attack", targetId: "guard" });
+  const scout = state.units.find((unit) => unit.id === "scout")!;
+  const guard = state.units.find((unit) => unit.id === "guard")!;
+  const distance = (cell: { x: number; y: number }) => Math.abs(cell.x - guard.cell.x) + Math.abs(cell.y - guard.cell.y);
+  if (distance(scout.cell) === 1) return battleCommand(state, { type: "attack", targetId: "guard" });
+
+  const occupied = (cell: { x: number; y: number }) => state.units.some((unit) => (
+    unit.id !== "scout" && !unit.disabled && unit.cell.x === cell.x && unit.cell.y === cell.y
+  ));
+  const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+  const movePath = steps
+    .map(([dx, dy]) => ({ x: scout.cell.x + dx, y: scout.cell.y + dy }))
+    .filter((cell) => cell.x >= 0 && cell.y >= 0 && cell.x < state.board.width && cell.y < state.board.height && !occupied(cell))
+    .sort((left, right) => distance(left) - distance(right))[0];
+  return movePath === undefined
+    ? battleCommand(state, { type: "guard" })
+    : battleCommand(state, { type: "guard" }, [movePath]);
 }
 
 function combinedStrategy(state: BattleState): TurnCommand {
