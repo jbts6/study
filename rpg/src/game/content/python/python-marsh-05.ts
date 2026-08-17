@@ -1,15 +1,55 @@
 import type { BattleState } from "../../combat/types";
 import type { LevelDefinition } from "../shared/types";
 
-export const STARTER_CODE_05 = `# 可以把“选敌人”“选目标”“选行动”拆成辅助函数。
-# 本关不提供函数骨架，请从 world 视图开始组织代码。
-# API 速查：
-# world["activeUnitId"] 填入 "actorId"。
-# world["revision"] 填入 "expectedRevision"。
-# world["units"] 提供 hunter、guard 和技能状态。
-# world["objectives"] 提供 node-a、node-b。
-# 返回命令可包含 "movePath": [{"x": 1, "y": 0}]。
-# "action" 可写为 {"type": "guard"}。
+export const STARTER_CODE_05 = `def pick_entry(world):
+    for obj in world["objects"]:
+        if obj["status"] == "aligned":
+            return obj["id"]
+    return "entry-stone-c"
+
+
+def go_interact(world, target_id):
+    return {"expectedRevision": world["revision"],
+            "type": "inspect", "targetId": target_id}
+
+
+def attack_target(world, unit_id):
+    for unit in world["units"]:
+        if unit["id"] == unit_id and not unit["disabled"]:
+            return {"type": "attack", "targetId": unit_id}
+    return {"type": "wait"}
+
+
+def choose_world_action(world):
+    step = world["quests"][0]["stepId"]
+    if step == "pick_rift_entry":
+        return go_interact(world, pick_entry(world))
+    if step == "prepare_rift_battle":
+        return {"expectedRevision": world["revision"],
+                "type": "prepareBattle",
+                "encounterId": "rift_guardians"}
+    return {"expectedRevision": world["revision"],
+            "type": "talk", "targetId": "toma"}
+
+
+def choose_turn(world):
+    base = {
+        "actorId": world["activeUnitId"],
+        "expectedRevision": world["revision"],
+        "movePath": [],
+    }
+    for objective in world["objectives"]:
+        if objective["id"] in ("node-a", "node-b"):
+            if not objective["completed"]:
+                return {**base, "action": {
+                    "type": "interact",
+                    "targetId": objective["id"]}}
+    for unit in world["units"]:
+        if unit["id"] in ("hunter", "guard"):
+            if not unit["disabled"]:
+                action = attack_target(world, unit["id"])
+                return {**base, "action": action}
+    return {**base, "action": {"type": "wait"}}
 `;
 
 function createPythonMarsh05(): BattleState {

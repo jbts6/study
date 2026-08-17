@@ -4,6 +4,7 @@ import { PYTHON_MARSH_01 } from "./python-marsh-01";
 import { createVenomForkContent } from "./world-chapter-02";
 import { createSurveyRidgeContent } from "./world-chapter-03";
 import { createLockYardContent } from "./world-chapter-04";
+import { createRiftNodesContent } from "./world-chapter-05";
 
 const MARSH_GUARDIAN_BATTLE = {
   ...PYTHON_MARSH_01.initialBattle,
@@ -13,6 +14,7 @@ const MARSH_GUARDIAN_BATTLE = {
 const venomFork = createVenomForkContent();
 const surveyRidge = createSurveyRidgeContent();
 const lockYard = createLockYardContent();
+const riftNodes = createRiftNodesContent();
 
 export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
   chapters: {
@@ -41,13 +43,14 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
     ...venomFork.chapters,
     ...surveyRidge.chapters,
     ...lockYard.chapters,
+    ...riftNodes.chapters,
   },
   locations: {
     "rust-marsh-camp": {
       id: "rust-marsh-camp",
       name: "锈沼营地",
       weather: "acid_rain",
-      connectedLocationIds: ["old_foundry", "venom-fork", "survey-ridge", "lock-yard"],
+      connectedLocationIds: ["old_foundry", "venom-fork", "survey-ridge", "lock-yard", "rift-nodes"],
       npcIds: ["toma"],
       objectIds: ["scrap_pile", "weather_station"],
       itemSourceIds: ["copper_wire_source"],
@@ -56,6 +59,7 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
         "venom-fork": { chapter_02_unlocked: true },
         "survey-ridge": { venom_fork_cleared: true },
         "lock-yard": { survey_ridge_cleared: true },
+        "rift-nodes": { lock_yard_cleared: true },
       },
     },
     old_foundry: {
@@ -69,6 +73,7 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
     ...venomFork.locations,
     ...surveyRidge.locations,
     ...lockYard.locations,
+    ...riftNodes.locations,
   },
   npcs: {
     toma: {
@@ -98,6 +103,7 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
     ...venomFork.objects,
     ...surveyRidge.objects,
     ...lockYard.objects,
+    ...riftNodes.objects,
   },
   itemSources: {
     copper_wire_source: {
@@ -119,6 +125,7 @@ export const PYTHON_WORLD_CONTENT: WorldCampaignContent = {
     ...venomFork.encounters,
     ...surveyRidge.encounters,
     ...lockYard.encounters,
+    ...riftNodes.encounters,
   },
 };
 

@@ -173,8 +173,14 @@ describe("campaign levels", () => {
     expect(fourth.starterCode).toContain("gate-b");
     expect(fourth.starterCode).not.toContain("worldFlags");
     expect(fourth.starterCode).not.toContain("pass");
-    expect(fifth.starterCode).toContain("辅助函数");
-    expect(fifth.starterCode).not.toContain("def choose_turn");
+    expect(fifth.starterCode).toContain("def pick_entry");
+    expect(fifth.starterCode).toContain("def go_interact");
+    expect(fifth.starterCode).toContain("def attack_target");
+    expect(fifth.starterCode).toContain("def choose_world_action");
+    expect(fifth.starterCode).toContain("def choose_turn");
+    expect(fifth.starterCode).toContain("node-a");
+    expect(fifth.starterCode).toContain("node-b");
+    expect(fifth.starterCode).not.toContain("pass");
     expect(sixth.starterCode).toContain("world");
     expect(sixth.starterCode).not.toMatch(/条件分支|遍历筛选|辅助函数/);
     expect(sixth.starterCode).not.toContain("def choose_turn");
