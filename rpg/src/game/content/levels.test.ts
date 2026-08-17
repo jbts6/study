@@ -164,8 +164,14 @@ describe("campaign levels", () => {
     expect(third.starterCode).toContain('world["objects"]');
     expect(third.starterCode).toContain('world["units"]');
     expect(third.starterCode).toContain("scout-mark");
-    expect(fourth.starterCode).toMatch(/example\s*=\s*\w+\s+and\s+\(\w+\s+or\s+not\s+\w+\)/);
-    expect(fourth.starterCode).not.toContain("def choose_turn");
+    expect(fourth.starterCode).toContain("def choose_world_action");
+    expect(fourth.starterCode).toContain("def choose_turn");
+    expect(fourth.starterCode).toContain(" and ");
+    expect(fourth.starterCode).toContain(" or ");
+    expect(fourth.starterCode).toContain("not ");
+    expect(fourth.starterCode).toContain("gate-a");
+    expect(fourth.starterCode).toContain("gate-b");
+    expect(fourth.starterCode).not.toContain("pass");
     expect(fifth.starterCode).toContain("辅助函数");
     expect(fifth.starterCode).not.toContain("def choose_turn");
     expect(sixth.starterCode).toContain("world");

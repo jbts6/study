@@ -1,17 +1,52 @@
 import type { BattleState } from "../../combat/types";
 import type { LevelDefinition } from "../shared/types";
 
-export const STARTER_CODE_04 = `# 下面的表达式只示范组合条件语法，不对应本关答案。
-# world 会公开单位、目标、危险格和技能冷却。
-# API 速查：
-# world["activeUnitId"] 填入 "actorId"。
-# world["revision"] 填入 "expectedRevision"。
-# world["units"]、world["objectives"]、world["board"] 可组合判断。
-# 返回命令可包含 "movePath": [{"x": 1, "y": 0}]。
-# "action" 可写为 {"type": "guard"}。
-has_turn = world["activeUnitId"] is not None
-has_board = world["board"]["width"] > 0
-example = has_turn and (has_board or not has_turn)
+export const STARTER_CODE_04 = `def choose_world_action(world):
+    step = world["quests"][0]["stepId"]
+    base = {"expectedRevision": world["revision"]}
+    flags = world.get("worldFlags", {})
+    has_wire = any(
+        item["id"] == "copper_wire"
+        and item["amount"] >= 1
+        for item in world["inventory"]
+    )
+    venom_ready = flags.get("venom_fork_cleared") is True
+    if step == "pick_lock_gate":
+        gate = "gate-b"
+        if has_wire and venom_ready:
+            gate = "gate-a"
+        return {**base, "type": "inspect", "targetId": gate}
+    if step == "prepare_lockdown_battle":
+        return {**base, "type": "prepareBattle",
+                "encounterId": "lockdown_pair"}
+    return {**base, "type": "talk", "targetId": "toma"}
+
+
+def choose_turn(world):
+    scout = next(unit for unit in world["units"]
+                 if unit["id"] == "scout")
+    scout_low = scout["hp"] <= 3
+    seal_done = any(
+        obj["id"] == "seal" and obj["completed"]
+        for obj in world["objectives"]
+    )
+    guard_alive = any(
+        unit["id"] == "guard" and not unit["disabled"]
+        for unit in world["units"]
+    )
+    pierce_ready = any(
+        skill["id"] == "pierce"
+        and skill["remainingCooldown"] == 0
+        for skill in scout["skills"]
+    )
+    example = scout_low and (not seal_done or guard_alive)
+    example = example and pierce_ready
+    return {
+        "actorId": world["activeUnitId"],
+        "expectedRevision": world["revision"],
+        "movePath": [],
+        "action": {"type": "wait"},
+    }
 `;
 
 function createPythonMarsh04(): BattleState {
