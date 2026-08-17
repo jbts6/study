@@ -1,0 +1,12 @@
+{
+  "id": "python-foundation",
+  "title": "Python 基础与自动化",
+  "track": "python",
+  "stage": "foundation",
+  "lessons": [
+    {
+      "id": "python-functions-01",
+      "directory": "lessons/python-functions-01"
+    }
+  ]
+}

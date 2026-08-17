@@ -1,0 +1,20 @@
+{
+  "id": "python-functions-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "用函数汇总日志",
+  "objectives": [
+    "定义接收列表并返回字典的函数",
+    "使用循环和条件统计错误记录"
+  ],
+  "prerequisites": [],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["helsinki-python-parts-2-4"],
+  "estimatedMinutes": 90,
+  "explanation": "把输入、处理和返回值放进函数，避免把逻辑散落在顶层脚本。",
+  "exerciseGoal": "实现 summarize(lines)，返回 total 和 errors 两个计数。",
+  "hints": [
+    "先创建 total 和 errors 变量",
+    "用字符串是否包含 ERROR 判断错误记录"
+  ]
+}

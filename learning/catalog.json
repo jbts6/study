@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "currentTrack": "python",
+  "tracks": [
+    {
+      "id": "python",
+      "stage": "foundation",
+      "title": "Python 基础与自动化",
+      "entryCommand": "cd python/interactive-course && npm start",
+      "sourceRefs": [
+        "https://programming-26.mooc.fi/",
+        "https://cs50.harvard.edu/python/"
+      ],
+      "representativeUnit": "python-functions-01"
+    },
+    {
+      "id": "go",
+      "stage": "engineering",
+      "title": "Go 工程与并发",
+      "entryCommand": "cd go/interactive-course && go run ./cmd/server --addr 127.0.0.1:8080 --runner-mode local",
+      "sourceRefs": [
+        "https://go.dev/tour/",
+        "https://quii.gitbook.io/learn-go-with-tests"
+      ],
+      "representativeUnit": "go-start-01"
+    },
+    {
+      "id": "rust",
+      "stage": "systems",
+      "title": "Rust 系统建模",
+      "entryCommand": "cd rust/interactive-course && npm start",
+      "sourceRefs": [
+        "https://doc.rust-lang.org/book/",
+        "https://rustlings.rust-lang.org/"
+      ],
+      "representativeUnit": "rust-start-00"
+    }
+  ]
+}
