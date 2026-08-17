@@ -128,6 +128,30 @@ test('keeps execution and static failures inside HTTP contracts', async () => {
       assert.match(incorrectResult.stderr, /FAILED/);
     });
 
+    const syntaxResponse = await fetch(baseUrl + '/api/execute', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        lessonId: 'python-functions-01',
+        code: 'def summarize(:\n    return {}',
+      }),
+    });
+    const syntaxResult = await syntaxResponse.json();
+    checkExecutionResponse(
+      failures,
+      'syntax error',
+      syntaxResponse,
+      syntaxResult,
+      200,
+      'compile_error',
+    );
+    captureFailure(failures, 'syntax error diagnostics', () => {
+      assert.match(syntaxResult.stderr, /solution\.py/);
+      assert.match(syntaxResult.stderr, /SyntaxError/);
+      assert.doesNotMatch(syntaxResult.stderr, /File "(?:[A-Za-z]:[\\/]|\/)/);
+      assert.doesNotMatch(syntaxResult.stderr, /python-course-/);
+    });
+
     const invalidJsonResponse = await fetch(baseUrl + '/api/execute', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -197,6 +221,19 @@ test('keeps execution and static failures inside HTTP contracts', async () => {
   } catch (error) {
     failures.push('invalid static path rejected: ' + error.message);
   }
+
+  const unavailableResult = await createPythonRunner({
+    pythonCommand: 'python-course-command-does-not-exist',
+  }).run({
+    code: 'def summarize(lines):\n    return {}',
+    hiddenTest: 'import unittest',
+  });
+  captureFailure(failures, 'missing Python recovery guidance', () => {
+    assert.equal(unavailableResult.status, 'runner_unavailable');
+    assert.match(unavailableResult.stderr, /python-course-command-does-not-exist/);
+    assert.match(unavailableResult.stderr, /--version/);
+    assert.match(unavailableResult.stderr, /python\.org\/downloads/);
+  });
 
   assert.deepEqual(failures, []);
 });

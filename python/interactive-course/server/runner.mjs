@@ -45,7 +45,7 @@ export function createPythonRunner(options = {}) {
         return result(
           'runner_unavailable',
           '',
-          error instanceof Error ? error.message : String(error),
+          runnerUnavailableMessage(error, pythonCommand),
           performance.now() - startedAt,
         );
       } finally {
@@ -111,21 +111,48 @@ function execute({ pythonCommand, cwd, timeoutMs, maxOutputBytes }) {
 }
 
 function classify(value, durationMs) {
+  const stderr = sanitizePythonDiagnostics(value.stderr);
   if (value.timedOut) {
     return result('timeout', value.stdout, '执行超过 5 秒', durationMs);
   }
   if (value.exitCode === 0) {
-    return result('passed', value.stdout, value.stderr, durationMs);
+    return result('passed', value.stdout, stderr, durationMs);
   }
 
-  const output = value.stdout + '\n' + value.stderr;
+  const output = value.stdout + '\n' + stderr;
   if (/SyntaxError|IndentationError|TabError/.test(output)) {
-    return result('compile_error', value.stdout, value.stderr, durationMs);
+    return result('compile_error', value.stdout, stderr, durationMs);
   }
   if (/FAILED \(failures=/.test(output)) {
-    return result('test_failed', value.stdout, value.stderr, durationMs);
+    return result('test_failed', value.stdout, stderr, durationMs);
   }
-  return result('runtime_error', value.stdout, value.stderr, durationMs);
+  return result('runtime_error', value.stdout, stderr, durationMs);
+}
+
+function sanitizePythonDiagnostics(output) {
+  return String(output).replace(
+    /File "((?:[A-Za-z]:[\\/]|\/)[^"\r\n]+)"/g,
+    (_, absolutePath) =>
+      `File "${path.posix.basename(absolutePath.replaceAll('\\', '/'))}"`,
+  );
+}
+
+function runnerUnavailableMessage(error, pythonCommand) {
+  const detail = error instanceof Error ? error.message : String(error);
+  const missingExecutable =
+    error?.code === 'ENOENT'
+    || /(?:ENOENT|not found|cannot find|找不到)/i.test(detail);
+  const heading = missingExecutable
+    ? `找不到 Python 可执行程序 "${pythonCommand}"。`
+    : '本地 Python 执行器启动失败。';
+
+  return [
+    heading,
+    `检测命令: ${pythonCommand} --version`,
+    '安装入口: https://www.python.org/downloads/',
+    '安装 Python 3.12 或更高版本后，重新启动本地课程服务。',
+    `原始错误: ${sanitizePythonDiagnostics(detail)}`,
+  ].join('\n');
 }
 
 function result(status, stdout, stderr, durationMs) {
