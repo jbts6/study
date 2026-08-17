@@ -12,9 +12,7 @@ export function createSurveyRidgeContent(): Pick<WorldCampaignContent, "chapters
     maxRounds: 12,
     turnOrder: ["scout", "hunter-a", "hunter-b", "hunter-c"],
     units: [
-      ...base.units.map((unit) => unit.team === "enemies"
-        ? { ...unit, attack: 1 }
-        : unit),
+      ...base.units,
       {
         id: "hunter-c",
         team: "enemies",
