@@ -19,17 +19,39 @@ export function createHandler({ catalog, runner, staticRoot = null }) {
       }
 
       if (request.method === 'POST' && url.pathname === '/api/execute') {
-        const payload = await readJson(request);
-        const lessonId =
-          typeof payload.lessonId === 'string' ? payload.lessonId.trim() : '';
-        const code = typeof payload.code === 'string' ? payload.code : '';
-        if (!lessonId || !code.trim()) {
-          return writeJson(response, 400, {
-            status: 'invalid_request',
-            stderr: 'lessonId 和 code 不能为空',
-          });
+        let payload;
+        try {
+          payload = await readJson(request);
+        } catch {
+          return writeJson(
+            response,
+            400,
+            executionResult('invalid_request', '请求 JSON 无效'),
+          );
         }
-        const lesson = catalog.lesson(lessonId);
+        const lessonId =
+          typeof payload?.lessonId === 'string' ? payload.lessonId.trim() : '';
+        const code = typeof payload?.code === 'string' ? payload.code : '';
+        if (!lessonId || !code.trim()) {
+          return writeJson(
+            response,
+            400,
+            executionResult('invalid_request', 'lessonId 和 code 不能为空'),
+          );
+        }
+        let lesson;
+        try {
+          lesson = catalog.lesson(lessonId);
+        } catch (error) {
+          return writeJson(
+            response,
+            400,
+            executionResult(
+              'invalid_request',
+              error instanceof Error ? error.message : String(error),
+            ),
+          );
+        }
         return writeJson(
           response,
           200,
@@ -38,15 +60,22 @@ export function createHandler({ catalog, runner, staticRoot = null }) {
       }
 
       if (request.method === 'GET' && staticRoot) {
-        return serveStatic(response, url.pathname, staticRoot);
+        return await serveStatic(response, url.pathname, staticRoot);
       }
 
       return writeJson(response, 404, { error: 'Not found' });
     } catch (error) {
-      return writeJson(response, 500, {
-        status: 'runner_unavailable',
-        stderr: error instanceof Error ? error.message : String(error),
-      });
+      if (request.method === 'GET' && error instanceof URIError) {
+        return writeJson(response, 400, { error: 'Invalid path' });
+      }
+      return writeJson(
+        response,
+        500,
+        executionResult(
+          'runner_unavailable',
+          error instanceof Error ? error.message : String(error),
+        ),
+      );
     }
   };
 }
@@ -86,6 +115,17 @@ async function serveStatic(response, pathname, staticRoot) {
     }
     throw error;
   }
+}
+
+function executionResult(status, stderr) {
+  return {
+    status,
+    stdout: '',
+    stderr,
+    diagnostics: [],
+    checks: [],
+    durationMs: 0,
+  };
 }
 
 function writeJson(response, statusCode, value) {
