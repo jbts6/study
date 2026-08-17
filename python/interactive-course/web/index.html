@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1f2924">
+    <title>本地编程工坊 · Python 基础与自动化</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="product-name">本地编程工坊</p>
+        <h1>Python 基础与自动化</h1>
+      </div>
+      <p id="progress-summary" class="progress-summary"></p>
+    </header>
+
+    <div class="course-layout">
+      <nav aria-label="课程目录">
+        <div class="nav-heading">
+          <span>课程目录</span>
+          <span id="course-count" class="nav-count"></span>
+        </div>
+        <ol id="lesson-list"></ol>
+      </nav>
+
+      <main id="course-main" tabindex="-1" aria-busy="true">
+        <section id="lesson-copy"></section>
+
+        <section class="workspace" aria-label="练习工作区">
+          <div class="editor-pane">
+            <div class="pane-heading">
+              <label for="code-editor">你的 Python 代码</label>
+              <span class="language-tag">Python</span>
+            </div>
+            <textarea id="code-editor" spellcheck="false" disabled></textarea>
+            <div class="actions">
+              <button id="run-button" type="button" disabled>运行练习</button>
+              <label class="mastery-check">
+                <input id="mastered-check" type="checkbox" disabled>
+                <span>我已从空白文件独立重建</span>
+              </label>
+            </div>
+          </div>
+
+          <section class="result-pane" aria-labelledby="result-title">
+            <div class="pane-heading">
+              <h2 id="result-title">运行结果</h2>
+              <span id="result-status" class="result-status">等待运行</span>
+            </div>
+            <pre id="result-output" aria-live="polite">尚未运行</pre>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
