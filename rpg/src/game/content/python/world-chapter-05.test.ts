@@ -111,10 +111,27 @@ function dynamicStrategy(state: BattleState): TurnCommand {
 }
 
 function fixedOldPositionStrategy(state: BattleState): TurnCommand {
-  return battleCommand(state, { type: "interact", targetId: "node-a" }, [{ x: 0, y: 1 }]);
+  const nodeA = state.objectives.find((objective) => objective.id === "node-a")!;
+  const nodeB = state.objectives.find((objective) => objective.id === "node-b")!;
+  if (!nodeA.completed) return battleCommand(state, { type: "interact", targetId: "node-a" });
+  if (!nodeB.completed) return battleCommand(state, { type: "interact", targetId: "node-b" }, [{ x: 1, y: 0 }]);
+  const target = state.units.find((unit) => unit.id === "hunter" && !unit.disabled)
+    ?? state.units.find((unit) => unit.id === "guard" && !unit.disabled);
+  if (target === undefined) return battleCommand(state, { type: "wait" });
+  // 只等待 hunter 回到旧坐标，忽略敌人当前坐标，最终超时。
+  const oldHunterCell = { x: 4, y: 0 };
+  if (target.id === "hunter" && (target.cell.x !== oldHunterCell.x || target.cell.y !== oldHunterCell.y)) {
+    return battleCommand(state, { type: "wait" });
+  }
+  return battleCommand(state, { type: "attack", targetId: target.id });
 }
 
-function runBattle(strategy: (state: BattleState) => TurnCommand): { state: BattleState; rejected: boolean } {
+function runBattle(strategy: (state: BattleState) => TurnCommand): {
+  state: BattleState;
+  rejected: boolean;
+  rejectedAt?: "nodes" | "enemies";
+  rejectedCode?: string;
+} {
   const encounter = PYTHON_WORLD_CONTENT.encounters.rift_guardians!;
   const level = getLevel("python-marsh-05");
   let state = structuredClone(encounter.initialBattle);
@@ -122,9 +139,19 @@ function runBattle(strategy: (state: BattleState) => TurnCommand): { state: Batt
     const activeId = state.turnOrder[state.turnIndex];
     const command = activeId === "scout" ? strategy(state) : enemyCommand(level, state);
     const validation = validateLevelCommand(level, state, command);
-    if (!validation.accepted) return { state, rejected: true };
+    if (!validation.accepted) return {
+      state,
+      rejected: true,
+      rejectedAt: state.objectives.some((objective) => !objective.completed && objective.id.startsWith("node-")) ? "nodes" : "enemies",
+      rejectedCode: validation.errors[0]?.code,
+    };
     const resolution = resolveTurn(state, validation.command);
-    if (!resolution.accepted) return { state, rejected: true };
+    if (!resolution.accepted) return {
+      state,
+      rejected: true,
+      rejectedAt: state.objectives.some((objective) => !objective.completed && objective.id.startsWith("node-")) ? "nodes" : "enemies",
+      rejectedCode: resolution.errors[0]?.code,
+    };
     state = resolution.state;
   }
   return { state, rejected: false };
@@ -152,7 +179,11 @@ describe("Python world chapter 5", () => {
 
   it("rejects a fixed old-position strategy", () => {
     const result = runBattle(fixedOldPositionStrategy);
-    expect(result.rejected || result.state.phase === "lost").toBe(true);
+    expect(result.rejected).toBe(false);
+    expect(result.state.phase).toBe("lost");
+    expect(result.state.objectives.find((objective) => objective.id === "node-a")?.completed).toBe(true);
+    expect(result.state.objectives.find((objective) => objective.id === "node-b")?.completed).toBe(true);
+    expect(result.state.units.find((unit) => unit.id === "scout")?.disabled).toBe(true);
   });
 
   it("wins with separated dynamic entry, interaction, and attack helpers", () => {

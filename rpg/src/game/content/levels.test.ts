@@ -178,6 +178,12 @@ describe("campaign levels", () => {
     expect(fifth.starterCode).toContain("def attack_target");
     expect(fifth.starterCode).toContain("def choose_world_action");
     expect(fifth.starterCode).toContain("def choose_turn");
+    expect(fifth.starterCode).toContain("entry = pick_entry(world)");
+    expect(fifth.starterCode).toContain('"type": "inspect", "targetId": entry');
+    expect(fifth.starterCode).toContain("action = go_interact");
+    expect(fifth.starterCode).toContain("action = attack_target");
+    expect(fifth.starterCode).toContain("if distance == 1:");
+    expect(fifth.starterCode).not.toContain("return go_interact(world");
     expect(fifth.starterCode).toContain("node-a");
     expect(fifth.starterCode).toContain("node-b");
     expect(fifth.starterCode).not.toContain("pass");
