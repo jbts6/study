@@ -1,19 +1,46 @@
 # Task 3 实现报告
 
+## 状态
+
+- 已完成 Python 课程页面、本地进度存储、真实本地执行反馈和桌面端布局。
+- 产品提交：`b26756c`（课程界面）、`f5806ed`（反馈状态修复）、`a7a7ad9`（诊断与恢复指引修复）。
+- 各产品提交均未混入 `STATE.md` 或其他流程文件。
+
 ## 交付内容
 
-- 注册 `python-marsh-01` 至 `python-marsh-03`，提供递减教学脚手架、固定敌方职责、奖励及初始战斗。
-- 新增 `levels.ts`，集中提供六关固定顺序、前三关内容访问、下一关推导与内容引用校验。
-- 存档升级为 `SaveDataV2`；V1、未知版本、未注册关卡及战斗 ID 与关卡不符时进入恢复流程。
-- `AppController` 从关卡定义派生初始战斗、已解锁能力与结算；新增重试和进入下一关操作。
-- 玩家和敌方指令都在调用 `resolveTurn` 前执行 `validateLevelCommand`；非关键目标未完成的内核胜利视为任务失败，不发奖励也不能推进。
-- 入口移除单关创建函数与等待型敌方指令，改由控制器使用战役内容。
+- `web/index.html`：语义化课程目录、讲解、示例、编辑器、运行操作、独立重建证据和实时结果区。
+- `web/app.js`：`createCourseApp(dependencies)` 单控制器；页面可变状态仅为 `course`、`activeLesson`、`progress`、`running`、`lastResult`。
+- `web/store.js`：`createStore(storage)`；进度字段固定为 `currentLessonId`、`drafts`、`practiced`、`mastered`。
+- `web/styles.css`：桌面目录 + 内容 + 双栏工作区；包含可见焦点、44px 操作目标和减弱动效。
+- `server/runner.mjs`：清理 Python 诊断中的本机绝对路径；Python 不可用时显示缺失程序、检测命令、安装入口和原始错误。
+- `test/store.test.mjs`：严格保留 2 个核心用例，不增加 DOM、CSS、快照、Playwright 或状态矩阵测试。
+
+## TDD 证据
+
+- 第一例 RED：缺少 `web/store.js`，测试以 `ERR_MODULE_NOT_FOUND` 失败；实现存储后 GREEN，1/1 通过。
+- 第二例 RED：损坏 JSON 抛出 `SyntaxError`，1/2 通过；加入空进度回退后 GREEN，2/2 通过。
+- 诊断修复 RED：既有错误路径用例同时捕获绝对路径泄露和缺少恢复指引；修复 Runner 后该用例 GREEN，测试数量保持不变。
+- `practiced` 只在执行结果为 `passed` 时写入；`mastered` 只由用户显式勾选“我已从空白文件独立重建”写入。
 
 ## 验证
 
-- `npm test -- src/game/content/levels.test.ts src/app/save-store.test.ts src/app/app-controller.test.ts`：3 个测试文件、12 项测试通过。
-- `npm run build`：`tsc --noEmit` 和 Vite 生产构建通过。
+- 9 个 JavaScript 文件执行 `node --check`：9/9 通过。
+- `npm test`：2 个 Node 测试文件，5/5 通过，0 失败。
+- 总测试预算：3 个测试代码文件、6 个用例；其中 Node 2 文件 5 例，`hidden_test.py` 1 文件 1 例。
+- `git diff --check` 与 `git diff --check 41ea3b7..HEAD`：通过。
 
-## 说明
+## 浏览器验收
 
-- Vite 报告当前主包压缩后略超过 500 kB；未改变现有打包边界，属于非阻断提示。
+- 1280x800：目录、讲解、编辑器和结果区无重叠、无页面级横向溢出，编辑器和结果区均可操作。
+- 正确答案显示 `passed`，刷新后保留草稿和 `practiced`。
+- 显式勾选独立重建后刷新，`mastered` 和复选框状态保留。
+- 错误答案显示 `test_failed` 和 unittest 失败信息；语法错误显示 `compile_error` 和真实 Python 行号。
+- Tab 顺序覆盖目录、参考示例滚动区、编辑器、运行按钮和掌握复选框。
+- 减弱动效下过渡和动画时长均为 `1e-05s`。
+- 桌面截图：`C:/Users/fh345/AppData/Local/Temp/python-course-task3-desktop.png`。
+
+## 自审
+
+- 未新增依赖、第二套客户端状态机或超出任务范围的抽象。
+- 移动端不在本阶段验收范围内。
+- `a7a7ad9` 的定向复审已通过，无剩余阻断项。
