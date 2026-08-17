@@ -299,6 +299,8 @@ main {
   [data-status="compile_error"],
   [data-status="test_failed"],
   [data-status="runtime_error"],
+  [data-status="timeout"],
+  [data-status="runner_unavailable"],
   [data-status="request_failed"]
 ) {
   color: #f1a7a0;

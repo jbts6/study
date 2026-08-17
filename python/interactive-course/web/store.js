@@ -18,7 +18,14 @@ export function createStore(storage = globalThis.localStorage) {
     },
     save(value) {
       const next = normalize(value);
-      storage?.setItem(STORAGE_KEY, JSON.stringify(next));
+      try {
+        storage?.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch (error) {
+        globalThis.console?.warn?.(
+          '无法保存课程进度，当前会话仍可继续。',
+          error,
+        );
+      }
       return next;
     },
   };

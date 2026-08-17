@@ -172,12 +172,13 @@ class CourseApp {
 
   renderLessonCopy() {
     if (!this.course) {
-      const title = this.lastResult?.status === 'request_failed'
+      const requestFailed = this.lastResult?.status === 'request_failed';
+      const title = requestFailed
         ? '课程暂时无法打开'
         : '正在加载课程内容';
       const message = this.lastResult?.stderr || '正在读取本地课程目录…';
       this.elements.lessonCopy.innerHTML = emptyState(title, message);
-      this.elements.main.setAttribute('aria-busy', 'true');
+      this.elements.main.setAttribute('aria-busy', requestFailed ? 'false' : 'true');
       return;
     }
     this.elements.main.setAttribute('aria-busy', 'false');
@@ -281,7 +282,7 @@ function requestFailure(message) {
 }
 
 function emptyState(title, message) {
-  return `<div class="empty-state"><p class="eyebrow">课程内容</p><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div>`;
+  return `<div class="empty-state" role="status" aria-live="polite" aria-atomic="true"><p class="eyebrow">课程内容</p><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div>`;
 }
 
 function listItems(values) {
