@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-//go:embed content/course.json content/lessons/*
+//go:embed content/course.json content/testdata/lessons/*
 var embeddedContent embed.FS
 
 var expectedLessonIDs = []string{
@@ -19,6 +19,24 @@ var expectedLessonIDs = []string{
 	"go-start-02",
 	"go-start-03",
 	"go-start-04",
+	"go-start-05",
+	"go-start-06",
+	"go-start-07",
+	"go-start-08",
+	"go-start-09",
+	"go-start-10",
+	"go-start-11",
+	"go-start-12",
+	"go-start-13",
+	"go-start-14",
+	"go-start-15",
+	"go-start-16",
+	"go-start-17",
+	"go-start-18",
+	"go-start-19",
+	"go-start-20",
+	"go-start-21",
+	"go-start-22",
 }
 
 // Catalog provides validated course data and server-only lesson tests.
@@ -101,7 +119,7 @@ func loadLesson(files fs.FS, metadata Lesson) (Lesson, error) {
 }
 
 func readRequiredLessonFile(files fs.FS, lessonID, filename string) (string, error) {
-	filePath := path.Join("content/lessons", lessonID, filename)
+	filePath := path.Join("content/testdata/lessons", lessonID, filename)
 	data, err := fs.ReadFile(files, filePath)
 	if err != nil {
 		return "", fmt.Errorf("lesson %q missing %s: %w", lessonID, filename, err)
@@ -191,7 +209,7 @@ func validateLessonMetadata(lesson Lesson) error {
 }
 
 func validateLessonDirectories(files fs.FS, lessonIDs map[string]struct{}) error {
-	entries, err := fs.ReadDir(files, "content/lessons")
+	entries, err := fs.ReadDir(files, "content/testdata/lessons")
 	if err != nil {
 		return fmt.Errorf("read lesson directories: %w", err)
 	}

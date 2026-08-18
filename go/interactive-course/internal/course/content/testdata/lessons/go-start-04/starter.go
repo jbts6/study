@@ -1,15 +1,9 @@
-//go:build ignore
-
 package main
 
 import "fmt"
 
 func sum(numbers []int) int {
-	total := 0
-	for _, number := range numbers {
-		total += number
-	}
-	return total
+	return 0
 }
 
 func main() {

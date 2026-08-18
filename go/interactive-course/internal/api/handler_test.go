@@ -41,8 +41,11 @@ func TestGetCourseReturnsPublicLessonsWithoutHiddenTests(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &public); err != nil {
 		t.Fatalf("decode course response: %v", err)
 	}
-	if len(public.Lessons) != 4 || public.Lessons[0].ID != "go-start-01" {
-		t.Fatalf("course lessons = %#v, want four ordered lessons", public.Lessons)
+	if len(public.Lessons) != 22 {
+		t.Fatalf("course lesson count = %d, want 22", len(public.Lessons))
+	}
+	if public.Lessons[0].ID != "go-start-01" || public.Lessons[21].ID != "go-start-22" {
+		t.Fatalf("course lesson IDs = %q...%q, want go-start-01...go-start-22", public.Lessons[0].ID, public.Lessons[21].ID)
 	}
 	if strings.Contains(recorder.Body.String(), "captureProgramOutput") || strings.Contains(recorder.Body.String(), "hidden_test.go") {
 		t.Fatalf("course response contains server-only test source: %s", recorder.Body.String())

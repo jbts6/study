@@ -21,7 +21,7 @@ func TestLoadCatalogProvidesPublicCourseAndPrivateTests(t *testing.T) {
 		t.Fatalf("course title = %q, want %q", public.Title, "Go 起步")
 	}
 
-	wantIDs := []string{"go-start-01", "go-start-02", "go-start-03", "go-start-04"}
+	wantIDs := expectedLessonIDs
 	if len(public.Lessons) != len(wantIDs) {
 		t.Fatalf("lesson count = %d, want %d", len(public.Lessons), len(wantIDs))
 	}
@@ -72,14 +72,16 @@ func TestLoadCatalogRejectsInvalidContent(t *testing.T) {
 		{
 			name: "duplicate lesson ID",
 			fs: func() fstest.MapFS {
-				return fixtureFS([]string{"go-start-01", "go-start-01", "go-start-03", "go-start-04"}, "")
+				ids := append([]string(nil), expectedLessonIDs...)
+				ids[1] = ids[0]
+				return fixtureFS(ids, "")
 			},
 		},
 		{
 			name: "missing starter file",
 			fs: func() fstest.MapFS {
 				fsys := fixtureFS(nil, "")
-				delete(fsys, "content/lessons/go-start-02/starter.go")
+				delete(fsys, "content/testdata/lessons/go-start-02/starter.go")
 				return fsys
 			},
 		},
@@ -117,7 +119,7 @@ type testTestMetadata struct {
 
 func fixtureFS(ids []string, emptyField string) fstest.MapFS {
 	if len(ids) == 0 {
-		ids = []string{"go-start-01", "go-start-02", "go-start-03", "go-start-04"}
+		ids = append([]string(nil), expectedLessonIDs...)
 	}
 
 	lessons := make([]testLessonMetadata, 0, len(ids))
@@ -137,7 +139,7 @@ func fixtureFS(ids []string, emptyField string) fstest.MapFS {
 		}
 		lessons = append(lessons, lesson)
 
-		prefix := "content/lessons/" + id + "/"
+		prefix := "content/testdata/lessons/" + id + "/"
 		fsys[prefix+"starter.go"] = &fstest.MapFile{Data: []byte("package main\n")}
 		fsys[prefix+"example.go"] = &fstest.MapFile{Data: []byte("package main\n")}
 		fsys[prefix+"hidden_test.go"] = &fstest.MapFile{Data: []byte("package main\nfunc captureProgramOutput() {}\n")}

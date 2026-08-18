@@ -61,6 +61,168 @@
         {"id": "TestSumHandlesEmptySingleAndManyValues", "label": "覆盖空、单元素和多元素"},
         {"id": "TestMainPrintsSumExample", "label": "输出求和示例"}
       ]
+    },
+    {
+      "id": "go-start-05",
+      "title": "结构体与组合",
+      "goal": "用 struct 把相关字段组合成有明确含义的领域值。",
+      "explanation": "结构体让字段名和类型成为程序契约。优先按字段名初始化，避免字段顺序变化后产生隐蔽错误。\n\n本节通过 User 值练习定义类型、创建实例和读取字段。",
+      "exerciseGoal": "实现 describeUser(user User) string，返回 <name> (<age>) 格式的简介。",
+      "hints": ["定义包含 Name string 和 Age int 的 User。", "使用 fmt.Sprintf 组合字段。"],
+      "tests": [{"id": "TestDescribeUser", "label": "格式化结构体字段"}]
+    },
+    {
+      "id": "go-start-06",
+      "title": "指针与可变状态",
+      "goal": "使用指针参数修改调用方的数据，并安全处理 nil。",
+      "explanation": "Go 默认按值传递。需要修改原值时传入指针，并在可能为 nil 的边界先检查。\n\n指针只表达共享和可变性，不需要手动释放内存。",
+      "exerciseGoal": "实现 addPoints(points *int, amount int)，累加分数且 nil 输入不 panic。",
+      "hints": ["用 points == nil 提前返回。", "通过 *points 读取和修改指向的整数。"],
+      "tests": [{"id": "TestAddPoints", "label": "修改指针指向的值"}, {"id": "TestAddPointsNil", "label": "安全处理 nil 指针"}]
+    },
+    {
+      "id": "go-start-07",
+      "title": "方法与接收者",
+      "goal": "为自定义类型定义值接收者和指针接收者方法。",
+      "explanation": "方法把行为放到相关类型旁边。只读方法可以使用值接收者，需要修改状态的方法使用指针接收者。\n\nCounter 用 Add 修改内部值，用 Value 返回当前值。",
+      "exerciseGoal": "完成 Counter.Add 和 Counter.Value，使多次累加得到正确结果。",
+      "hints": ["Add 的接收者应为 *Counter。", "Value 只读取状态，可以使用值接收者。"],
+      "tests": [{"id": "TestCounterMethods", "label": "方法更新并读取状态"}]
+    },
+    {
+      "id": "go-start-08",
+      "title": "接口与能力边界",
+      "goal": "用小接口描述调用方真正需要的能力。",
+      "explanation": "Go 接口由实现者隐式满足。接口越小，越容易替换实现和编写测试。\n\n本节定义 Measurable，并让 totalMeasure 只依赖 Measure 方法。",
+      "exerciseGoal": "实现 Rectangle.Measure 与 totalMeasure，汇总不同 Measurable 的测量值。",
+      "hints": ["Rectangle 的测量值是 Width * Height。", "遍历接口切片并调用 item.Measure()。"],
+      "tests": [{"id": "TestTotalMeasure", "label": "通过接口汇总不同实现"}]
+    },
+    {
+      "id": "go-start-09",
+      "title": "显式错误处理",
+      "goal": "使用 (value, error) 返回可解释的失败。",
+      "explanation": "Go 用 error 值表达失败，调用者必须显式检查。错误消息说明边界原因，成功路径返回 nil。\n\n本节解析正整数，并区分格式错误与非正数。",
+      "exerciseGoal": "实现 parsePositive(input string) (int, error)，只接受去除空白后大于 0 的整数。",
+      "hints": ["先 strings.TrimSpace，再 strconv.Atoi。", "解析失败或值不大于 0 时返回非 nil error。"],
+      "tests": [{"id": "TestParsePositive", "label": "解析有效正整数"}, {"id": "TestParsePositiveErrors", "label": "拒绝无效和非正输入"}]
+    },
+    {
+      "id": "go-start-10",
+      "title": "包、模块与配置边界",
+      "goal": "用明确的数据类型和默认值建立包之间的配置契约。",
+      "explanation": "go.mod 定义模块，package 定义代码边界。即使练习运行在单文件中，也应先设计稳定的公开输入输出。\n\n本节用 Config 展示边界归一化。",
+      "exerciseGoal": "实现 normalizeConfig(config Config) Config，为缺失 Host 和 Port 补上 127.0.0.1 与 8080。",
+      "hints": ["空字符串表示 Host 未设置。", "Port 为 0 时补默认端口，同时保留已提供的字段。"],
+      "tests": [{"id": "TestNormalizeConfig", "label": "补齐默认配置并保留显式值"}]
+    },
+    {
+      "id": "go-start-11",
+      "title": "goroutine 并发",
+      "goal": "启动 goroutine 完成独立计算，并等待所有结果。",
+      "explanation": "goroutine 是由 Go 运行时调度的轻量执行单元。并发函数必须有明确的结果汇合点，否则 main 可能先结束。\n\n本节把切片分成两部分并发求和，再通过 channel 汇总。",
+      "exerciseGoal": "实现 parallelSum(numbers []int) int，使用两个 goroutine 返回总和。",
+      "hints": ["创建容量为 2 的结果 channel。", "每个 goroutine 只计算自己的切片并发送一次结果。"],
+      "tests": [{"id": "TestParallelSum", "label": "并发汇总空切片和多元素切片"}]
+    },
+    {
+      "id": "go-start-12",
+      "title": "channel 消息传递",
+      "goal": "由发送方关闭 channel，使用 range 接收全部消息。",
+      "explanation": "channel 在 goroutine 之间传递有类型的值。关闭表示不会再发送，不代表清空已有消息。\n\n本节把输入发送到缓冲 channel，关闭后按顺序收集。",
+      "exerciseGoal": "实现 collectMessages(messages []string) []string，发送、关闭并收集所有消息。",
+      "hints": ["缓冲区容量可以设为 len(messages)。", "发送完成后 close(channel)，再用 for range 收集。"],
+      "tests": [{"id": "TestCollectMessages", "label": "发送并收集全部消息"}]
+    },
+    {
+      "id": "go-start-13",
+      "title": "select 与就绪事件",
+      "goal": "使用 select 等待多个 channel 中最先就绪的消息。",
+      "explanation": "select 把多个 channel 操作组合成一个等待点，只执行当前可进行的分支。\n\n本节使用缓冲 channel 构造确定性输入，聚焦 select 的选择语义。",
+      "exerciseGoal": "实现 firstMessage(primary, fallback <-chan string) string，返回先就绪的消息。",
+      "hints": ["select 中为两个接收操作各写一个 case。", "参数使用只接收 channel 类型 <-chan string。"],
+      "tests": [{"id": "TestFirstMessage", "label": "返回已就绪 channel 的消息"}]
+    },
+    {
+      "id": "go-start-14",
+      "title": "标准库文本处理",
+      "goal": "组合 strings 标准库完成稳定的文本统计。",
+      "explanation": "标准库通常已经提供经过验证的字符串、时间、排序和 I/O 工具。先组合标准库，再考虑自定义解析器。\n\n本节统计非空单词数与文本行数，并明确空文本边界。",
+      "exerciseGoal": "实现 summarizeText(text string) (words int, lines int)，空文本返回 0,0。",
+      "hints": ["strings.Fields 会忽略连续空白。", "非空文本的行数等于换行数加一。"],
+      "tests": [{"id": "TestSummarizeText", "label": "统计单词、行和空文本"}]
+    },
+    {
+      "id": "go-start-15",
+      "title": "文件与 os",
+      "goal": "在文件边界返回错误，并把读取结果转换为行切片。",
+      "explanation": "文件 I/O 可能因路径、权限或内容失败，函数应把 error 交给调用者处理。\n\n本节只负责读取和拆行，不在业务函数中打印或退出进程。",
+      "exerciseGoal": "实现 readLines(path string) ([]string, error)，忽略末尾换行，空文件返回空切片。",
+      "hints": ["使用 os.ReadFile 读取小型学习文件。", "先移除末尾换行，再按换行拆分；读取失败直接返回 error。"],
+      "tests": [{"id": "TestReadLines", "label": "读取文件并处理末尾换行"}, {"id": "TestReadLinesMissingFile", "label": "返回缺失文件错误"}]
+    },
+    {
+      "id": "go-start-16",
+      "title": "net/http 服务边界",
+      "goal": "用 http.Handler 建立可测试的请求与响应边界。",
+      "explanation": "net/http 的核心抽象是 Handler。把路由逻辑返回为 Handler，就能用 httptest 在内存中验证，而不必真的占用端口。\n\n本节实现健康检查、未知路径和错误方法三种响应。",
+      "exerciseGoal": "实现 newStatusHandler() http.Handler：GET /health 返回 200 和 ok，错误方法返回 405，其他路径返回 404。",
+      "hints": ["使用 http.HandlerFunc 包装函数。", "先检查方法，再检查路径。"],
+      "tests": [{"id": "TestStatusHandler", "label": "处理健康检查与错误请求"}]
+    },
+    {
+      "id": "go-start-17",
+      "title": "JSON 编解码",
+      "goal": "用结构体标签稳定控制 JSON 字段。",
+      "explanation": "encoding/json 按公开字段和标签完成编解码。API 边界应保留 error，让调用者决定如何展示失败。\n\n本节定义 Task，并实现字符串形式的编码与解码函数。",
+      "exerciseGoal": "实现 encodeTask 和 decodeTask，使 title/done 字段可往返，并拒绝无效 JSON。",
+      "hints": ["结构体字段必须导出并添加 json 标签。", "json.Marshal 返回 []byte，json.Unmarshal 写入指针。"],
+      "tests": [{"id": "TestTaskJSONRoundTrip", "label": "JSON 往返保持字段"}, {"id": "TestDecodeTaskInvalid", "label": "无效 JSON 返回错误"}]
+    },
+    {
+      "id": "go-start-18",
+      "title": "Web 框架的核心边界",
+      "goal": "理解框架路由背后的 handler 与 middleware 组合。",
+      "explanation": "Gin 等框架简化路由和中间件，但核心仍是函数组合。课程执行器不安装第三方依赖，因此用等价的标准 Go 函数练习组合顺序。\n\n掌握边界后，再把相同思路迁移到具体框架。",
+      "exerciseGoal": "实现 withPrefix 与 applyTextMiddleware，使中间件按声明顺序包装 TextHandler。",
+      "hints": ["中间件接收并返回一个 handler。", "从切片末尾向前包装，才能保持声明顺序。"],
+      "tests": [{"id": "TestApplyTextMiddleware", "label": "按顺序组合处理器与中间件"}]
+    },
+    {
+      "id": "go-start-19",
+      "title": "数据访问与仓储",
+      "goal": "用小接口隔离业务代码与具体数据库实现。",
+      "explanation": "database/sql 和 ORM 都是数据访问实现，业务层更适合依赖自己需要的最小接口。\n\n本节用内存仓储练习 Save/Find 契约，之后可替换成 SQL 实现而不改变调用方。",
+      "exerciseGoal": "实现 MemoryTaskStore：拒绝空标题，保存后可按标题查找。",
+      "hints": ["构造函数中初始化 map。", "Save 先 strings.TrimSpace 校验，再写入 map。"],
+      "tests": [{"id": "TestMemoryTaskStore", "label": "保存并查询任务"}, {"id": "TestMemoryTaskStoreRejectsEmptyTitle", "label": "拒绝空标题"}]
+    },
+    {
+      "id": "go-start-20",
+      "title": "中间件组合",
+      "goal": "用中间件在不改业务 handler 的前提下加入认证边界。",
+      "explanation": "中间件处理横切逻辑：认证、日志、恢复和指标。每层接收 next，并决定调用、修改或提前返回。\n\n本节构造 token 认证中间件和可复用的链式组合函数。",
+      "exerciseGoal": "实现 authMiddleware 与 chain，使合法 token 到达 handler，缺失或错误 token 返回 unauthorized。",
+      "hints": ["从 Headers map 读取 X-Token。", "chain 从后向前包装 middleware。"],
+      "tests": [{"id": "TestAuthMiddleware", "label": "认证通过后调用业务处理器"}, {"id": "TestAuthMiddlewareRejectsRequest", "label": "拒绝错误 token"}]
+    },
+    {
+      "id": "go-start-21",
+      "title": "testing 与表驱动思维",
+      "goal": "把可枚举的输入输出组织成稳定的纯函数契约。",
+      "explanation": "Go 的 testing 包鼓励小型、可重复的行为验证。表驱动测试把多组边界输入集中表达，而生产代码保持简单。\n\n本节实现状态计数，隐藏测试会覆盖空输入和重复值。",
+      "exerciseGoal": "实现 countByStatus(statuses []string) map[string]int，忽略空字符串并统计其余状态。",
+      "hints": ["用 make 初始化 map。", "遇到空字符串时 continue，否则 counts[status]++。"],
+      "tests": [{"id": "TestCountByStatus", "label": "统计重复状态并忽略空值"}]
+    },
+    {
+      "id": "go-start-22",
+      "title": "综合项目：日志分析",
+      "goal": "组合切片、map、错误边界和纯函数完成一个小型日志分析器。",
+      "explanation": "综合练习使用 service|level 格式的本地日志。函数只处理解析和汇总，CLI、文件读取或 HTTP 可在独立项目中作为边界接入。\n\n无效行被忽略，有效行计入总数、错误数和服务分组。",
+      "exerciseGoal": "实现 analyzeLogs(lines []string) LogSummary，统计 Total、Errors 和 ByService。",
+      "hints": ["用 strings.SplitN(line, \"|\", 2) 解析。", "只接受非空 service，以及 INFO、WARN、ERROR 三种 level。"],
+      "tests": [{"id": "TestAnalyzeLogs", "label": "汇总有效日志并忽略坏行"}]
     }
   ]
 }
