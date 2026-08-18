@@ -7,7 +7,10 @@ import { parseCargoOutput, truncateOutput } from './output.mjs';
 
 export const DEFAULT_MAX_CODE_BYTES = 64 * 1024;
 export const DEFAULT_MAX_OUTPUT_BYTES = 32 * 1024;
-export const DEFAULT_TIMEOUT_MS = 5_000;
+// Cold Cargo startup on a local machine can take several seconds before the
+// learner's code begins running. Keep the trusted local runner usable on the
+// first submission while preserving explicit shorter timeouts for exercises.
+export const DEFAULT_TIMEOUT_MS = 15_000;
 
 export function validateCode(code, maxBytes = DEFAULT_MAX_CODE_BYTES) {
   if (typeof code !== 'string' || code.trim() === '') {

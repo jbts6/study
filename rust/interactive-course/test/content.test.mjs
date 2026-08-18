@@ -31,7 +31,7 @@ test('course content maps the twelve Rust chapters in order', () => {
 });
 test('every lesson example passes its server-side hidden tests', async () => {
   const catalog = loadCatalog(contentRoot);
-  const runner = createCargoRunner({ timeoutMs: 10_000 });
+  const runner = createCargoRunner({ timeoutMs: 30_000 });
 
   for (const lesson of catalog.publicCourse().lessons) {
     const internal = catalog.lesson(lesson.id);

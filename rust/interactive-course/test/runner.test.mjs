@@ -49,7 +49,7 @@ test('parseCargoOutput maps compile and test failures', () => {
 });
 
 test('cargo runner executes a passing hidden test', async () => {
-  const runner = createCargoRunner({ timeoutMs: 10_000 });
+  const runner = createCargoRunner({ timeoutMs: 30_000 });
   const result = await runner.run({
     code: 'pub fn greeting(name: &str) -> String { format!("Hello, {name}!") }',
     hiddenTest,
@@ -61,7 +61,7 @@ test('cargo runner executes a passing hidden test', async () => {
 });
 
 test('cargo runner reports compile errors without throwing', async () => {
-  const runner = createCargoRunner({ timeoutMs: 10_000 });
+  const runner = createCargoRunner({ timeoutMs: 30_000 });
   const result = await runner.run({
     code: 'pub fn greeting(name: &str) -> String {',
     hiddenTest,
@@ -91,7 +91,7 @@ test('cargo runner stops a job after the timeout', async () => {
 });
 
 test('cargo runner truncates noisy output', async () => {
-  const runner = createCargoRunner({ maxOutputBytes: 512, timeoutMs: 10_000 });
+  const runner = createCargoRunner({ maxOutputBytes: 512, timeoutMs: 30_000 });
   const result = await runner.run({
     code: 'pub fn answer() -> i32 { 42 }',
     hiddenTest: '#[test] fn noisy() { println!("{}", "x".repeat(100_000)); }',
