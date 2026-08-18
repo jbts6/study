@@ -2,11 +2,7 @@ import { createStore } from './store.js';
 
 export function canOpenLesson(course, state, lessonId) {
   const lessons = Array.isArray(course?.lessons) ? course.lessons : [];
-  const index = lessons.findIndex((lesson) => lesson.id === lessonId);
-  if (index < 0) return false;
-  if (index === 0) return true;
-  const passed = new Set(Array.isArray(state?.passed) ? state.passed : []);
-  return passed.has(lessons[index - 1].id);
+  return lessons.some((lesson) => lesson.id === lessonId);
 }
 
 export function executionPresentation(result = {}) {
@@ -139,9 +135,11 @@ export function createCourseApp({
     refs.nav.innerHTML = course.lessons.map((lesson, index) => {
       const passed = state.passed.includes(lesson.id);
       const open = canOpenLesson(course, state, lesson.id);
+      const recommended = index === 0 || state.passed.includes(course.lessons[index - 1].id);
+      const status = passed ? '已通过' : recommended ? '可开始' : '建议先完成上一课';
       return `<button class="lesson-link${lesson.id === activeLesson?.id ? ' is-active' : ''}${passed ? ' is-passed' : ''}" data-lesson-id="${escapeHtml(lesson.id)}" ${open ? '' : 'disabled'}>${
         `<span class="lesson-index">${String(index + 1).padStart(2, '0')}</span>`
-        + `<span class="lesson-link-copy"><strong>${escapeHtml(lesson.title)}</strong><small>${passed ? '已通过' : open ? '可开始' : '完成上一课后解锁'}</small></span>`
+        + `<span class="lesson-link-copy"><strong>${escapeHtml(lesson.title)}</strong><small>${status}</small></span>`
       }</button>`;
     }).join('');
     refs.nav.querySelectorAll?.('[data-lesson-id]').forEach((button) => {

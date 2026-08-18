@@ -47,7 +47,7 @@ npm run dev -- --host 127.0.0.1
 2. 并发与标准库（11-17）：goroutine、channel、select、文本处理、文件、`net/http` 和 JSON。
 3. 工程实践（18-22）：Web handler 与 middleware、数据访问、认证组合、表驱动测试思维和日志分析综合项目。
 
-通过当前小节的服务端隐藏测试后，下一小节才会解锁。每节都包含讲解、参考答案、可编辑起始代码、公开验收条件和服务端隐藏测试。已完成状态和编辑器草稿保存在浏览器 `localStorage`，服务端不保存用户身份、历史代码或运行记录。
+全部小节都可以提前浏览；目录会按前置关系提示推荐顺序，但不会锁住后续内容。每节都包含讲解、参考答案、可编辑起始代码、公开验收条件和服务端隐藏测试，只有通过当前小节的隐藏测试才会记录为完成。已完成状态和编辑器草稿保存在浏览器 `localStorage`，服务端不保存用户身份、历史代码或运行记录。
 
 ## 执行边界
 
@@ -78,4 +78,4 @@ npx playwright install chromium
 npx playwright test
 ```
 
-Playwright 测试使用 mock API 验证桌面和移动端的页面状态、通过后解锁和布局；设置 `GO_COURSE_DOCKER_INTEGRATION=1` 后，`internal/runner/integration_test.go` 才会验证真实容器执行，否则会明确跳过。
+Playwright 测试使用 mock API 验证桌面和移动端的页面状态、课程预览、完成记录和布局；如果本机已有其他课程占用 `5173`，可用 `GO_COURSE_WEB_PORT=5174 npx playwright test` 指定验收端口。设置 `GO_COURSE_DOCKER_INTEGRATION=1` 后，`internal/runner/integration_test.go` 才会验证真实容器执行，否则会明确跳过。

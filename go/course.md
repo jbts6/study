@@ -23,7 +23,7 @@
 
 ---
 
-### 知识点 1：cargo 是 Go 的 npm
+### 知识点 1：go 命令与模块管理
 
 Go 用 `cargo`... 不对，Go 用 **`go` 命令**本身管理项目，不用单独的包管理器。`go mod` 就是 Go 的 `package.json`。
 

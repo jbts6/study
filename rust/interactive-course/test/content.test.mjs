@@ -29,7 +29,7 @@ test('course content maps the twelve Rust chapters in order', () => {
     assert.equal('hiddenTest' in lesson, false);
   }
 });
-test('every lesson example passes its server-side hidden tests', async () => {
+test('every lesson example passes and its starter fails the server-side hidden tests', async () => {
   const catalog = loadCatalog(contentRoot);
   const runner = createCargoRunner({ timeoutMs: 30_000 });
 
@@ -41,6 +41,13 @@ test('every lesson example passes its server-side hidden tests', async () => {
       tests: internal.tests,
     });
     assert.equal(result.status, 'passed', `${lesson.id}: ${result.stderr}`);
+
+    const starterResult = await runner.run({
+      code: internal.starterCode,
+      hiddenTest: internal.hiddenTest,
+      tests: internal.tests,
+    });
+    assert.equal(starterResult.status, 'test_failed', `${lesson.id}: ${starterResult.stderr}`);
   }
 });
 

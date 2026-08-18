@@ -26,16 +26,19 @@ function lesson(id: string, title: string, starterCode: string) {
 }
 
 test.describe("Go 交互式课程页面", () => {
-  test("桌面端完成第一节并解锁下一节", async ({ page }) => {
+  test("桌面端可提前浏览后续课程并记录完成状态", async ({ page }) => {
     await mockCourse(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
 
     await expect(page.getByRole("heading", { name: "第一个 Go 程序", exact: true })).toBeVisible();
     await expect(page.locator(".cm-editor")).toBeVisible();
+    const nextLesson = page.locator('[data-lesson-id="go-start-02"]');
+    await expect(nextLesson).toBeEnabled();
+    await expect(nextLesson).toContainText("建议先完成上一节");
     await page.getByRole("button", { name: "运行代码", exact: true }).click();
     await expect(page.getByRole("heading", { name: "通过", exact: true })).toBeVisible();
-    await expect(page.locator('[data-lesson-id="go-start-02"]')).toBeEnabled();
+    await expect(nextLesson).toContainText("开始");
 
     const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     expect(hasOverflow).toBe(false);

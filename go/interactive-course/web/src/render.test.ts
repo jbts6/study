@@ -17,6 +17,17 @@ const course: Course = {
       hints: ["提示"],
       tests: [{ id: "TestHello", label: "输出欢迎语" }],
     },
+    {
+      id: "go-start-02",
+      title: "变量与基础类型",
+      goal: "认识变量",
+      explanation: "解释",
+      exampleCode: "package main",
+      starterCode: "package main",
+      exerciseGoal: "完成程序",
+      hints: ["提示"],
+      tests: [{ id: "TestProfile", label: "生成简介" }],
+    },
   ],
 };
 
@@ -51,6 +62,15 @@ describe("app rendering", () => {
     expect(root.querySelector("[data-editor]")).not.toBeNull();
     expect(root.querySelector("[data-run-state]")?.textContent).toContain("运行中");
     expect(elements.runButton.disabled).toBe(true);
+  });
+
+  it("keeps later lessons available and marks the recommended order", () => {
+    const root = document.createElement("div");
+    const elements = createAppShell(root);
+    renderApp(elements, course, baseState);
+    const laterLesson = root.querySelector<HTMLButtonElement>('[data-lesson-id="go-start-02"]');
+    expect(laterLesson?.disabled).toBe(false);
+    expect(laterLesson?.textContent).toContain("建议先完成上一节");
   });
 
   it("shows diagnostics and failed tests in the result panel", () => {

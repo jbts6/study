@@ -72,10 +72,11 @@ test('page declares stable DOM contract', async () => {
   }
 });
 
-test('only the first lesson is open until its predecessor passes', () => {
+test('every lesson can be previewed while invalid lesson ids stay unavailable', () => {
   assert.equal(canOpenLesson(course, { passed: [] }, 'rust-start-00'), true);
-  assert.equal(canOpenLesson(course, { passed: [] }, 'rust-start-01'), false);
+  assert.equal(canOpenLesson(course, { passed: [] }, 'rust-start-01'), true);
   assert.equal(canOpenLesson(course, { passed: ['rust-start-00'] }, 'rust-start-01'), true);
+  assert.equal(canOpenLesson(course, { passed: [] }, 'missing-lesson'), false);
 });
 
 test('execution statuses have explicit presentation states', () => {
@@ -104,7 +105,8 @@ test('app loads the course and renders the initial lesson', async () => {
   await app.load();
 
   assert.match(document.elements.get('courseNav').innerHTML, /工具链/);
+  assert.match(document.elements.get('courseNav').innerHTML, /建议先完成上一课/);
+  assert.doesNotMatch(document.elements.get('courseNav').innerHTML, /disabled/);
   assert.match(document.elements.get('lessonMain').innerHTML, /完成第一题/);
   assert.match(document.elements.get('progressText').textContent, /1 \/ 2/);
 });
-

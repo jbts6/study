@@ -31,26 +31,26 @@ describe("course store", () => {
     window.localStorage.clear();
   });
 
-  it("restores drafts and progress, then unlocks the next lesson after passing", () => {
+  it("restores drafts and progress while every lesson remains available to preview", () => {
     const storage = window.localStorage;
     const first = createCourseStore(course, storage);
     expect(first.state().selectedLessonId).toBe("go-start-01");
-    expect(first.isUnlocked("go-start-02")).toBe(false);
+    expect(first.isUnlocked("go-start-02")).toBe(true);
+    expect(first.isUnlocked("go-start-03")).toBe(true);
 
     first.setDraft("go-start-01", "edited code");
     first.markPassed("go-start-01");
-    expect(first.isUnlocked("go-start-02")).toBe(true);
-    expect(first.selectLesson("go-start-02")).toBe(true);
+    expect(first.selectLesson("go-start-03")).toBe(true);
 
     const restored = createCourseStore(course, storage);
-    expect(restored.state().selectedLessonId).toBe("go-start-02");
+    expect(restored.state().selectedLessonId).toBe("go-start-03");
     expect(restored.getDraft("go-start-01")).toBe("edited code");
-    expect(restored.isUnlocked("go-start-03")).toBe(false);
+    expect(restored.state().completedLessonIds).toEqual(["go-start-01"]);
   });
 
-  it("does not persist a locked selection and reset restores starter code", () => {
+  it("rejects an unknown selection and reset restores starter code", () => {
     const store = createCourseStore(course, window.localStorage);
-    expect(store.selectLesson("go-start-02")).toBe(false);
+    expect(store.selectLesson("missing-lesson")).toBe(false);
     expect(store.getDraft("go-start-01")).toBe("starter go-start-01");
     store.setDraft("go-start-01", "changed");
     expect(store.resetLesson("go-start-01")).toBe("starter go-start-01");

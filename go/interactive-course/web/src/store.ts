@@ -45,10 +45,6 @@ export function createCourseStore(course: Course, storage: Storage): CourseStore
     drafts,
     run: { status: "idle" },
   };
-  if (!isUnlocked(current.selectedLessonId, course, current.completedLessonIds)) {
-    current.selectedLessonId = course.lessons[0]?.id ?? "";
-  }
-
   const listeners = new Set<Listener>();
   const emit = (): void => {
     persist(storage, current);
@@ -70,9 +66,9 @@ export function createCourseStore(course: Course, storage: Storage): CourseStore
       emit();
       return course.lessons.find((lesson) => lesson.id === lessonId)?.starterCode ?? "";
     },
-    isUnlocked: (lessonId) => isUnlocked(lessonId, course, current.completedLessonIds),
+    isUnlocked: (lessonId) => isUnlocked(lessonId, course),
     selectLesson: (lessonId) => {
-      if (!lessonIds.has(lessonId) || !isUnlocked(lessonId, course, current.completedLessonIds)) return false;
+      if (!lessonIds.has(lessonId)) return false;
       current = { ...current, selectedLessonId: lessonId, run: { status: "idle" } };
       emit();
       return true;
@@ -93,9 +89,8 @@ export function createCourseStore(course: Course, storage: Storage): CourseStore
   };
 }
 
-function isUnlocked(lessonId: string, course: Course, completedLessonIds: string[]): boolean {
-  const index = course.lessons.findIndex((lesson) => lesson.id === lessonId);
-  return index === 0 || (index > 0 && completedLessonIds.includes(course.lessons[index - 1].id));
+function isUnlocked(lessonId: string, course: Course): boolean {
+  return course.lessons.some((lesson) => lesson.id === lessonId);
 }
 
 function persist(storage: Storage, state: CourseState): void {

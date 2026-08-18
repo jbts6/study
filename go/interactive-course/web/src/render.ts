@@ -95,10 +95,11 @@ export function renderFatalError(root: HTMLElement, message: string): void {
 
 function renderLessonNavItem(lesson: Lesson, index: number, course: Course, state: CourseState): string {
   const lessonIndex = course.lessons.indexOf(lesson);
-  const unlocked = lessonIndex === 0 || state.completedLessonIds.includes(course.lessons[lessonIndex - 1].id);
+  const recommended = lessonIndex === 0 || state.completedLessonIds.includes(course.lessons[lessonIndex - 1].id);
   const completed = state.completedLessonIds.includes(lesson.id);
   const selected = state.selectedLessonId === lesson.id;
-  return `<li><button type="button" class="lesson-link${selected ? " is-selected" : ""}" data-lesson-id="${escapeHTML(lesson.id)}"${selected ? " aria-current=\"step\"" : ""}${unlocked ? "" : " disabled aria-disabled=\"true\""}><span class="lesson-number">${String(index + 1).padStart(2, "0")}</span><span class="lesson-link__title">${escapeHTML(lesson.title)}</span><span class="lesson-link__status">${completed ? "完成" : unlocked ? "开始" : "锁定"}</span></button></li>`;
+  const status = completed ? "完成" : recommended ? "开始" : "建议先完成上一节";
+  return `<li><button type="button" class="lesson-link${selected ? " is-selected" : ""}" data-lesson-id="${escapeHTML(lesson.id)}"${selected ? " aria-current=\"step\"" : ""}><span class="lesson-number">${String(index + 1).padStart(2, "0")}</span><span class="lesson-link__title">${escapeHTML(lesson.title)}</span><span class="lesson-link__status">${status}</span></button></li>`;
 }
 
 function renderResult(panel: HTMLElement, result: ExecuteResult | undefined, status: CourseState["run"]["status"]): void {
