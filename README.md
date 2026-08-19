@@ -2,7 +2,7 @@
 
 这是一个面向个人、本机运行的编程学习仓库。主线按 **Python -> Go -> Rust** 推进；奥术工业幻想 Python RPG 保留为选修综合项目，不再作为全部课程的外壳。
 
-Python、Go、Rust 三套本地交互课程均已有可运行入口：Go 包含 22 节，Rust 包含 12 节。代码只由本机对应工具链执行，不会发送到远程服务。
+Python、Go、Rust 三套本地交互课程均已有可运行入口：Python 包含 18 节，Go 包含 22 节，Rust 包含 12 节。代码只由本机对应工具链执行，不会发送到远程服务。
 
 ## 先从 Python 开始
 
@@ -56,7 +56,7 @@ npm start
 
 | 阶段 | 当前状态 | 入口 |
 | --- | --- | --- |
-| Python 基础与自动化 | 当前主线，已提供首个可运行课节 | [`python/`](python/) |
+| Python 基础与自动化 | 当前主线，已完成 18 节自包含交互课程 | [`python/`](python/) |
 | Go 工程与并发 | 已完成 22 节交互课程 | [`go/interactive-course/`](go/interactive-course/) |
 | Rust 系统建模 | 已完成 12 节交互课程 | [`rust/interactive-course/`](rust/interactive-course/) |
 | Python RPG 综合项目 | 选修，用于综合应用 Python | [`rpg/`](rpg/) |
@@ -91,7 +91,7 @@ npm start
 
 ## 当前范围
 
-- 当前 Python 垂直切片包含一个代表课节，用于验证完整学习流程。
+- Python 课程包含 18 节、4 个模块，并以单文件本地日志审计器结业。
 - Python 当前只验收桌面浏览器；Go、Rust 保留现有响应式课程界面。
 - 推荐按 Python、Go、Rust 的顺序学习，但三套课程入口均可独立启动。
 - RPG 不再限制主线课程形态，只作为选修综合练习。
