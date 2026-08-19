@@ -53,8 +53,12 @@ test('loads the shared route and exposes no hidden Python tests', () => {
     'go',
     'rust',
   ]);
-  assert.equal(publicCourse.lessons.length, 1);
-  const publicLesson = publicCourse.lessons[0];
+  assert.equal(publicCourse.lessons.length, 18);
+  assert.equal(publicCourse.lessons[0].id, 'python-values-01');
+  assert.equal(publicCourse.lessons.at(-1).id, 'python-log-auditor-01');
+  const publicLesson = publicCourse.lessons.find(
+    (lesson) => lesson.id === 'python-functions-01',
+  );
   assert.equal(publicLesson.id, 'python-functions-01');
   assert.deepEqual(publicLesson.module, {
     id: 'reusable-programs',
@@ -65,7 +69,7 @@ test('loads the shared route and exposes no hidden Python tests', () => {
   assert.equal(publicLesson.concepts.length, 3);
   assert.equal(publicLesson.commonMistakes.length, 2);
   assert.equal(publicLesson.exercise.acceptance.length, 3);
-  assert.equal('hiddenTest' in publicLesson, false);
+  assert.equal(publicCourse.lessons.some((lesson) => 'hiddenTest' in lesson), false);
   assert.match(course.lesson('python-functions-01').hiddenTest, /unittest/);
 });
 

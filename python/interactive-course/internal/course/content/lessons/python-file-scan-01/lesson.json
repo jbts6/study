@@ -1,0 +1,79 @@
+{
+  "id": "python-file-scan-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "扫描目录与筛选文件",
+  "module": {
+    "id": "log-auditor",
+    "title": "日志审计器",
+    "order": 4
+  },
+  "order": 16,
+  "objectives": [
+    "使用 Path.rglob 递归查找日志文件",
+    "通过扩展名和文件类型过滤扫描结果",
+    "按平台无关路径生成稳定顺序"
+  ],
+  "prerequisites": ["python-argparse-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-argparse-pathlib"],
+  "estimatedMinutes": 80,
+  "explanation": "日志审计器需要在目录树中找到所有 .log 文件，同时忽略其他文件和名称碰巧以 .log 结尾的目录。扫描结果还必须稳定排序，才能得到可重复的处理顺序和报告。",
+  "exerciseGoal": "实现 collect_log_files(root)，递归返回 root 下所有真实 .log 文件，并按 as_posix 路径排序。",
+  "hints": [
+    "先用 Path(root) 统一字符串和 Path 输入",
+    "使用 rglob(\"*.log\") 递归查找候选项，并用 is_file 过滤",
+    "把 path.as_posix() 作为 sorted 的 key，得到稳定的平台无关顺序"
+  ],
+  "concepts": [
+    {
+      "title": "递归遍历",
+      "explanation": "Path.rglob 会从根目录向下遍历所有子目录，并返回符合模式的路径对象。它适合处理按日期或服务分层保存的日志。",
+      "analogy": "递归遍历像从总档案室进入每个子柜和文件夹，不遗漏深层存放的日志。",
+      "code": "from pathlib import Path\n\nfor path in Path(\"logs\").rglob(\"*.log\"):\n    print(path)"
+    },
+    {
+      "title": "文件筛选",
+      "explanation": "文件名模式只判断名称，不保证候选项真的是文件。调用 is_file 可以排除同名目录和其他非文件路径。",
+      "analogy": "筛选像核对档案编号后再确认拿到的是纸质文件，而不是贴着相同编号的柜子。",
+      "code": "files = [path for path in root.rglob(\"*.log\") if path.is_file()]"
+    },
+    {
+      "title": "稳定排序",
+      "explanation": "文件系统返回顺序没有跨平台保证。按 as_posix 形式的路径排序，可以让相同目录结构每次按同一顺序处理。",
+      "analogy": "稳定排序像按完整档案路径编号排队，避免每次盘点顺序都由仓库临时决定。",
+      "code": "files = sorted(files, key=lambda path: path.as_posix())"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "扫描结果包含一个名为 archive.log 的目录，读取时抛出错误。",
+      "cause": "只按名称模式筛选，没有检查候选路径是否为文件。",
+      "fix": "在生成器中加入 path.is_file() 条件。"
+    },
+    {
+      "symptom": "相同文件在不同机器上的处理顺序不同，报告难以比较。",
+      "cause": "直接依赖 rglob 或文件系统的返回顺序。",
+      "fix": "按 path.as_posix() 显式排序后再返回。"
+    }
+  ],
+  "exercise": {
+    "goal": "为日志审计器提供递归、准确且顺序稳定的文件发现函数。",
+    "steps": [
+      "将 root 规范化为 Path",
+      "递归查找所有名称匹配 *.log 的路径",
+      "过滤掉目录等非文件候选项",
+      "按 as_posix 路径排序并返回列表"
+    ],
+    "acceptance": [
+      "同时接受 str 和 Path 根目录",
+      "能发现嵌套目录中的 .log 文件并忽略 .txt 文件",
+      "不返回名称以 .log 结尾的目录，结果顺序稳定"
+    ]
+  },
+  "recap": [
+    "rglob 负责递归发现候选日志路径",
+    "is_file 将名称匹配收窄为真实文件",
+    "稳定排序为日志审计器提供可重复输入顺序"
+  ]
+}

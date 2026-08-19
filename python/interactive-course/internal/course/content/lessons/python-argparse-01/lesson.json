@@ -1,0 +1,79 @@
+{
+  "id": "python-argparse-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "argparse 命令行入口",
+  "module": {
+    "id": "log-auditor",
+    "title": "日志审计器",
+    "order": 4
+  },
+  "order": 15,
+  "objectives": [
+    "使用 ArgumentParser 定义日志审计器入口",
+    "区分必需的位置参数和带默认值的选项",
+    "用 choices 限制报告格式并生成帮助信息"
+  ],
+  "prerequisites": ["python-unittest-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-argparse-pathlib"],
+  "estimatedMinutes": 80,
+  "explanation": "命令行入口把日志目录、输出目录和报告格式变成明确的调用契约。argparse 负责解析参数、校验可选值并生成帮助信息，使日志审计器既适合人工运行，也适合自动化脚本调用。",
+  "exerciseGoal": "实现 build_parser()，接收日志目录，并提供输出目录和 json、csv、both 三种报告格式。",
+  "hints": [
+    "先创建带 description 的 argparse.ArgumentParser",
+    "log_dir 使用位置参数，--output 和 --format 使用可选参数",
+    "为 --format 设置 choices 和默认值 both"
+  ],
+  "concepts": [
+    {
+      "title": "解析器",
+      "explanation": "ArgumentParser 集中描述命令用途和参数规则。parse_args 会把经过校验的命令行文本转换成带属性的命名空间。",
+      "analogy": "解析器像审计任务的登记台，先确认每个字段符合规则，再把整理好的任务单交给程序。",
+      "code": "import argparse\n\nparser = argparse.ArgumentParser(description=\"审计本地日志目录\")"
+    },
+    {
+      "title": "位置参数",
+      "explanation": "位置参数没有前缀，调用时必须按顺序提供。日志目录是执行审计不可缺少的输入，因此适合作为位置参数。",
+      "analogy": "位置参数像寄件单上的收件地址，没有地址就无法开始配送。",
+      "code": "parser.add_argument(\"log_dir\", help=\"包含 .log 文件的目录\")"
+    },
+    {
+      "title": "选项与 choices",
+      "explanation": "可选参数可以提供默认值，choices 则把输入限制为已支持的集合。非法格式会由 argparse 直接报告，而不会进入业务代码。",
+      "analogy": "choices 像表单中的下拉框，使用者只能选择审计器真正支持的报告类型。",
+      "code": "parser.add_argument(\"--format\", choices=(\"json\", \"csv\", \"both\"), default=\"both\")"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "缺少参数时程序抛出 IndexError，使用者不知道正确用法。",
+      "cause": "直接读取 sys.argv 的固定下标。",
+      "fix": "用 ArgumentParser 声明参数，让 argparse 统一生成用法和缺失参数错误。"
+    },
+    {
+      "symptom": "帮助页面能看到 --output，却不知道省略它会写到哪里。",
+      "cause": "帮助文字没有说明选项的默认行为。",
+      "fix": "为选项设置清晰的 default，并在 help 中说明输出目录用途。"
+    }
+  ],
+  "exercise": {
+    "goal": "为日志审计器建立可解析、可校验且自带帮助信息的命令行契约。",
+    "steps": [
+      "创建描述日志审计用途的 ArgumentParser",
+      "添加必需的 log_dir 位置参数",
+      "添加默认值为 audit-output 的 --output",
+      "添加只接受 json、csv、both 且默认 both 的 --format"
+    ],
+    "acceptance": [
+      "只提供日志目录时能得到两个选项的默认值",
+      "可以显式选择输出目录和 csv 格式",
+      "不支持的格式会被 argparse 拒绝"
+    ]
+  },
+  "recap": [
+    "ArgumentParser 统一参数解析、校验和帮助信息",
+    "位置参数表达必需输入，可选参数承载稳定默认值",
+    "命令行契约将作为最终日志审计器的公开入口"
+  ]
+}

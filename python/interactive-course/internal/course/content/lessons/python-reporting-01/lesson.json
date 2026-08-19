@@ -1,0 +1,79 @@
+{
+  "id": "python-reporting-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "聚合统计与报告生成",
+  "module": {
+    "id": "log-auditor",
+    "title": "日志审计器",
+    "order": 4
+  },
+  "order": 17,
+  "objectives": [
+    "使用累加器统计记录总数和日志级别",
+    "把大小写不同的级别归一化后稳定排序",
+    "按选择写出可解析的 JSON 和 CSV 报告"
+  ],
+  "prerequisites": ["python-file-scan-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-argparse-pathlib"],
+  "estimatedMinutes": 90,
+  "explanation": "扫描和解析完成后，日志审计器需要把记录聚合为总数和按级别统计。聚合与写文件分成两个函数，可以先在内存中验证报告，再一次性生成稳定的 JSON 和 CSV 输出。",
+  "exerciseGoal": "实现 build_report(entries) 和 write_reports(report, output_dir, output_format)，生成排序稳定的级别统计及报告文件。",
+  "hints": [
+    "遍历 entries 时同时累加 records，并把 entry.level 转为大写",
+    "返回报告前用 dict(sorted(by_level.items())) 固定级别顺序",
+    "先创建输出目录，再根据 output_format 分别写 audit.json 和 audit.csv"
+  ],
+  "concepts": [
+    {
+      "title": "累加器",
+      "explanation": "遍历可迭代记录时，可以同时累加总记录数和字典计数。这样列表和生成器都能作为输入，不必提前复制全部数据。",
+      "analogy": "累加器像审计员边翻档案边更新总页数和分类表，一次遍历就得到全部统计。",
+      "code": "records = 0\nby_level = {}\nfor entry in entries:\n    records += 1"
+    },
+    {
+      "title": "按级别分组",
+      "explanation": "先把级别转换为大写，再通过 dict.get 读取已有数量，可以避免 error 和 ERROR 被拆成两个类别。",
+      "analogy": "归一化像把不同大小写的标签统一贴成标准大写标签，再放进同一个档案盒。",
+      "code": "level = entry.level.upper()\nby_level[level] = by_level.get(level, 0) + 1"
+    },
+    {
+      "title": "双格式输出",
+      "explanation": "JSON 保留完整报告结构，CSV 把级别计数展成表格。根据 output_format 分支，可以只生成调用方真正需要的文件。",
+      "analogy": "同一份审计结论既能装订成机器读取的档案，也能整理成人员查看的表格。",
+      "code": "if output_format in {\"json\", \"both\"}:\n    write_json()\nif output_format in {\"csv\", \"both\"}:\n    write_csv()"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "处理大量记录时反复打开和重写报告文件，速度慢且可能留下半成品。",
+      "cause": "在聚合循环内部执行文件写入。",
+      "fix": "先在内存中完成统计，再调用 write_reports 一次性写出。"
+    },
+    {
+      "symptom": "相同输入生成的 CSV 行顺序不稳定，自动比较经常失败。",
+      "cause": "没有在输出前对级别键排序。",
+      "fix": "在 build_report 中返回按键排序的 by_level 字典。"
+    }
+  ],
+  "exercise": {
+    "goal": "把日志记录聚合成稳定报告，并按需写出 JSON、CSV 或两种文件。",
+    "steps": [
+      "遍历记录并累加 records 和按级别计数",
+      "将级别大写并对最终 by_level 排序",
+      "创建输出目录并写入 UTF-8 JSON",
+      "使用 csv.writer 写入 level/count 表头和统计行"
+    ],
+    "acceptance": [
+      "可迭代输入得到正确的 records 和大小写归一化计数",
+      "both 模式生成可解析的 audit.json 与 audit.csv",
+      "JSON 使用 UTF-8，CSV 级别行按名称稳定排序"
+    ]
+  },
+  "recap": [
+    "一次遍历即可完成总数和分组计数",
+    "归一化与排序让报告内容稳定可比较",
+    "报告写入与聚合分离，便于最终日志审计器组合和测试"
+  ]
+}

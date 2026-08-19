@@ -1,0 +1,80 @@
+{
+  "id": "python-log-auditor-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "集成、测试和交付",
+  "module": {
+    "id": "log-auditor",
+    "title": "日志审计器",
+    "order": 4
+  },
+  "order": 18,
+  "objectives": [
+    "把参数解析、文件扫描、记录解析和报告写入组合成管线",
+    "用退出码区分成功和可预期的调用失败",
+    "通过临时目录完成端到端行为验证"
+  ],
+  "prerequisites": ["python-reporting-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-argparse-pathlib"],
+  "estimatedMinutes": 120,
+  "explanation": "结业练习把前面课节的函数组合为单文件本地日志审计器。程序扫描 .log 文件，跳过空行，把坏记录计入 invalid，聚合合法记录并生成报告；命令行入口用明确退出码告诉脚本调用方执行是否成功。",
+  "exerciseGoal": "完成 log_auditor.py 的完整管线，生成 audit.json 和 audit.csv，并让 main(argv) 正确报告成功或缺失目录。",
+  "hints": [
+    "让 audit_logs 只负责编排已有小函数，并在解析每行时单独处理 ValueError",
+    "先用 build_report 汇总合法记录，再补入 files 和 invalid",
+    "main 先检查日志目录，再调用 audit_logs；失败返回 1，成功打印摘要并返回 0"
+  ],
+  "concepts": [
+    {
+      "title": "组合管线",
+      "explanation": "扫描、读取、解析、聚合和写报告各自保持单一职责，audit_logs 只按顺序连接这些步骤。小函数可以单独测试，管线也更容易定位失败阶段。",
+      "analogy": "日志审计管线像一条分工明确的处理线，每个工位只完成一种检查，调度员负责传递结果。",
+      "code": "files = collect_log_files(log_dir)\nentries = [parse_line(line) for line in lines]\nreport = build_report(entries)"
+    },
+    {
+      "title": "退出码",
+      "explanation": "main 返回 0 表示成功，返回非零值表示调用失败。错误文字供人阅读，退出码则供终端和自动化脚本稳定判断。",
+      "analogy": "退出码像任务单上的状态章：正文说明原因，数字状态让调度系统快速决定是否继续。",
+      "code": "if not source.is_dir():\n    print(f\"日志目录不存在: {source}\", file=sys.stderr)\n    return 1"
+    },
+    {
+      "title": "端到端验证",
+      "explanation": "临时目录可以建立真实的嵌套日志、坏记录和输出目录。测试从命令参数一路验证到 JSON、CSV 文件，证明各步骤组合后仍符合契约。",
+      "analogy": "端到端测试像一次完整审计演练，从接收档案到交付两种报告都使用受控样本。",
+      "code": "with TemporaryDirectory() as directory:\n    report = audit_logs(logs, output)\n    assert (output / \"audit.json\").exists()"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "main 函数很长，扫描、解析、统计和写文件混在一起，任何失败都难以单独测试。",
+      "cause": "把命令入口当成所有业务细节的实现位置。",
+      "fix": "保留已有小函数，让 main 只解析参数、检查输入、调用管线和返回退出码。"
+    },
+    {
+      "symptom": "日志目录不存在时打印了错误，但命令仍返回成功状态。",
+      "cause": "失败分支没有返回非零退出码。",
+      "fix": "缺失目录向 stderr 输出明确路径并返回 1，成功路径返回 0。"
+    }
+  ],
+  "exercise": {
+    "goal": "交付一个能扫描本地目录、容忍坏记录、生成双格式报告并提供可靠退出码的单文件日志审计器。",
+    "steps": [
+      "实现参数解析、递归扫描、记录解析、聚合和报告写入函数",
+      "在 audit_logs 中读取每个文件，跳过空行并统计 ValueError",
+      "生成包含 files、records、invalid、by_level 的最终报告",
+      "实现 main 的目录检查、成功摘要和 0/1 退出码"
+    ],
+    "acceptance": [
+      "两个 .log 文件中的三条合法记录和一条坏记录被正确统计",
+      "非日志文件被忽略，audit.json 和 audit.csv 都可解析",
+      "缺失日志目录返回 1、写入 stderr 且不创建报告目录",
+      "有效目录通过 main 运行时返回 0 并打印审计摘要"
+    ]
+  },
+  "recap": [
+    "小函数通过组合形成可读、可测的日志审计管线",
+    "报告同时记录文件数、合法记录、坏记录和级别统计",
+    "明确退出码与端到端测试让本地自动化工具可以可靠交付"
+  ]
+}

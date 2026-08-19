@@ -59,6 +59,22 @@
     {
       "id": "python-unittest-01",
       "directory": "lessons/python-unittest-01"
+    },
+    {
+      "id": "python-argparse-01",
+      "directory": "lessons/python-argparse-01"
+    },
+    {
+      "id": "python-file-scan-01",
+      "directory": "lessons/python-file-scan-01"
+    },
+    {
+      "id": "python-reporting-01",
+      "directory": "lessons/python-reporting-01"
+    },
+    {
+      "id": "python-log-auditor-01",
+      "directory": "lessons/python-log-auditor-01"
     }
   ]
 }
