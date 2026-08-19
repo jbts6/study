@@ -1,0 +1,79 @@
+{
+  "id": "python-log-parsing-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "解析日志记录",
+  "module": {
+    "id": "files-reliability",
+    "title": "文件与可靠性",
+    "order": 3
+  },
+  "order": 11,
+  "objectives": [
+    "把一行日志拆分成固定字段的数据类",
+    "使用 maxsplit 保留消息中的分隔符",
+    "在解析边界校验格式并报告可理解的错误"
+  ],
+  "prerequisites": ["python-paths-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-pathlib-json-csv-unittest"],
+  "estimatedMinutes": 85,
+  "explanation": "日志行通常由时间、级别和消息组成，但消息本身也可能包含竖线。解析器应限制拆分次数、清理字段并拒绝缺字段或空字段的坏记录，让后续审计步骤只处理可信结构。",
+  "exerciseGoal": "定义冻结的 LogEntry，并实现 parse_line(line)，按 timestamp|level|message 解析并规范级别。",
+  "hints": [
+    "从 dataclasses 导入 dataclass，并使用 frozen=True 声明 LogEntry",
+    "调用 line.split(\"|\", maxsplit=2)，然后分别对三个字段 strip",
+    "字段数量不是 3 或任意字段为空时抛出带格式说明的 ValueError"
+  ],
+  "concepts": [
+    {
+      "title": "清理文本",
+      "explanation": "split 得到的字段可能带有换行或额外空格。逐个调用 strip 可以统一数据形状，再交给后续筛选和统计。",
+      "analogy": "清理像日志进入档案室前的整理，把标签边缘的空白剪掉，避免同一个级别被记录成多个写法。",
+      "code": "parts = [part.strip() for part in line.split(\"|\", maxsplit=2)]"
+    },
+    {
+      "title": "限制次数拆分",
+      "explanation": "默认 split 会把消息里的每个竖线都拆开。maxsplit=2 只切出前两个分隔符，让第三部分完整保留原始消息。",
+      "analogy": "解析器只按表头的两条边界切割表格，第三列里的竖线仍属于备注内容。",
+      "code": "timestamp, level, message = line.split(\"|\", maxsplit=2)"
+    },
+    {
+      "title": "输入校验",
+      "explanation": "在创建 LogEntry 前检查字段数和非空状态，可以把格式错误定位在入口。明确的 ValueError 比让后续代码遇到索引错误更容易排查。",
+      "analogy": "校验像档案收件处的清单检查，缺少必填栏目的记录会被退回并标明原因。",
+      "code": "if len(parts) != 3 or not all(parts):\n    raise ValueError(\"日志格式必须是 timestamp|level|message\")"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "消息包含竖线时被截断，或者解析结果多出字段。",
+      "cause": "调用 split(\"|\") 时没有限制拆分次数。",
+      "fix": "用 maxsplit=2 只分出时间、级别和剩余消息三部分。"
+    },
+    {
+      "symptom": "坏日志被静默转换成空字段，后续统计出现难以解释的记录。",
+      "cause": "解析函数没有检查字段数量和内容是否为空。",
+      "fix": "在创建数据类前校验 len(parts) 和 all(parts)，失败时抛出明确的 ValueError。"
+    }
+  ],
+  "exercise": {
+    "goal": "构建一个能保留复杂消息、规范级别并拒绝坏输入的日志行解析器。",
+    "steps": [
+      "定义 frozen=True 的 LogEntry 数据类",
+      "以 maxsplit=2 拆分输入并清理三个字段",
+      "检查字段数量和空字段，格式不符时抛出 ValueError",
+      "将 level 转为大写后返回 LogEntry"
+    ],
+    "acceptance": [
+      "消息中的竖线仍出现在 message 字段中",
+      "level 统一为大写且三个字段去除两端空白",
+      "缺少字段或空字段会抛出指定中文错误信息"
+    ]
+  },
+  "recap": [
+    "清理文本让日志字段具有稳定形状",
+    "maxsplit=2 可以保留消息中的分隔符",
+    "入口校验把坏记录转成可定位的 ValueError"
+  ]
+}

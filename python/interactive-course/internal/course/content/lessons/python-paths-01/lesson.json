@@ -1,0 +1,79 @@
+{
+  "id": "python-paths-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "pathlib 与文本文件",
+  "module": {
+    "id": "files-reliability",
+    "title": "文件与可靠性",
+    "order": 3
+  },
+  "order": 10,
+  "objectives": [
+    "使用 Path 对象表达跨平台的日志文件路径",
+    "以 UTF-8 读取文本并忽略空白记录",
+    "用上下文管理器安全地完成文件读写"
+  ],
+  "prerequisites": ["python-modules-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-pathlib-json-csv-unittest"],
+  "estimatedMinutes": 80,
+  "explanation": "文件处理是日志审计器连接真实数据的入口。pathlib 把路径操作表示为对象，read_text 以明确编码读取内容，读写操作配合上下文管理器可以在发生异常时也正确关闭文件。",
+  "exerciseGoal": "实现 read_lines(file_path)，接受字符串或 Path，读取 UTF-8 文本后返回去除两端空白且非空的行。",
+  "hints": [
+    "先从 pathlib 导入 Path，并在函数开头用 Path(file_path) 规范化输入",
+    "调用 read_text(encoding=\"utf-8\") 后使用 splitlines 保留原始行边界",
+    "用列表推导过滤空行，同时对每一行调用 strip"
+  ],
+  "concepts": [
+    {
+      "title": "Path 对象",
+      "explanation": "Path 把文件系统路径表示成可组合的对象，/ 运算符能在不同平台使用正确的分隔符。Path(value) 还可以统一接收字符串和已有的 Path。",
+      "analogy": "Path 像日志档案的地址卡片，组合目录和文件名时由系统填写正确的格式，不必手工拼接斜杠。",
+      "code": "from pathlib import Path\n\nlog_path = Path(\"data\") / \"audit.log\""
+    },
+    {
+      "title": "UTF-8 读写",
+      "explanation": "文本文件的字节必须用一致的字符编码解释。显式传入 encoding=\"utf-8\" 能让中文日志在不同机器上按同一种方式解码。",
+      "analogy": "编码像档案馆和读者共同约定的文字密码，读写两边使用 UTF-8 才不会把日志中的中文读成乱码。",
+      "code": "text = Path(\"audit.log\").read_text(encoding=\"utf-8\")\nPath(\"copy.log\").write_text(text, encoding=\"utf-8\")"
+    },
+    {
+      "title": "上下文管理器",
+      "explanation": "open 返回的文件对象应在使用后关闭。with 语句会在代码块结束或异常发生时自动执行清理，避免文件句柄长期占用。",
+      "analogy": "with 像借用审计室钥匙的登记流程，离开房间时无论任务是否顺利都会归还钥匙。",
+      "code": "with Path(\"audit.log\").open(encoding=\"utf-8\") as handle:\n    first_line = handle.readline()"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "Windows 上的路径在 Linux 或 macOS 上无法打开。",
+      "cause": "把反斜杠和斜杠直接拼成字符串。",
+      "fix": "使用 Path(directory) / filename 组合路径，让 pathlib 负责平台分隔符。"
+    },
+    {
+      "symptom": "中文日志在部分环境中读取失败或显示乱码。",
+      "cause": "依赖系统默认编码，没有为文本读写指定编码。",
+      "fix": "读取和写入文本时都明确传入 encoding=\"utf-8\"。"
+    }
+  ],
+  "exercise": {
+    "goal": "把路径规范化和 UTF-8 文本读取组合成可复用的日志行加载函数。",
+    "steps": [
+      "导入 Path 并把 file_path 转换为 Path 对象",
+      "用 UTF-8 读取整个文件并按行拆分",
+      "清理每行两端空白并过滤空行",
+      "返回清理后的字符串列表"
+    ],
+    "acceptance": [
+      "同时接受 str 和 pathlib.Path 路径",
+      "中文内容按 UTF-8 正确读取",
+      "空白行被忽略且保留非空行的原有顺序"
+    ]
+  },
+  "recap": [
+    "Path 对象让日志文件路径跨平台且易于组合",
+    "显式 UTF-8 编码保证文本内容稳定解码",
+    "with 上下文管理器负责文件资源清理"
+  ]
+}

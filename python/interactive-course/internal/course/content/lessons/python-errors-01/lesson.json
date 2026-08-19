@@ -1,0 +1,79 @@
+{
+  "id": "python-errors-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "异常、校验与错误信息",
+  "module": {
+    "id": "files-reliability",
+    "title": "文件与可靠性",
+    "order": 3
+  },
+  "order": 13,
+  "objectives": [
+    "区分预期异常和真正的编程错误",
+    "定义面向日志加载场景的自定义异常",
+    "使用 from 保留底层异常的原因链"
+  ],
+  "prerequisites": ["python-json-csv-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-pathlib-json-csv-unittest"],
+  "estimatedMinutes": 80,
+  "explanation": "文件不存在和内容为空是日志加载时可以预期的失败。自定义 LogLoadError 能让调用方只处理业务语义，错误信息指出具体路径，而 from error 保留 FileNotFoundError 供调试追根溯源。",
+  "exerciseGoal": "定义 LogLoadError 并实现 load_log(path)，读取非空 UTF-8 行，在文件缺失或为空时抛出带原因或上下文的异常。",
+  "hints": [
+    "让 LogLoadError 继承 Exception，并用 Path(path) 统一字符串和 Path 输入",
+    "只捕获 FileNotFoundError，在 except 中用 raise LogLoadError(...) from error",
+    "读取并清理非空行后，如果列表为空则抛出说明日志为空的 LogLoadError"
+  ],
+  "concepts": [
+    {
+      "title": "预期异常",
+      "explanation": "文件不存在或内容为空属于调用方可能遇到的输入状态，应在边界处转成清晰的业务错误。没有必要捕获所有异常，因为编码错误等问题仍应暴露。",
+      "analogy": "加载日志像验收货箱，找不到货箱和空货箱是可说明的状态，工具损坏等意外则应继续上报。",
+      "code": "try:\n    text = source.read_text(encoding=\"utf-8\")\nexcept FileNotFoundError as error:\n    raise LogLoadError(\"找不到日志文件\") from error"
+    },
+    {
+      "title": "自定义异常",
+      "explanation": "继承 Exception 的 LogLoadError 表达日志加载这一层的失败语义。调用方可以捕获它而不依赖 Path 或操作系统错误的具体文本。",
+      "analogy": "自定义异常像审计系统统一的故障标签，把不同底层原因归类为日志加载失败。",
+      "code": "class LogLoadError(Exception):\n    pass"
+    },
+    {
+      "title": "保留原因链",
+      "explanation": "raise NewError(...) from error 会把原异常放进 __cause__。用户看到友好的业务文案，调试器仍能看到真实的 FileNotFoundError。",
+      "analogy": "原因链像故障报告的摘要和附件：摘要告诉使用者发生了什么，附件保留设备返回的原始证据。",
+      "code": "except FileNotFoundError as error:\n    raise LogLoadError(f\"找不到日志文件: {source}\") from error"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "任何错误都被转换成同一句话，真正的编程错误难以定位。",
+      "cause": "使用 except Exception 捕获所有异常。",
+      "fix": "只捕获能解释的预期异常，其他异常保留原始堆栈并继续暴露。"
+    },
+    {
+      "symptom": "调用方看到了自定义错误，但调试时找不到文件系统的原始原因。",
+      "cause": "在 except 中重新抛出异常时没有使用 from。",
+      "fix": "使用 raise LogLoadError(...) from error 保留 __cause__ 链。"
+    }
+  ],
+  "exercise": {
+    "goal": "为日志读取建立清晰、可调试且不会吞掉意外错误的异常边界。",
+    "steps": [
+      "定义继承 Exception 的 LogLoadError",
+      "把输入路径规范化并尝试以 UTF-8 读取",
+      "仅捕获 FileNotFoundError 并用 from 保留原因",
+      "过滤空行并对空文件抛出带路径的 LogLoadError"
+    ],
+    "acceptance": [
+      "缺失文件抛出包含路径的 LogLoadError 且 __cause__ 为 FileNotFoundError",
+      "只包含空白的文件抛出说明日志为空的 LogLoadError",
+      "有效文件返回清理后的非空行列表"
+    ]
+  },
+  "recap": [
+    "预期输入失败应在边界处转成清晰错误",
+    "自定义异常隔离了调用方与底层实现",
+    "原因链同时保留用户文案和调试证据"
+  ]
+}

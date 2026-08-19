@@ -1,0 +1,79 @@
+{
+  "id": "python-unittest-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "unittest、临时目录与调试",
+  "module": {
+    "id": "files-reliability",
+    "title": "文件与可靠性",
+    "order": 3
+  },
+  "order": 14,
+  "objectives": [
+    "用 Arrange/Act/Assert 组织可读的单元测试",
+    "使用 TestCase 验证日志错误计数",
+    "用临时目录隔离文件夹具并缩小调试范围"
+  ],
+  "prerequisites": ["python-errors-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-pathlib-json-csv-unittest"],
+  "estimatedMinutes": 90,
+  "explanation": "可靠的日志工具需要可重复的回归测试。unittest.TestCase 把准备数据、调用函数和断言结果分开，TemporaryDirectory 提供一次性文件夹具，失败时可以从具体断言快速定位问题。",
+  "exerciseGoal": "实现 count_errors(lines)，并编写包含至少两个通过测试方法的 LogAuditTests，覆盖错误计数和空输入。",
+  "hints": [
+    "在 count_errors 中对每一行检查 \"ERROR\" in line，并用 sum 汇总布尔值",
+    "让 LogAuditTests 继承 unittest.TestCase，每个测试方法名以 test_ 开头",
+    "使用 assertEqual 断言精确数量，必要的文件夹具放在 TemporaryDirectory 中"
+  ],
+  "concepts": [
+    {
+      "title": "Arrange/Act/Assert",
+      "explanation": "测试先准备输入，再调用被测函数，最后精确断言结果。三个阶段分明时，失败信息能直接说明是数据、行为还是预期出了问题。",
+      "analogy": "像审计复核流程：先摆好样本，再执行规则，最后对照应有的统计数字。",
+      "code": "lines = [\"INFO ready\", \"ERROR disk\"]  # Arrange\nresult = count_errors(lines)  # Act\nself.assertEqual(result, 1)  # Assert"
+    },
+    {
+      "title": "TestCase",
+      "explanation": "继承 unittest.TestCase 后，以 test_ 开头的方法会被测试运行器发现。assertEqual 等断言会在结果不符时提供对比信息。",
+      "analogy": "TestCase 像一张标准化的审计检查单，每一项检查都有统一的执行和报告格式。",
+      "code": "import unittest\n\nclass LogAuditTests(unittest.TestCase):\n    def test_empty_input(self):\n        self.assertEqual(count_errors([]), 0)"
+    },
+    {
+      "title": "临时目录",
+      "explanation": "tempfile.TemporaryDirectory 会创建隔离目录，并在 with 代码块结束后清理。测试可以使用真实文件而不会依赖或污染玩家的用户目录。",
+      "analogy": "临时目录像为每次演练搭建的移动档案室，演练结束自动拆除，不影响正式档案。",
+      "code": "from pathlib import Path\nfrom tempfile import TemporaryDirectory\n\nwith TemporaryDirectory() as directory:\n    fixture = Path(directory) / \"audit.log\""
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "测试在开发机上通过，换一台机器或换个用户目录就失败。",
+      "cause": "直接读取真实用户文件作为测试夹具。",
+      "fix": "在 TemporaryDirectory 中创建最小文件夹具，测试只依赖自己准备的数据。"
+    },
+    {
+      "symptom": "测试只确认函数没有抛异常，却无法发现返回数量错误。",
+      "cause": "没有用精确断言检查结果值。",
+      "fix": "使用 assertEqual 等断言验证具体数量和边界输入的预期结果。"
+    }
+  ],
+  "exercise": {
+    "goal": "用两个可重复的 TestCase 测试日志错误计数，并为后续调试留下清晰失败信息。",
+    "steps": [
+      "实现 count_errors，统计包含 ERROR 的行",
+      "定义继承 unittest.TestCase 的 LogAuditTests",
+      "为正常日志和空列表分别编写以 test_ 开头的方法",
+      "用 assertEqual 断言精确结果并运行 unittest"
+    ],
+    "acceptance": [
+      "LogAuditTests 至少包含两个测试方法且都能通过",
+      "包含 ERROR 的行各计数一次，其他行不计数",
+      "空输入返回 0，测试不依赖真实用户文件"
+    ]
+  },
+  "recap": [
+    "Arrange/Act/Assert 让测试意图和失败位置清楚",
+    "TestCase 与 assertEqual 提供可重复的精确检查",
+    "TemporaryDirectory 隔离文件夹具并帮助安全调试"
+  ]
+}

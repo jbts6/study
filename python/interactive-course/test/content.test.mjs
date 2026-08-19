@@ -18,6 +18,11 @@ const expectedLessonIds = [
   'python-parameters-01',
   'python-dataclasses-01',
   'python-modules-01',
+  'python-paths-01',
+  'python-log-parsing-01',
+  'python-json-csv-01',
+  'python-errors-01',
+  'python-unittest-01',
 ];
 
 test('maps the implemented Python lessons in order', () => {

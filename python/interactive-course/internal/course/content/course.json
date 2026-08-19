@@ -39,6 +39,26 @@
     {
       "id": "python-modules-01",
       "directory": "lessons/python-modules-01"
+    },
+    {
+      "id": "python-paths-01",
+      "directory": "lessons/python-paths-01"
+    },
+    {
+      "id": "python-log-parsing-01",
+      "directory": "lessons/python-log-parsing-01"
+    },
+    {
+      "id": "python-json-csv-01",
+      "directory": "lessons/python-json-csv-01"
+    },
+    {
+      "id": "python-errors-01",
+      "directory": "lessons/python-errors-01"
+    },
+    {
+      "id": "python-unittest-01",
+      "directory": "lessons/python-unittest-01"
     }
   ]
 }

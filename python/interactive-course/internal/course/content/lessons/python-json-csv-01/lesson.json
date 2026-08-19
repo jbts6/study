@@ -1,0 +1,79 @@
+{
+  "id": "python-json-csv-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "JSON 与 CSV",
+  "module": {
+    "id": "files-reliability",
+    "title": "文件与可靠性",
+    "order": 3
+  },
+  "order": 12,
+  "objectives": [
+    "使用 json 模块保存可交换的统计对象",
+    "用 csv.writer 生成表头和数据行",
+    "通过排序让审计摘要输出稳定可比较"
+  ],
+  "prerequisites": ["python-log-parsing-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-pathlib-json-csv-unittest"],
+  "estimatedMinutes": 85,
+  "explanation": "日志统计结果需要同时供程序读取和人类查看。JSON 保留对象结构，CSV 适合表格工具；标准库负责转义引号、逗号和非 ASCII 文本，排序后的条目则能让输出在测试和审计中保持稳定。",
+  "exerciseGoal": "实现 save_summary(summary, json_path, csv_path)，同时写入 UTF-8 JSON 文件和带 metric/value 表头的 CSV 文件。",
+  "hints": [
+    "使用 json.dumps(summary, ensure_ascii=False, indent=2) 并在文本末尾补一个换行",
+    "以 newline=\"\" 打开 CSV 文件，再创建 csv.writer",
+    "先写入 [\"metric\", \"value\"]，再对 summary.items() 排序后写入数据行"
+  ],
+  "concepts": [
+    {
+      "title": "JSON 对象",
+      "explanation": "json.dumps 把 Python 字典等对象编码成标准 JSON 文本，ensure_ascii=False 可以直接保留中文，indent=2 让审计文件便于阅读。",
+      "analogy": "JSON 像带字段名称的数字化档案，程序可以按键读取，人在文本编辑器中也能看懂层级。",
+      "code": "import json\n\ntext = json.dumps({\"错误\": 2}, ensure_ascii=False, indent=2)"
+    },
+    {
+      "title": "CSV 行",
+      "explanation": "csv.writer 会根据字段内容正确处理逗号、引号和换行。先写表头，再逐行写入数据，输出就能被电子表格工具可靠读取。",
+      "analogy": "CSV 像审计报表的二维表格，每一行是一条指标记录，writer 负责把特殊字符放进正确的单元格。",
+      "code": "import csv\n\nwriter.writerow([\"metric\", \"value\"])\nwriter.writerow([\"errors\", 2])"
+    },
+    {
+      "title": "稳定输出",
+      "explanation": "对字典项排序后再写 CSV，可以让相同输入始终得到相同的行顺序。稳定输出便于版本比较、调试和自动化测试。",
+      "analogy": "排序像每次都按指标名称排列审计报告，读者能快速定位变化，测试也不依赖字典构造顺序。",
+      "code": "for metric, value in sorted(summary.items()):\n    writer.writerow([metric, value])"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "指标名或消息中的引号、逗号破坏了 JSON 结构。",
+      "cause": "手工拼接 JSON 字符串，没有让 json 模块负责转义。",
+      "fix": "使用 json.dumps 编码 Python 对象，并按需求设置 ensure_ascii 和 indent。"
+    },
+    {
+      "symptom": "Windows 生成的 CSV 出现空白行，或换行在不同工具中显示异常。",
+      "cause": "打开 CSV 时遗漏 newline=\"\"。",
+      "fix": "用 Path.open(\"w\", encoding=\"utf-8\", newline=\"\") 配合 csv.writer。"
+    }
+  ],
+  "exercise": {
+    "goal": "将日志摘要一次写成可解析的 JSON 和稳定的 CSV 两种格式。",
+    "steps": [
+      "把两个输出路径规范化成 Path",
+      "用 json.dumps 生成保留中文的缩进 JSON 并写入",
+      "用 newline=\"\" 打开 CSV，写入固定表头",
+      "按指标名称排序后写出所有 summary 条目"
+    ],
+    "acceptance": [
+      "JSON 解析后与输入 summary 完全相等",
+      "CSV 第一行是 metric 和 value 表头",
+      "CSV 数据行按指标名称稳定排序且特殊字符可被 csv.reader 还原"
+    ]
+  },
+  "recap": [
+    "json.dumps 负责对象结构与字符转义",
+    "csv.writer 负责表格字段和换行细节",
+    "排序输出让日志摘要易比较且便于测试"
+  ]
+}
