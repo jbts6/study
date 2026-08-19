@@ -1,0 +1,78 @@
+{
+  "id": "python-values-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "运行、变量与字符串",
+  "module": {
+    "id": "python-expressions",
+    "title": "Python 表达方式",
+    "order": 1
+  },
+  "order": 1,
+  "objectives": [
+    "理解 Python 脚本按从上到下的顺序执行",
+    "用变量保存并重新使用日志统计值",
+    "使用 f-string 生成包含变量值的摘要"
+  ],
+  "prerequisites": [],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-tutorial-basics"],
+  "estimatedMinutes": 60,
+  "explanation": "Python 脚本会从第一行开始依次执行。变量让后面的语句能复用前面得到的数据，f-string 则把不同类型的值按指定格式放进字符串。本节会把日志来源、总数和错误数组合成一行稳定摘要。",
+  "exerciseGoal": "实现 format_summary(source, total, errors)，返回“来源: 错误数/总数 errors”格式的字符串。",
+  "hints": [
+    "函数参数已经把来源、总数和错误数绑定到三个变量",
+    "在字符串前加 f，并把要替换的变量写在花括号中",
+    "按 source、errors、total 的顺序核对输出"
+  ],
+  "concepts": [
+    {
+      "title": "脚本顺序执行",
+      "explanation": "Python 通常按照代码从上到下的顺序执行。后面的语句可以使用前面已经创建的值，因此先准备数据，再生成摘要。",
+      "analogy": "像按时间阅读日志：只有先读到记录，后面才能汇总已经出现的信息。",
+      "code": "source = \"worker\"\ntotal = 5\nprint(source, total)"
+    },
+    {
+      "title": "变量绑定",
+      "explanation": "赋值语句把名称绑定到一个值。使用变量名时，Python 会读取当前绑定的值，而不是把名称本身当作文本。",
+      "analogy": "变量名像工作台上的标签，标签指向当前放在对应位置的数据。",
+      "code": "errors = 1\nerrors = errors + 1\nprint(errors)  # 2"
+    },
+    {
+      "title": "f-string",
+      "explanation": "f-string 在引号前使用 f，并计算花括号中的表达式。数字会自动转换成适合显示的文本，不需要手动调用 str。",
+      "analogy": "它像一张带命名空位的摘要模板，每个空位都由变量的当前值填入。",
+      "code": "source = \"api\"\nerrors = 2\nprint(f\"{source}: {errors} errors\")"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "使用加号拼接摘要时出现字符串和整数不能相加的错误。",
+      "cause": "加号拼接要求两边都是字符串，而 total 和 errors 是整数。",
+      "fix": "使用 f-string 直接嵌入数字，或先明确地用 str 转换数字。"
+    },
+    {
+      "symptom": "输出中出现字面量 source，而不是实际来源名称。",
+      "cause": "把变量名写进了普通字符串，没有使用 f-string 的花括号。",
+      "fix": "把字符串写成 f\"{source}: ...\"，让 Python 读取变量值。"
+    }
+  ],
+  "exercise": {
+    "goal": "返回一行包含来源、错误数和总数的日志摘要。",
+    "steps": [
+      "保留 format_summary(source, total, errors) 函数签名",
+      "创建 f-string，并按来源、错误数、总数的顺序嵌入参数",
+      "返回生成的字符串"
+    ],
+    "acceptance": [
+      "结果格式为“来源: 错误数/总数 errors”",
+      "total 和 errors 为零时仍显示两个零",
+      "返回值是字符串，不额外打印内容"
+    ]
+  },
+  "recap": [
+    "脚本顺序决定变量何时可用",
+    "变量名读取当前绑定的值",
+    "f-string 能把字符串和数字清晰地组合起来"
+  ]
+}

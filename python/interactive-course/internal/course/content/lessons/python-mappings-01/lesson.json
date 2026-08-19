@@ -1,0 +1,79 @@
+{
+  "id": "python-mappings-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "字典与集合",
+  "module": {
+    "id": "python-expressions",
+    "title": "Python 表达方式",
+    "order": 1
+  },
+  "order": 4,
+  "objectives": [
+    "使用字典把来源名称映射到计数",
+    "用 get 安全读取可能缺失的键",
+    "使用集合从一组值中去除重复项"
+  ],
+  "prerequisites": ["python-sequences-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-tutorial-basics"],
+  "estimatedMinutes": 70,
+  "explanation": "字典通过键查找对应的值，适合保存“日志来源到数量”的关系。get 可以为缺失键提供默认值，集合则只保留唯一元素。本节会逐条读取日志记录，安全地按来源累计数量。",
+  "exerciseGoal": "实现 summarize_sources(entries)，统计每个 source 的出现次数，缺失 source 的记录归入 unknown。",
+  "hints": [
+    "从空字典 counts 开始累积",
+    "用 entry.get(\"source\", \"unknown\") 读取来源",
+    "用 counts.get(source, 0) + 1 更新当前计数"
+  ],
+  "concepts": [
+    {
+      "title": "键值映射",
+      "explanation": "字典为每个键保存一个值。键在同一字典中唯一，再次给相同键赋值会更新原有值，因此很适合维护分类计数。",
+      "analogy": "像按来源名称建立索引，每个名称直接指向该来源的当前统计。",
+      "code": "counts = {\"api\": 1}\ncounts[\"api\"] = counts[\"api\"] + 1"
+    },
+    {
+      "title": "安全取值",
+      "explanation": "使用方括号读取不存在的键会引发 KeyError。dict.get(key, default) 在键缺失时返回默认值，适合处理字段可能不完整的记录。",
+      "analogy": "get 像带备用路线的查询：找不到指定入口时返回约定的默认分类。",
+      "code": "entry = {}\nsource = entry.get(\"source\", \"unknown\")"
+    },
+    {
+      "title": "集合去重",
+      "explanation": "集合只保留唯一元素，不记录重复值。集合元素必须可哈希，字符串和数字可以作为元素，列表不可以。",
+      "analogy": "集合像已见标记表，同一个来源无论遇到多少次都只登记一次。",
+      "code": "sources = {\"api\", \"worker\", \"api\"}\nprint(len(sources))  # 2"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "处理缺少 source 的记录时出现 KeyError。",
+      "cause": "使用 entry[\"source\"] 直接读取了可能不存在的键。",
+      "fix": "改用 entry.get(\"source\", \"unknown\") 提供默认分类。"
+    },
+    {
+      "symptom": "把列表加入集合时出现 unhashable type: list。",
+      "cause": "列表内容可变，不能作为集合元素或字典键。",
+      "fix": "集合中保存字符串等可哈希值；需要固定序列时可先转换为元组。"
+    }
+  ],
+  "exercise": {
+    "goal": "返回一个从日志来源到出现次数的统计字典。",
+    "steps": [
+      "创建空字典 counts",
+      "遍历 entries，并为每条记录读取 source 或 unknown",
+      "以零为默认旧值递增对应来源的计数",
+      "循环结束后返回 counts"
+    ],
+    "acceptance": [
+      "重复来源会累加到同一个字典键",
+      "缺失 source 的记录计入 unknown",
+      "空输入返回空字典"
+    ]
+  },
+  "recap": [
+    "字典用唯一键组织相关值",
+    "get 能在键缺失时返回明确默认值",
+    "集合用于保留唯一且可哈希的元素"
+  ]
+}

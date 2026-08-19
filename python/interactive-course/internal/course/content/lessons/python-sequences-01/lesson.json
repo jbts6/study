@@ -1,0 +1,78 @@
+{
+  "id": "python-sequences-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "列表、元组与切片",
+  "module": {
+    "id": "python-expressions",
+    "title": "Python 表达方式",
+    "order": 1
+  },
+  "order": 3,
+  "objectives": [
+    "区分可变列表和不可变元组",
+    "使用负索引和切片选取最近的日志项",
+    "理解列表赋值、切片复制和别名的差异"
+  ],
+  "prerequisites": ["python-conditions-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-tutorial-basics"],
+  "estimatedMinutes": 70,
+  "explanation": "列表和元组都能按顺序保存多个值，但列表可修改，元组不可修改。索引取得单项，切片取得一个范围并生成新的序列。本节会用负向切片安全地取出最近若干条日志，同时保持原输入不变。",
+  "exerciseGoal": "实现 recent_entries(lines, limit=3)，返回新的最近日志列表；limit 不大于零时返回空列表。",
+  "hints": [
+    "先处理 limit <= 0，避免 -0 与 0 的切片含义相同",
+    "lines[-limit:] 表示从倒数第 limit 项取到末尾",
+    "用 list(...) 保证无论输入是列表还是元组都返回新列表"
+  ],
+  "concepts": [
+    {
+      "title": "可变与不可变序列",
+      "explanation": "列表可以增加、删除或替换元素；元组创建后不能修改。两者都保留元素顺序，也都支持索引和切片。",
+      "analogy": "列表像可编辑的运行队列，元组像已经确认且不再改动的一组配置。",
+      "code": "queue = [\"INFO\", \"WARN\"]\nqueue.append(\"ERROR\")\nlevels = (\"INFO\", \"WARN\", \"ERROR\")"
+    },
+    {
+      "title": "索引与切片",
+      "explanation": "索引从 0 开始并取得一个元素，负索引从末尾计数。切片使用 start:stop 取得一个范围，省略 stop 时一直取到末尾。",
+      "analogy": "索引像指定一条记录的编号，切片像框选一段连续的记录。",
+      "code": "lines = [\"a\", \"b\", \"c\", \"d\"]\nprint(lines[-2:])  # ['c', 'd']"
+    },
+    {
+      "title": "复制与别名",
+      "explanation": "直接赋值列表只会增加一个指向同一列表的名称，一处修改会在另一处看到。切片或 list(...) 会创建独立的新列表。",
+      "analogy": "别名像给同一份日志加第二个快捷方式，复制则得到一份可以独立编辑的副本。",
+      "code": "original = [\"a\", \"b\"]\ncopy = list(original)\ncopy.append(\"c\")\nprint(original)  # ['a', 'b']"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "读取 lines[len(lines)] 时出现 IndexError。",
+      "cause": "有效索引从 0 开始，最后一项索引是 len(lines) - 1。",
+      "fix": "读取最后一项可使用 lines[-1]；读取最近多项则使用切片。"
+    },
+    {
+      "symptom": "修改副本时原始日志列表也发生变化。",
+      "cause": "写成 copy = lines 只创建了别名，没有复制列表。",
+      "fix": "使用 list(lines) 或 lines[:] 创建新列表。"
+    }
+  ],
+  "exercise": {
+    "goal": "返回不超过 limit 条的最近日志，并保持输入序列不变。",
+    "steps": [
+      "当 limit <= 0 时立即返回空列表",
+      "使用负向切片取得末尾最多 limit 项",
+      "把结果转换为新列表后返回"
+    ],
+    "acceptance": [
+      "五项输入在默认 limit 下返回最后三项",
+      "limit 为零或负数时返回空列表",
+      "返回值是新列表，调用后原输入保持不变"
+    ]
+  },
+  "recap": [
+    "列表可变而元组不可变",
+    "负向切片适合选取序列末尾的若干项",
+    "直接赋值产生别名，list(...) 产生新列表"
+  ]
+}

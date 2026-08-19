@@ -1,0 +1,78 @@
+{
+  "id": "python-loops-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "循环、enumerate 与推导式",
+  "module": {
+    "id": "python-expressions",
+    "title": "Python 表达方式",
+    "order": 1
+  },
+  "order": 5,
+  "objectives": [
+    "直接迭代序列中的日志值",
+    "使用 enumerate 为筛选后的记录编号",
+    "用简单列表推导式完成过滤和格式转换"
+  ],
+  "prerequisites": ["python-mappings-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-tutorial-basics"],
+  "estimatedMinutes": 75,
+  "explanation": "for 循环会依次把序列中的值交给循环变量。需要序号时，enumerate 同时提供编号和值；简单列表推导式能紧凑表达“遍历、筛选、转换”。本节先筛出错误日志，再从 1 开始编号。",
+  "exerciseGoal": "实现 number_errors(lines)，只返回包含 ERROR 的日志，并按“序号. 原日志”从 1 开始编号。",
+  "hints": [
+    "先用条件筛选出所有包含 ERROR 的行",
+    "调用 enumerate(errors, start=1) 得到从 1 开始的序号",
+    "用 f-string 把 index、点号和原日志组合起来"
+  ],
+  "concepts": [
+    {
+      "title": "直接迭代",
+      "explanation": "for line in lines 会依次取得每条日志，不需要自己维护索引。直接使用值通常比通过 range 和下标访问更清楚。",
+      "analogy": "像逐条处理传送带上的记录，只关心当前来到面前的那一条。",
+      "code": "for line in lines:\n    if \"ERROR\" in line:\n        print(line)"
+    },
+    {
+      "title": "带序号迭代",
+      "explanation": "enumerate 在迭代值的同时产生序号，start 参数控制起始编号。它避免手动创建并递增计数变量。",
+      "analogy": "像在读取记录时由工具自动盖上连续编号，不必自己维护号码牌。",
+      "code": "for index, line in enumerate(lines, start=1):\n    print(index, line)"
+    },
+    {
+      "title": "简单列表推导式",
+      "explanation": "列表推导式用一行表达生成新列表的遍历、可选筛选和转换。适合没有副作用的简单处理，复杂分支应使用普通循环。",
+      "analogy": "像一条明确的处理流水线：输入每项，保留符合条件的项，再输出转换结果。",
+      "code": "errors = [line for line in lines if \"ERROR\" in line]"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "循环中删除元素后，有些本应处理的日志被跳过。",
+      "cause": "遍历期间修改了同一个列表，元素位置发生变化。",
+      "fix": "遍历原列表并把需要的元素放进新列表，不在当前遍历对象上删除。"
+    },
+    {
+      "symptom": "推导式包含打印、状态更新和多层条件，难以理解或调试。",
+      "cause": "把适合简单值转换的推导式用于了复杂副作用。",
+      "fix": "推导式只保留简单过滤和转换；复杂步骤改用普通 for 循环。"
+    }
+  ],
+  "exercise": {
+    "goal": "筛选错误日志，并按筛选后的顺序从 1 开始编号。",
+    "steps": [
+      "创建只包含 ERROR 行的新列表 errors",
+      "使用 enumerate(errors, start=1) 取得连续编号",
+      "用 f-string 生成编号后的新字符串列表并返回"
+    ],
+    "acceptance": [
+      "普通行不会出现在结果中",
+      "错误行保持原顺序并从 1 开始连续编号",
+      "没有错误行时返回空列表"
+    ]
+  },
+  "recap": [
+    "直接迭代能避免不必要的下标管理",
+    "enumerate 同时提供序号和值",
+    "列表推导式适合清楚、无副作用的简单处理"
+  ]
+}

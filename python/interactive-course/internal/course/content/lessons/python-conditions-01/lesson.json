@@ -1,0 +1,78 @@
+{
+  "id": "python-conditions-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "条件、比较与真值",
+  "module": {
+    "id": "python-expressions",
+    "title": "Python 表达方式",
+    "order": 1
+  },
+  "order": 2,
+  "objectives": [
+    "使用 if、elif 和 else 选择一个执行分支",
+    "用比较和成员运算检查日志内容",
+    "理解空字符串等常见值的真假判断"
+  ],
+  "prerequisites": ["python-values-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-tutorial-basics"],
+  "estimatedMinutes": 60,
+  "explanation": "条件语句让程序根据数据选择行为。Python 会从上到下检查 if 和 elif，执行第一个为真的分支；若都不匹配，再执行 else。本节用这种顺序把日志行归类为 error、warning 或 info。",
+  "exerciseGoal": "实现 classify_level(line)，其中 ERROR 优先于 WARN，其他行返回 info。",
+  "hints": [
+    "用 \"ERROR\" in line 判断错误标记是否出现",
+    "把更高优先级的 ERROR 分支写在 WARN 分支前",
+    "前两个条件都不满足时直接返回 info"
+  ],
+  "concepts": [
+    {
+      "title": "if、elif 与 else",
+      "explanation": "一组 if、elif、else 只会选择一个分支。Python 从上到下检查条件，遇到第一个真条件后便跳过这组语句的其余分支。",
+      "analogy": "像日志分流规则：先命中的规则取得记录，后面的规则不再处理它。",
+      "code": "if level == \"ERROR\":\n    label = \"error\"\nelif level == \"WARN\":\n    label = \"warning\"\nelse:\n    label = \"info\""
+    },
+    {
+      "title": "比较与成员运算",
+      "explanation": "== 比较两个值是否相等，in 检查一个值是否包含在另一个容器中。日志行通常还带有正文，因此用 in 检查标记更合适。",
+      "analogy": "== 像核对整张标签，in 像在一整行记录里寻找关键标记。",
+      "code": "line = \"ERROR timeout\"\nprint(\"ERROR\" in line)  # True"
+    },
+    {
+      "title": "空值的真值",
+      "explanation": "条件会把值解释为真或假。空字符串、空列表和数字 0 为假，非空字符串和非空容器通常为真。",
+      "analogy": "空容器像没有待处理记录的队列，条件判断时表示当前没有内容。",
+      "code": "line = \"\"\nif not line:\n    print(\"empty\")"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "同时含有 WARN 和 ERROR 的日志被归为 warning。",
+      "cause": "WARN 分支写在 ERROR 分支前，先匹配后就不会继续检查。",
+      "fix": "按优先级排列分支，先检查 ERROR，再检查 WARN。"
+    },
+    {
+      "symptom": "条件行出现语法错误，或意外改变了变量。",
+      "cause": "在条件中使用了赋值符号 =，而不是比较符号 ==。",
+      "fix": "需要比较两个值时使用 ==；本练习检查子串时使用 in。"
+    }
+  ],
+  "exercise": {
+    "goal": "根据日志行中的标记返回规范化级别。",
+    "steps": [
+      "先判断 line 是否包含 ERROR，并返回 error",
+      "再判断 line 是否包含 WARN，并返回 warning",
+      "其余情况返回 info"
+    ],
+    "acceptance": [
+      "含 ERROR 的日志返回 error",
+      "只含 WARN 的日志返回 warning",
+      "普通日志返回 info，且 ERROR 比 WARN 优先"
+    ]
+  },
+  "recap": [
+    "条件分支按从上到下的顺序匹配",
+    "in 适合检查日志行是否包含级别标记",
+    "空字符串等空值在条件中为假"
+  ]
+}

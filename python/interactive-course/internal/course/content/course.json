@@ -5,6 +5,26 @@
   "stage": "foundation",
   "lessons": [
     {
+      "id": "python-values-01",
+      "directory": "lessons/python-values-01"
+    },
+    {
+      "id": "python-conditions-01",
+      "directory": "lessons/python-conditions-01"
+    },
+    {
+      "id": "python-sequences-01",
+      "directory": "lessons/python-sequences-01"
+    },
+    {
+      "id": "python-mappings-01",
+      "directory": "lessons/python-mappings-01"
+    },
+    {
+      "id": "python-loops-01",
+      "directory": "lessons/python-loops-01"
+    },
+    {
       "id": "python-functions-01",
       "directory": "lessons/python-functions-01"
     }
