@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateLessonMetadata } from './content-contract.mjs';
 import { Catalog } from './model.mjs';
 
 const DEFAULT_ROOT = fileURLToPath(
@@ -25,7 +26,10 @@ export function loadCourse(contentRoot = DEFAULT_ROOT) {
     seen.add(entry.id);
 
     const lessonRoot = path.join(root, entry.directory);
-    const metadata = readJson(path.join(lessonRoot, 'lesson.json'));
+    const metadata = validateLessonMetadata(
+      readJson(path.join(lessonRoot, 'lesson.json')),
+      entry.id,
+    );
     if (metadata.id !== entry.id) {
       throw new Error('课节 id 与目录声明不一致: ' + entry.id);
     }

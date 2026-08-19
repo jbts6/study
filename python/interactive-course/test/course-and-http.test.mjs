@@ -54,8 +54,18 @@ test('loads the shared route and exposes no hidden Python tests', () => {
     'rust',
   ]);
   assert.equal(publicCourse.lessons.length, 1);
-  assert.equal(publicCourse.lessons[0].id, 'python-functions-01');
-  assert.equal('hiddenTest' in publicCourse.lessons[0], false);
+  const publicLesson = publicCourse.lessons[0];
+  assert.equal(publicLesson.id, 'python-functions-01');
+  assert.deepEqual(publicLesson.module, {
+    id: 'reusable-programs',
+    title: '可复用程序',
+    order: 2,
+  });
+  assert.equal(publicLesson.order, 6);
+  assert.equal(publicLesson.concepts.length, 3);
+  assert.equal(publicLesson.commonMistakes.length, 2);
+  assert.equal(publicLesson.exercise.acceptance.length, 3);
+  assert.equal('hiddenTest' in publicLesson, false);
   assert.match(course.lesson('python-functions-01').hiddenTest, /unittest/);
 });
 

@@ -3,18 +3,77 @@
   "track": "python",
   "stage": "foundation",
   "title": "用函数汇总日志",
+  "module": {
+    "id": "reusable-programs",
+    "title": "可复用程序",
+    "order": 2
+  },
+  "order": 6,
   "objectives": [
     "定义接收列表并返回字典的函数",
-    "使用循环和条件统计错误记录"
+    "使用循环和条件统计错误记录",
+    "用明确的返回值连接后续日志审计步骤"
   ],
-  "prerequisites": [],
+  "prerequisites": ["python-loops-01"],
   "activityTypes": ["guided", "rebuild"],
-  "sourceRefs": ["helsinki-python-parts-2-4"],
-  "estimatedMinutes": 90,
-  "explanation": "把输入、处理和返回值放进函数，避免把逻辑散落在顶层脚本。",
+  "sourceRefs": ["python-docs-functions"],
+  "estimatedMinutes": 75,
+  "explanation": "把输入、处理和返回值放进函数，避免把逻辑散落在顶层脚本。你会从一组日志行生成一个可复用的统计结果，为后面的本地审计器准备清晰的数据接口。",
   "exerciseGoal": "实现 summarize(lines)，返回 total 和 errors 两个计数。",
   "hints": [
     "先创建 total 和 errors 变量",
-    "用字符串是否包含 ERROR 判断错误记录"
+    "用字符串是否包含 ERROR 判断错误记录",
+    "最后返回包含两个键的字典"
+  ],
+  "concepts": [
+    {
+      "title": "函数边界",
+      "explanation": "函数把一段处理逻辑命名为可重复调用的单元，并用参数接收输入。调用者只需要知道参数和返回值，不必重复理解内部循环。",
+      "analogy": "这类似把前端数据转换步骤封装成一个只关心输入和输出的工具函数。",
+      "code": "def summarize(lines):\n    total = len(lines)\n    return {\"total\": total}"
+    },
+    {
+      "title": "局部变量与返回值",
+      "explanation": "函数内部创建的变量默认只在函数执行期间使用。要把计算结果交给调用者，必须通过 return 明确返回，而不是只在函数内更新变量。",
+      "analogy": "局部变量像组件内部的临时状态，return 像组件向外发出的最终数据。",
+      "code": "def count_errors(lines):\n    errors = sum(\"ERROR\" in line for line in lines)\n    return errors"
+    },
+    {
+      "title": "字典结果",
+      "explanation": "当一次计算需要返回多个有关联的值时，可以用字典为每个值命名。这样调用者能通过 result[\"total\"] 和 result[\"errors\"] 清楚地读取结果。",
+      "analogy": "字典结果像接口返回的对象：字段名说明数据含义，比依赖位置的元组更容易扩展。",
+      "code": "def summarize(lines):\n    return {\n        \"total\": len(lines),\n        \"errors\": sum(\"ERROR\" in line for line in lines),\n    }"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "调用 summarize(lines) 得到 None。",
+      "cause": "函数中计算了结果，却忘记使用 return 把结果交给调用者。",
+      "fix": "在函数末尾返回包含 total 和 errors 的字典，并在调用处检查返回值。"
+    },
+    {
+      "symptom": "带有前缀或后缀的错误行没有被统计。",
+      "cause": "只写了 line == \"ERROR\"，把整行等于标记和整行包含标记混为一谈。",
+      "fix": "使用 \"ERROR\" in line；只要日志行包含这个标记，就把它计入 errors。"
+    }
+  ],
+  "exercise": {
+    "goal": "实现 summarize(lines)，返回 total 和 errors 两个计数。",
+    "steps": [
+      "定义接收 lines 参数的 summarize 函数",
+      "用 len(lines) 得到 total",
+      "遍历日志行并统计包含 ERROR 的行",
+      "返回包含 total 和 errors 的字典"
+    ],
+    "acceptance": [
+      "空列表返回 {\"total\": 0, \"errors\": 0}",
+      "普通日志行的 total 等于输入行数",
+      "包含 ERROR 的行计入 errors，即使整行还有其他文字"
+    ]
+  },
+  "recap": [
+    "函数用参数接收输入，用 return 交付结果",
+    "局部变量不会自动成为调用者可见的数据",
+    "用字典返回多个命名统计值，为日志审计器提供稳定接口"
   ]
 }
