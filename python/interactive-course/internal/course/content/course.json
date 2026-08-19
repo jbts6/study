@@ -27,6 +27,18 @@
     {
       "id": "python-functions-01",
       "directory": "lessons/python-functions-01"
+    },
+    {
+      "id": "python-parameters-01",
+      "directory": "lessons/python-parameters-01"
+    },
+    {
+      "id": "python-dataclasses-01",
+      "directory": "lessons/python-dataclasses-01"
+    },
+    {
+      "id": "python-modules-01",
+      "directory": "lessons/python-modules-01"
     }
   ]
 }

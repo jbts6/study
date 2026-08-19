@@ -1,0 +1,79 @@
+{
+  "id": "python-parameters-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "参数、返回值与作用域",
+  "module": {
+    "id": "reusable-programs",
+    "title": "可复用程序",
+    "order": 2
+  },
+  "order": 7,
+  "objectives": [
+    "使用位置参数、关键字参数和默认值配置函数调用",
+    "用仅关键字参数明确布尔选项的含义",
+    "在局部作用域中完成统计并通过返回值交付结果"
+  ],
+  "prerequisites": ["python-functions-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-functions-dataclasses-modules"],
+  "estimatedMinutes": 75,
+  "explanation": "同一个日志统计函数可以用参数适配不同级别和大小写规则，而不必复制多份代码。本节会把日志行、目标级别和匹配方式设计成清晰的函数接口，让本地日志审计器能重复调用并取得独立结果。",
+  "exerciseGoal": "实现 count_level(lines, level=\"ERROR\", *, case_sensitive=False)，返回包含目标级别的日志行数量。",
+  "hints": [
+    "先根据 case_sensitive 决定是否对 level 调用 casefold",
+    "遍历每行时使用相同的大小写规则生成待检查文本",
+    "用 return 返回匹配数量，不要修改函数外的计数器"
+  ],
+  "concepts": [
+    {
+      "title": "位置参数与关键字参数",
+      "explanation": "调用函数时，位置参数按声明顺序传入；关键字参数通过名称说明用途。level 提供默认值后，常见的 ERROR 统计可以省略该参数，其他级别仍能显式指定。",
+      "analogy": "日志审计器像一台可调节的筛选器：日志行是固定输入，level 是可以按名称调整的筛选档位。",
+      "code": "count_level(lines)\ncount_level(lines, \"WARNING\")\ncount_level(lines, level=\"INFO\")"
+    },
+    {
+      "title": "仅关键字参数",
+      "explanation": "参数列表中的星号表示后续参数必须按名称传入。case_sensitive 是布尔选项，写成关键字能让调用处直接表达是否区分大小写，避免看到 True 却不知道它控制什么。",
+      "analogy": "这像在日志审计器面板上标明开关名称，而不是只给一个没有标签的位置。",
+      "code": "def count_level(lines, level=\"ERROR\", *, case_sensitive=False):\n    pass\n\ncount_level(lines, case_sensitive=True)"
+    },
+    {
+      "title": "局部作用域",
+      "explanation": "函数内的 needle 和计数过程属于本次调用的局部作用域，不会污染下一次统计。函数通过 return 把最终数量交给调用者，使不同规则的审计结果可以安全地分别保存。",
+      "analogy": "每次日志审计都有自己的工作台；处理结束后只交出报告，不把临时标记留在公共区域。",
+      "code": "def count_level(lines, level=\"ERROR\"):\n    needle = level.casefold()\n    return sum(needle in line.casefold() for line in lines)"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "函数使用列表作为默认参数时，后一次调用看到了前一次调用留下的内容。",
+      "cause": "可变默认值只在函数定义时创建一次，多次调用会共享同一个列表。",
+      "fix": "把默认值设为 None，并在函数内部为每次调用创建新列表；不可变的字符串和布尔默认值可以直接使用。"
+    },
+    {
+      "symptom": "调用函数后没有返回计数，只能依赖外部变量查看结果。",
+      "cause": "函数修改了 global 或外层计数器，误以为外部状态可以替代明确的返回值。",
+      "fix": "在局部作用域完成计算并 return 数量，让日志审计器从调用结果取得数据。"
+    }
+  ],
+  "exercise": {
+    "goal": "实现可配置日志级别和大小写规则的 count_level 函数。",
+    "steps": [
+      "按指定签名定义函数，并保留 ERROR 和 False 两个默认值",
+      "根据 case_sensitive 统一处理目标级别和每条日志行",
+      "统计包含目标文本的日志行",
+      "返回本次调用的匹配数量"
+    ],
+    "acceptance": [
+      "省略可选参数时，不区分大小写地统计 ERROR",
+      "传入其他 level 时统计对应文本",
+      "case_sensitive=True 时只统计大小写完全匹配的文本"
+    ]
+  },
+  "recap": [
+    "位置参数适合主要输入，关键字参数让可选配置更清楚",
+    "星号后的参数必须按名称传入",
+    "局部计算配合 return 为日志审计器提供互不干扰的统计结果"
+  ]
+}

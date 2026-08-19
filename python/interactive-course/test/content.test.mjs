@@ -15,6 +15,9 @@ const expectedLessonIds = [
   'python-mappings-01',
   'python-loops-01',
   'python-functions-01',
+  'python-parameters-01',
+  'python-dataclasses-01',
+  'python-modules-01',
 ];
 
 test('maps the implemented Python lessons in order', () => {

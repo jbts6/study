@@ -1,0 +1,79 @@
+{
+  "id": "python-dataclasses-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "类型提示与数据类",
+  "module": {
+    "id": "reusable-programs",
+    "title": "可复用程序",
+    "order": 2
+  },
+  "order": 8,
+  "objectives": [
+    "用类型提示说明日志数据的预期形状",
+    "使用 @dataclass 定义结构清晰的日志记录",
+    "通过冻结的数据类保护已经解析的审计记录"
+  ],
+  "prerequisites": ["python-parameters-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-functions-dataclasses-modules"],
+  "estimatedMinutes": 80,
+  "explanation": "日志审计器需要在多个处理步骤之间传递时间、级别和消息。类型提示帮助读者和编辑器理解字段含义，数据类则生成初始化与比较等常用行为；冻结记录还能防止解析后的日志在后续统计中被意外改写。",
+  "exerciseGoal": "定义冻结的 LogEntry 数据类，并实现 make_entry(timestamp, level, message) 清理输入后返回记录。",
+  "hints": [
+    "从 dataclasses 导入 dataclass，并在装饰器中设置 frozen=True",
+    "按 timestamp、level、message 的顺序声明三个 str 字段",
+    "创建记录前对 level 调用 upper，对 message 调用 strip"
+  ],
+  "concepts": [
+    {
+      "title": "类型提示的用途",
+      "explanation": "类型提示记录参数、字段和返回值的预期类型，能改善阅读体验并帮助静态检查工具发现不一致。Python 默认不会仅凭类型提示拒绝运行时传入的其他类型。",
+      "analogy": "类型提示像日志审计器的数据说明书，告诉维护者每个入口预期收到什么，但不会自动成为门禁。",
+      "code": "def normalize_level(level: str) -> str:\n    return level.upper()"
+    },
+    {
+      "title": "@dataclass",
+      "explanation": "dataclass 根据字段声明生成初始化、显示和比较等方法。用字段名表示一条日志的组成部分，比在多个位置依赖字典键或元组下标更清楚。",
+      "analogy": "数据类像日志审计器统一使用的记录表格，每一列都有固定名称和顺序。",
+      "code": "from dataclasses import dataclass\n\n@dataclass\nclass LogEntry:\n    timestamp: str\n    level: str\n    message: str"
+    },
+    {
+      "title": "不可变记录",
+      "explanation": "设置 frozen=True 后，实例创建完成便不能重新给字段赋值。日志解析结果作为事实记录传入筛选和统计步骤时，不可变性可以避免某个步骤意外改掉原始含义。",
+      "analogy": "冻结的数据类像已经盖章的审计条目：后续可以读取和比较，但不能在原件上涂改。",
+      "code": "@dataclass(frozen=True)\nclass LogEntry:\n    timestamp: str\n    level: str\n    message: str"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "给标注为 str 的字段传入数字后，程序仍然创建了实例。",
+      "cause": "把类型提示误认为 Python 自动执行的运行时校验。",
+      "fix": "把类型提示用于说明和静态检查；确实需要运行时限制时，在明确的输入边界主动校验。"
+    },
+    {
+      "symptom": "修改一个实例的列表字段时，另一个实例的字段也跟着变化。",
+      "cause": "多个实例共享了同一个可变默认对象。",
+      "fix": "对列表等可变字段使用 field(default_factory=list)，让每个实例获得独立对象。"
+    }
+  ],
+  "exercise": {
+    "goal": "创建字段明确、不可修改且输入经过清理的 LogEntry。",
+    "steps": [
+      "导入 dataclass 并声明 frozen=True 的 LogEntry",
+      "依次添加 timestamp、level 和 message 三个 str 字段",
+      "定义接收三个输入的 make_entry 函数",
+      "把级别转成大写、去除消息两端空白后返回 LogEntry"
+    ],
+    "acceptance": [
+      "LogEntry 恰好包含 timestamp、level 和 message 三个字段",
+      "创建后的字段不能重新赋值",
+      "make_entry 返回级别大写且消息已去除两端空白的记录"
+    ]
+  },
+  "recap": [
+    "类型提示表达预期类型，但默认不执行运行时校验",
+    "dataclass 用字段声明生成常用的数据对象行为",
+    "冻结的 LogEntry 为日志审计器提供不会被后续步骤改写的记录"
+  ]
+}

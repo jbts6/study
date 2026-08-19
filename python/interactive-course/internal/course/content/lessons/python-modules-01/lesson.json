@@ -1,0 +1,79 @@
+{
+  "id": "python-modules-01",
+  "track": "python",
+  "stage": "foundation",
+  "title": "模块、导入与标准库",
+  "module": {
+    "id": "reusable-programs",
+    "title": "可复用程序",
+    "order": 2
+  },
+  "order": 9,
+  "objectives": [
+    "用模块边界分离日志解析与审计规则",
+    "使用显式导入让依赖来源一目了然",
+    "借助 datetime 标准库解析并比较 ISO 时间"
+  ],
+  "prerequisites": ["python-dataclasses-01"],
+  "activityTypes": ["guided", "rebuild"],
+  "sourceRefs": ["python-docs-functions-dataclasses-modules"],
+  "estimatedMinutes": 70,
+  "explanation": "模块让相关函数放在独立文件中，并通过导入提供给其他代码使用。日志审计器可以把时间解析集中为一个模块，复用标准库 datetime 处理 ISO 时间，避免每个筛选规则都重复拆分字符串。",
+  "exerciseGoal": "实现 parse_timestamp(value) 和 is_at_or_after(value, cutoff)，解析 ISO 时间并判断日志是否达到截止时间。",
+  "hints": [
+    "使用 from datetime import datetime 显式导入所需名称",
+    "先把末尾 Z 替换为 +00:00，再调用 datetime.fromisoformat",
+    "is_at_or_after 应复用 parse_timestamp，并使用大于等于比较"
+  ],
+  "concepts": [
+    {
+      "title": "模块边界",
+      "explanation": "一个 Python 文件就是一个模块。把时间解析放在独立模块后，审计规则只需要调用公开函数，不必知道字符串转换细节，也不会在多处复制相同逻辑。",
+      "analogy": "日志审计器像由多个工位组成的流程，时间模块专门把原始时间转换成后续步骤能比较的对象。",
+      "code": "# time_tools.py\ndef parse_timestamp(value):\n    ...\n\n# audit.py\nfrom time_tools import parse_timestamp"
+    },
+    {
+      "title": "显式导入",
+      "explanation": "显式导入列出当前模块实际依赖的名称，阅读代码时能直接追踪 datetime 来自哪里，也能减少不同模块中同名对象的冲突。",
+      "analogy": "这像审计清单明确写出使用哪件工具，而不是把整个工具箱的内容全部倒进工作台。",
+      "code": "from datetime import datetime\n\nparsed = datetime.fromisoformat(\"2026-08-19T09:00:00+00:00\")"
+    },
+    {
+      "title": "datetime 标准库",
+      "explanation": "datetime.fromisoformat 可以把 ISO 格式文本转换为 datetime 对象。把 Z 规范化为 +00:00 后，结果带有 UTC 时区信息，可以与同样带时区的截止时间可靠比较。",
+      "analogy": "标准库解析像先把不同日志上的时间标签换算成统一刻度，再由审计器判断先后。",
+      "code": "from datetime import datetime\n\nvalue = \"2026-08-19T09:00:00Z\"\nparsed = datetime.fromisoformat(value.replace(\"Z\", \"+00:00\"))"
+    }
+  ],
+  "commonMistakes": [
+    {
+      "symptom": "阅读模块时无法判断某个名称来自哪里，或者导入后意外覆盖了已有名称。",
+      "cause": "使用 from module import * 把模块公开名称全部放进当前命名空间。",
+      "fix": "显式导入需要的名称，例如 from datetime import datetime，保持依赖和命名清晰。"
+    },
+    {
+      "symptom": "导入 datetime 时出现循环导入或找不到标准库中的属性。",
+      "cause": "项目文件命名为 datetime.py，遮蔽了同名标准库模块。",
+      "fix": "为本地模块选择能表达业务职责且不与标准库冲突的名称，例如 time_tools.py。"
+    }
+  ],
+  "exercise": {
+    "goal": "用标准库实现可复用的日志时间解析和截止时间判断。",
+    "steps": [
+      "从 datetime 模块显式导入 datetime",
+      "在 parse_timestamp 中把 Z 替换为 +00:00",
+      "调用 datetime.fromisoformat 返回时间对象",
+      "在 is_at_or_after 中复用解析函数并与 cutoff 做大于等于比较"
+    ],
+    "acceptance": [
+      "末尾为 Z 的时间解析为带 UTC 时区的 datetime",
+      "早于截止时间的日志返回 False",
+      "等于或晚于截止时间的日志返回 True"
+    ]
+  },
+  "recap": [
+    "模块用清晰边界组织可复用代码",
+    "显式导入能说明依赖来源并减少命名冲突",
+    "datetime 标准库为日志审计器提供可靠的时间解析与比较"
+  ]
+}
