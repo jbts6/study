@@ -1,9 +1,35 @@
-# 遍历 world["units"]，选择优先处理的敌人。
-# 敌人全部失能前，请激活 scout-mark。
-# API 速查：
-# world["activeUnitId"] 填入 "actorId"。
-# world["revision"] 填入 "expectedRevision"。
-# world["units"] 提供敌人状态。
-# world["objectives"] 提供 scout-mark 的 cell 和 completed。
-# 返回命令可包含 "movePath": [{"x": 1, "y": 0}]。
-# "action" 可写为 {"type": "guard"}。
+def choose_world_action(world):
+    # 可在命令中加入 "movePath" 和 "action"。
+    step = world["quests"][0]["stepId"]
+    base = {
+        "expectedRevision": world["revision"],
+    }
+    if step == "pick_survey_stake":
+        for obj in world["objects"]:
+            if obj["status"] == "charged":
+                return {**base, "type": "inspect",
+                        "targetId": obj["id"]}
+    if step == "prepare_survey_battle":
+        return {**base, "type": "prepareBattle",
+                "encounterId": "survey_pack"}
+    return {**base, "type": "talk", "targetId": "toma"}
+
+
+def choose_turn(world):
+    mark_done = False
+    for obj in world["objectives"]:
+        if obj["id"] == "scout-mark":
+            mark_done = obj["completed"]
+    weakest = None
+    for unit in world["units"]:
+        is_enemy = unit["team"] == "enemies"
+        if is_enemy and not unit["disabled"]:
+            is_weaker = weakest is None
+            if is_weaker or unit["hp"] < weakest["hp"]:
+                weakest = unit
+    # 先移动并交互，再按 hp 选择目标；这里保留练习空间。
+    return {
+        "actorId": world["activeUnitId"],
+        "expectedRevision": world["revision"],
+        "action": {"type": "wait"},
+    }

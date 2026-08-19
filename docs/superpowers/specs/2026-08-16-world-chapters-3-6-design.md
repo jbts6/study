@@ -34,8 +34,11 @@
 - 战斗覆写：marsh-03 战场 + `hunter-c`（5 血，atk 2，move 1，hunt-player，
   出生 (3,1)），`turnOrder` 加hunter-c，`maxRounds` 按推演调（基线 12）。
 - 强制点：固定目标死后必报错（INVALID_TARGET）；胜法 = 遍历 units 选血量
-  最低的活敌（for + 比较）+ 先激活 scout-mark 再杀最后敌人（引擎次序目
-  标已强制）。
+  最低的活敌（for + 比较）+ 先激活 scout-mark 再杀最后敌人。
+- 前置修复（Task 0）：`settleEncounter` 目前对"phase=won 但非关键目标未
+  完成"仍按胜利结算（次序检查只在 UI 反馈层）。增加引擎级判定：won 但
+  存在未完成的非关键目标 → 按战败分支重置战斗。三至六章的次序目标
+  （scout-mark / seal / node / final-seal）都依赖此判定。
 - 奖励 `renew` → 第四章起双治疗。
 
 ### 第四章 双重封锁（and/or 组合条件）

@@ -99,3 +99,89 @@
 - 实现提交：`47c3d3a`（`feat: settle world campaign encounters`；本补充报告追加后提交哈希随 Git 历史更新）。
 - 未修改通用世界指令 DSL 或协议；未运行全量测试或 `npm run install:local`（按 brief 要求）。
 
+## 本会话 Task 4（Webview）
+
+状态：DONE_WITH_CONCERNS
+
+改动文件：
+- `rpg/src/vscode/webview/manual-state.ts`
+  - 新增 `ManualViewState`、持久化状态和纯迁移函数。
+  - 覆盖 Go revision 0 默认重点、同 revision 恢复、合法 revision 增长回战场、换关重点重置、Python 无参考回战场。
+  - 增加稳定参考 ID 到 `turn-command` / `world` / `actions` 的章节映射。
+- `rpg/src/vscode/webview/manual-state.test.ts`
+  - 新增 8 项状态与引用映射测试。
+- `rpg/src/vscode/webview/render-game.ts`
+  - 保留根节点五段结构；Go 主内容支持战场/战术手册切换。
+  - 增加五章节手册、完整 Go SDK、`manual-entry-<referenceId>` 稳定定位和标题焦点目标。
+  - 反馈区根据 `relatedReferenceIds` 增加本地“查看相关 API”按钮；未改宿主命令协议。
+- `rpg/src/vscode/webview/render-game.test.ts`
+  - 增加 Go 手册、SDK、稳定引用和错误按钮测试；保留 Python 五段布局回归。
+- `rpg/src/vscode/webview/main.ts`
+  - 接入 Webview `getState` / `setState`。
+  - 接入快照状态迁移、视图/章节点击、窄屏/桌面方向键、Enter/Space 激活、错误 API 聚焦。
+
+提交：`ff47349 feat: add Go tactical manual Webview`
+
+TDD 红绿证据：
+- RED 1：`cd rpg && npx vitest run src/vscode/webview/manual-state.test.ts`；失败，`./manual-state` 模块不存在，测试套件 0 项执行。
+- GREEN 1：同一命令；通过，1 个测试文件、8 项测试全部通过。
+- RED 2：`cd rpg && npx vitest run src/vscode/webview/render-game.test.ts`；失败，Go 手册视图标签和本地 API 按钮不存在，11 项中 2 项失败，其余 Python/旧渲染测试通过。
+- GREEN 2：同一命令；通过，1 个测试文件、11 项测试全部通过。
+
+额外验证：
+- `cd rpg && npx vitest run src/vscode/webview/manual-state.test.ts src/vscode/webview/render-game.test.ts`：通过，2 个测试文件、19 项测试全部通过。
+- `cd rpg && npm run typecheck`：通过，`tsc --noEmit` 退出码 0。
+- `cd rpg && npm run build`：通过，Web、扩展和 Webview bundle 均生成；Vite 保留既有大 chunk 警告。
+- `cd rpg && npm run install:local`：通过，VSIX 打包并成功安装本机扩展；`vsce` 报缺少 repository/license 元数据警告，Node 报既有 `url.parse` 弃用警告。
+- `git diff --check`：通过，任务文件无空白错误。
+
+未解决疑点 / concerns：
+- `ManualViewState` 的公开契约不含 `levelId`，因此无 `persistedLevelId` 且传入未标注来源的旧状态时，纯函数只能按简报固定的 `go-marsh-01` 首关约定识别后续关卡；主入口实际通过持久化 `levelId` 判定换关。
+- 本任务简报未要求新增 `main.ts` 专用测试；交互 wiring 已通过类型检查、Webview 构建和状态/渲染契约验证，但未做独立 DOM 事件自动化覆盖。
+- 已安装扩展，但未在当前代理会话中重载 VS Code 窗口并重新打开游戏页面做人工视觉验收；Task 5 仍需完成样式与视口检查。
+
+## Task 4 审查修复（主代理）
+
+审查发现已定位并修复：
+
+- Python 快照没有 `programReference` 时不再显示“查看相关 API”按钮。
+- 战场/手册视图的 tab 始终拥有对应 panel，panel 使用稳定的 `aria-labelledby`；手册章节 panel 关联当前章节 tab。
+- `main.ts` 的 DOM 事件测试覆盖窄屏/桌面方向键、Enter/Space 激活、状态持久化、标题/引用焦点和回合命令协议。
+- `manual-state.ts` 改用显式 `previousLevelId`/`persistedLevelId` 上下文，不再使用隐藏 Symbol 或首关硬编码推断换关。
+- 渲染测试区分战场视图与手册视图，验证五章节只在手册视图出现，并验证视图 panel 关联。
+
+验证：
+
+- `cd rpg && npx vitest run src/vscode/webview/manual-state.test.ts src/vscode/webview/render-game.test.ts src/vscode/webview/main.test.ts`：3 个测试文件、25/25 通过。
+- `cd rpg && npm run typecheck`：通过。
+- `cd rpg && npm run build`：通过。
+- `git diff --check`：通过。
+
+## Sol 复审收口
+
+- 为每个手册章节增加当前 tab `tabIndex === 0`、其余 tab `tabIndex === -1` 的 roving-tabindex 断言。
+- 按职责拆分渲染模块：`render-game.ts` 保留战场/反馈/操作栏（255 行），新增 `render-manual.ts`（146 行）负责视图标签、手册章节和 SDK 条目，新增 `render-elements.ts`（12 行）共享 DOM 工具；没有改变外部渲染接口。
+
+验证：
+
+- `cd rpg && npx vitest run src/vscode/webview/manual-state.test.ts src/vscode/webview/render-game.test.ts src/vscode/webview/main.test.ts`：3 个测试文件、25/25 通过。
+- `cd rpg && npm run typecheck`：通过。
+- `cd rpg && npm run build`：通过。
+- `git diff --check`：通过。
+
+修复提交：待主代理完成 Sol 复审后提交。
+
+## Sol 复审补测
+
+Sol 复审指出主视图方向键和逐章节/完整 SDK 的渲染断言不足，已补充：
+
+- `main.test.ts` 增加主视图 tablist 在窄屏方向键循环断言。
+- `render-game.test.ts` 逐一验证 `focus`、`turn-command`、`world`、`actions`、`sdk` 的选中 tab、`aria-controls` 与 panel `aria-labelledby`。
+- `render-game.test.ts` 在 `sdk` 章节遍历 Go 参考 ID，验证入口、全部类型和动作条目均渲染。
+
+补测验证：
+
+- `cd rpg && npx vitest run src/vscode/webview/manual-state.test.ts src/vscode/webview/render-game.test.ts src/vscode/webview/main.test.ts`：3 个测试文件、25/25 通过。
+- `cd rpg && npm run typecheck`：通过。
+- `cd rpg && npm run build`：通过。
+- `git diff --check`：通过。
