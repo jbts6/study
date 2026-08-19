@@ -1,4 +1,9 @@
 import { createStore } from './store.js';
+import {
+  groupLessons,
+  isLessonUnlocked,
+  renderLessonContent,
+} from './lesson-view.js';
 
 export function createCourseApp(dependencies = {}) {
   return new CourseApp(dependencies);
@@ -76,7 +81,13 @@ class CourseApp {
   }
 
   async runExercise() {
-    if (!this.activeLesson || this.running || typeof this.fetch !== 'function') return;
+    const lessons = this.course?.lessons ?? [];
+    const unlocked = this.activeLesson && isLessonUnlocked(
+      lessons,
+      this.activeLesson.id,
+      this.progress.practiced,
+    );
+    if (!unlocked || this.running || typeof this.fetch !== 'function') return;
     this.saveDraft();
     this.running = true;
     this.lastResult = { status: 'running', stdout: '', stderr: '' };
@@ -137,21 +148,16 @@ class CourseApp {
   renderLessons() {
     const lessons = Array.isArray(this.course?.lessons) ? this.course.lessons : [];
     this.elements.lessonList.replaceChildren();
-    lessons.forEach((lesson, index) => {
-      const item = this.document.createElement('li');
-      const button = this.document.createElement('button');
-      const active = lesson.id === this.activeLesson?.id;
-      button.type = 'button';
-      button.className = 'lesson-link';
-      button.classList.toggle('is-active', active);
-      button.setAttribute('aria-current', active ? 'page' : 'false');
-      button.innerHTML = `
-        <span class="lesson-index">${index + 1}</span>
-        <span class="lesson-name">${escapeHtml(lesson.title)}</span>
-        <span class="lesson-state">${this.progressState(lesson.id)}</span>`;
-      button.addEventListener('click', () => this.selectLesson(lesson));
-      item.append(button);
-      this.elements.lessonList.append(item);
+    groupLessons(lessons).forEach((group) => {
+      const moduleItem = this.document.createElement('li');
+      const title = this.document.createElement('h2');
+      const list = this.document.createElement('ol');
+      moduleItem.className = 'lesson-module';
+      title.className = 'lesson-module-title';
+      title.textContent = group.module.title;
+      group.lessons.forEach((lesson) => list.append(this.createLessonItem(lesson, lessons)));
+      moduleItem.append(title, list);
+      this.elements.lessonList.append(moduleItem);
     });
     if (!lessons.length) {
       const item = this.document.createElement('li');
@@ -159,6 +165,31 @@ class CourseApp {
       item.textContent = this.course ? '暂无可用课节' : '正在载入…';
       this.elements.lessonList.append(item);
     }
+  }
+
+  createLessonItem(lesson, lessons) {
+    const item = this.document.createElement('li');
+    const button = this.document.createElement('button');
+    const active = lesson.id === this.activeLesson?.id;
+    const unlocked = isLessonUnlocked(lessons, lesson.id, this.progress.practiced);
+    const index = this.document.createElement('span');
+    const name = this.document.createElement('span');
+    const state = this.document.createElement('span');
+    button.type = 'button';
+    button.className = 'lesson-link';
+    button.classList.toggle('is-active', active);
+    button.dataset.locked = String(!unlocked);
+    button.setAttribute('aria-current', active ? 'page' : 'false');
+    index.className = 'lesson-index';
+    index.textContent = String(lesson.order ?? lessons.indexOf(lesson) + 1);
+    name.className = 'lesson-name';
+    name.textContent = lesson.title;
+    state.className = 'lesson-state';
+    state.textContent = this.progressState(lesson.id, unlocked);
+    button.append(index, name, state);
+    button.addEventListener('click', () => this.selectLesson(lesson));
+    item.append(button);
+    return item;
   }
 
   selectLesson(lesson) {
@@ -177,43 +208,51 @@ class CourseApp {
         ? '课程暂时无法打开'
         : '正在加载课程内容';
       const message = this.lastResult?.stderr || '正在读取本地课程目录…';
-      this.elements.lessonCopy.innerHTML = emptyState(title, message);
+      this.showEmptyLesson(title, message);
       this.elements.main.setAttribute('aria-busy', requestFailed ? 'false' : 'true');
       return;
     }
     this.elements.main.setAttribute('aria-busy', 'false');
     if (!this.activeLesson) {
-      this.elements.lessonCopy.innerHTML = emptyState(
+      this.showEmptyLesson(
         '暂无可用课节',
         '课程目录为空，请检查本地课程内容文件。',
       );
       return;
     }
-    const lesson = this.activeLesson;
-    const objectives = listItems(lesson.objectives);
-    const hints = listItems(lesson.hints) || '<li>先从函数的输入和返回值开始。</li>';
-    this.elements.lessonCopy.innerHTML = `
-      <div class="lesson-heading">
-        <p class="eyebrow">第 1 课 · ${escapeHtml(lesson.stage || 'foundation')}</p>
-        <h2>${escapeHtml(lesson.title)}</h2>
-        <p class="lesson-goal">${escapeHtml(lesson.exerciseGoal || '')}</p>
-      </div>
-      <div class="lesson-details">
-        <section><h3>本节目标</h3><ul>${objectives}</ul></section>
-        <section><h3>讲解</h3><p>${escapeHtml(lesson.explanation || '')}</p></section>
-        <section>
-          <h3>参考示例</h3>
-          <pre class="example-code"><code>${escapeHtml(lesson.exampleCode || '暂无示例')}</code></pre>
-        </section>
-        <section><h3>提示</h3><ul>${hints}</ul></section>
-      </div>`;
+    this.elements.lessonCopy.innerHTML = renderLessonContent(this.activeLesson);
+  }
+
+  showEmptyLesson(title, message) {
+    const container = this.document.createElement('div');
+    const eyebrow = this.document.createElement('p');
+    const heading = this.document.createElement('h2');
+    const copy = this.document.createElement('p');
+    container.className = 'empty-state';
+    container.setAttribute('role', 'status');
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-atomic', 'true');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = '课程内容';
+    heading.textContent = title;
+    copy.textContent = message;
+    container.append(eyebrow, heading, copy);
+    this.elements.lessonCopy.replaceChildren(container);
   }
 
   renderWorkspace() {
+    const lessons = this.course?.lessons ?? [];
     const ready = Boolean(this.activeLesson);
-    this.elements.editor.disabled = !ready || this.running;
-    this.elements.runButton.disabled = !ready || this.running;
-    this.elements.masteredCheck.disabled = !ready || this.running;
+    const unlocked = ready && isLessonUnlocked(
+      lessons,
+      this.activeLesson.id,
+      this.progress.practiced,
+    );
+    const editable = unlocked && !this.running;
+    this.elements.editor.disabled = !editable;
+    this.elements.runButton.disabled = !editable;
+    this.elements.masteredCheck.disabled = !editable;
+    this.elements.lessonLock.hidden = unlocked || !this.activeLesson;
     if (ready && !this.running) {
       const code = this.progress.drafts[this.activeLesson.id]
         ?? this.activeLesson.starterCode
@@ -254,10 +293,11 @@ class CourseApp {
     this.elements.resultOutput.textContent = output;
   }
 
-  progressState(id) {
+  progressState(id, unlocked) {
+    if (!unlocked) return '锁定：先通过上一节';
     if (this.progress.mastered.includes(id)) return '已掌握';
     if (this.progress.practiced.includes(id)) return '已练习';
-    return '未开始';
+    return '可运行';
   }
 }
 
@@ -272,6 +312,7 @@ function getElements(documentRef) {
     editor: documentRef.querySelector('#code-editor'),
     runButton: documentRef.querySelector('#run-button'),
     masteredCheck: documentRef.querySelector('#mastered-check'),
+    lessonLock: documentRef.querySelector('#lesson-lock'),
     resultStatus: documentRef.querySelector('#result-status'),
     resultOutput: documentRef.querySelector('#result-output'),
   };
@@ -279,14 +320,6 @@ function getElements(documentRef) {
 
 function requestFailure(message) {
   return { status: 'request_failed', stdout: '', stderr: message };
-}
-
-function emptyState(title, message) {
-  return `<div class="empty-state" role="status" aria-live="polite" aria-atomic="true"><p class="eyebrow">课程内容</p><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div>`;
-}
-
-function listItems(values) {
-  return (values ?? []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
 }
 
 function statusMessage(status) {
@@ -304,15 +337,6 @@ function statusMessage(status) {
 
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
 
 if (typeof document !== 'undefined') {

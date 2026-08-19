@@ -1,0 +1,163 @@
+.lesson-module {
+  margin-top: var(--space-4);
+}
+
+.lesson-module-title {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-2);
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.lesson-module ol {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson-link[data-locked="true"] {
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.lesson-link {
+  min-height: 40px;
+}
+
+.lesson-link[data-locked="true"] .lesson-index {
+  background: var(--muted);
+}
+
+.lesson-link[data-locked="true"] .lesson-state {
+  color: var(--warning);
+  font-weight: 700;
+}
+
+.lesson-section {
+  max-width: 1040px;
+  padding: var(--space-6) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.lesson-section > h2 {
+  margin: 0 0 var(--space-3);
+  color: var(--accent-strong);
+  font-size: 1.05rem;
+}
+
+.lesson-section p,
+.lesson-section ul,
+.lesson-section ol {
+  margin: 0;
+}
+
+.lesson-section ul,
+.lesson-section ol {
+  padding-left: 1.35rem;
+}
+
+.lesson-concepts,
+.lesson-mistakes {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.lesson-concept,
+.lesson-mistake {
+  min-width: 0;
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--accent);
+}
+
+.lesson-concept h3,
+.lesson-mistake h3,
+.exercise-columns h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 0.98rem;
+}
+
+.concept-analogy {
+  margin-top: var(--space-3) !important;
+  color: var(--muted);
+}
+
+.lesson-concept .example-code {
+  margin-top: var(--space-3);
+}
+
+.lesson-mistake dl {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+}
+
+.lesson-mistake dl div {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.lesson-mistake dt {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.lesson-mistake dd {
+  margin: 0;
+}
+
+.exercise-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+
+.lesson-hints details,
+.lesson-reference details {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.lesson-hints summary,
+.lesson-reference summary {
+  display: list-item;
+  min-height: 40px;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.lesson-hints summary:focus-visible,
+.lesson-reference summary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.lesson-hints ol,
+.lesson-reference .example-code {
+  margin-top: var(--space-3);
+}
+
+#lesson-lock {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--warning);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .exercise-columns {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+}
