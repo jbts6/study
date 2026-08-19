@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  getLessonProgression,
   groupLessons,
   isLessonUnlocked,
   renderLessonContent,
@@ -52,4 +53,32 @@ test('unlocks only the first lesson and the lesson after a pass', () => {
   assert.equal(isLessonUnlocked(lessons, 'two', []), false);
   assert.equal(isLessonUnlocked(lessons, 'two', ['one']), true);
   assert.equal(isLessonUnlocked(lessons, 'three', ['one']), false);
+});
+
+test('offers the next ordered lesson only after the current lesson passes', () => {
+  const lessons = [
+    { id: 'one', title: '第一课' },
+    { id: 'two', title: '第二课' },
+    { id: 'three', title: '第三课' },
+  ];
+
+  assert.deepEqual(getLessonProgression(lessons, 'one', []), {
+    status: 'pending',
+    nextLesson: null,
+  });
+  assert.deepEqual(getLessonProgression(lessons, 'one', ['one']), {
+    status: 'next',
+    nextLesson: lessons[1],
+  });
+  assert.deepEqual(getLessonProgression(lessons, 'three', ['three']), {
+    status: 'complete',
+    nextLesson: null,
+  });
+});
+
+test('does not advance when the current lesson is missing from the catalog', () => {
+  assert.deepEqual(getLessonProgression([{ id: 'one' }], 'missing', ['missing']), {
+    status: 'pending',
+    nextLesson: null,
+  });
 });

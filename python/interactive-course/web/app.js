@@ -1,5 +1,6 @@
 import { createStore } from './store.js';
 import {
+  getLessonProgression,
   groupLessons,
   isLessonUnlocked,
   renderLessonContent,
@@ -70,6 +71,7 @@ class CourseApp {
       });
     });
     this.elements.runButton.addEventListener('click', () => this.runExercise());
+    this.elements.nextLessonButton.addEventListener('click', () => this.goToNextLesson());
     this.elements.masteredCheck.addEventListener('change', () => {
       if (!this.activeLesson) return;
       const mastered = new Set(this.progress.mastered);
@@ -130,6 +132,17 @@ class CourseApp {
         [this.activeLesson.id]: this.elements.editor.value,
       },
     });
+  }
+
+  goToNextLesson() {
+    const progression = getLessonProgression(
+      this.course?.lessons ?? [],
+      this.activeLesson?.id ?? '',
+      this.progress.practiced,
+    );
+    if (this.running || progression.status !== 'next') return;
+    this.saveDraft();
+    this.selectLesson(progression.nextLesson);
   }
 
   render() {
@@ -198,7 +211,8 @@ class CourseApp {
     this.progress = this.store.save({ ...this.progress, currentLessonId: lesson.id });
     this.lastResult = null;
     this.render();
-    this.elements.main.focus();
+    this.elements.main.focus({ preventScroll: true });
+    this.elements.main.scrollIntoView({ block: 'start' });
   }
 
   renderLessonCopy() {
@@ -249,9 +263,21 @@ class CourseApp {
       this.progress.practiced,
     );
     const editable = unlocked && !this.running;
+    const progression = getLessonProgression(
+      lessons,
+      this.activeLesson?.id ?? '',
+      this.progress.practiced,
+    );
+    const hasNextLesson = progression.status === 'next';
     this.elements.editor.disabled = !editable;
     this.elements.runButton.disabled = !editable;
     this.elements.masteredCheck.disabled = !editable;
+    this.elements.nextLessonButton.hidden = !hasNextLesson;
+    this.elements.nextLessonButton.disabled = this.running || !hasNextLesson;
+    this.elements.nextLessonButton.textContent = hasNextLesson
+      ? `下一课：第 ${progression.nextLesson.order} 课 · ${progression.nextLesson.title}`
+      : '';
+    this.elements.courseComplete.hidden = progression.status !== 'complete';
     this.elements.lessonLock.hidden = unlocked || !this.activeLesson;
     if (ready && !this.running) {
       const code = this.progress.drafts[this.activeLesson.id]
@@ -311,6 +337,8 @@ function getElements(documentRef) {
     lessonCopy: documentRef.querySelector('#lesson-copy'),
     editor: documentRef.querySelector('#code-editor'),
     runButton: documentRef.querySelector('#run-button'),
+    nextLessonButton: documentRef.querySelector('#next-lesson-button'),
+    courseComplete: documentRef.querySelector('#course-complete'),
     masteredCheck: documentRef.querySelector('#mastered-check'),
     lessonLock: documentRef.querySelector('#lesson-lock'),
     resultStatus: documentRef.querySelector('#result-status'),

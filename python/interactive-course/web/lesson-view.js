@@ -16,6 +16,19 @@ export function isLessonUnlocked(lessons, lessonId, practiced = []) {
   return index === 0 || (index > 0 && practiced.includes(lessons[index - 1].id));
 }
 
+export function getLessonProgression(lessons, currentLessonId, practiced) {
+  const lessonList = Array.isArray(lessons) ? lessons : [];
+  const practicedIds = new Set(Array.isArray(practiced) ? practiced : []);
+  const currentIndex = lessonList.findIndex((lesson) => lesson.id === currentLessonId);
+  if (currentIndex < 0 || !practicedIds.has(currentLessonId)) {
+    return { status: 'pending', nextLesson: null };
+  }
+  const nextLesson = lessonList[currentIndex + 1] ?? null;
+  return nextLesson
+    ? { status: 'next', nextLesson }
+    : { status: 'complete', nextLesson: null };
+}
+
 export function renderLessonContent(lesson) {
   return [
     renderHeading(lesson),
