@@ -29,6 +29,12 @@ export function getLessonProgression(lessons, currentLessonId, practiced) {
     : { status: 'complete', nextLesson: null };
 }
 
+export function getScrollAdjustment(containerRect, itemRect) {
+  if (itemRect.top < containerRect.top) return itemRect.top - containerRect.top;
+  if (itemRect.bottom > containerRect.bottom) return itemRect.bottom - containerRect.bottom;
+  return 0;
+}
+
 export function renderLessonContent(lesson) {
   return [
     renderHeading(lesson),

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getLessonProgression,
+  getScrollAdjustment,
   groupLessons,
   isLessonUnlocked,
   renderLessonContent,
@@ -81,4 +82,11 @@ test('does not advance when the current lesson is missing from the catalog', () 
     status: 'pending',
     nextLesson: null,
   });
+});
+
+test('calculates only the scroll needed to reveal the active lesson', () => {
+  const container = { top: 100, bottom: 700 };
+  assert.equal(getScrollAdjustment(container, { top: 180, bottom: 260 }), 0);
+  assert.equal(getScrollAdjustment(container, { top: 60, bottom: 140 }), -40);
+  assert.equal(getScrollAdjustment(container, { top: 680, bottom: 760 }), 60);
 });

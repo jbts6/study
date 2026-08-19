@@ -1,0 +1,110 @@
+/* Course navigation */
+.course-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: calc(100vh - 112px);
+}
+
+.course-layout > nav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: var(--space-8) var(--space-4);
+  border-right: 1px solid var(--border);
+  background: #f7faf8;
+}
+
+.nav-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+
+nav ol {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson-link {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.lesson-link:hover {
+  border-color: var(--border);
+  background: var(--surface);
+  transform: translateX(2px);
+}
+
+.lesson-link.is-active {
+  border-color: #92b8a2;
+  background: #e1eee6;
+}
+
+.lesson-index {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lesson-state {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 720px) {
+  .course-layout {
+    display: block;
+    min-height: 0;
+  }
+
+  .course-layout > nav {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    overscroll-behavior: auto;
+    scrollbar-gutter: auto;
+    padding: var(--space-4) 20px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  nav ol {
+    display: flex;
+    overflow-x: auto;
+    margin-right: -20px;
+    padding-right: 20px;
+  }
+
+  nav li {
+    min-width: 220px;
+  }
+}

@@ -1,6 +1,7 @@
 import { createStore } from './store.js';
 import {
   getLessonProgression,
+  getScrollAdjustment,
   groupLessons,
   isLessonUnlocked,
   renderLessonContent,
@@ -160,6 +161,7 @@ class CourseApp {
 
   renderLessons() {
     const lessons = Array.isArray(this.course?.lessons) ? this.course.lessons : [];
+    const previousScrollTop = this.elements.courseNav.scrollTop;
     this.elements.lessonList.replaceChildren();
     groupLessons(lessons).forEach((group) => {
       const moduleItem = this.document.createElement('li');
@@ -178,6 +180,18 @@ class CourseApp {
       item.textContent = this.course ? '暂无可用课节' : '正在载入…';
       this.elements.lessonList.append(item);
     }
+    this.elements.courseNav.scrollTop = previousScrollTop;
+    this.revealActiveLesson();
+  }
+
+  revealActiveLesson() {
+    const activeLink = this.elements.courseNav.querySelector('.lesson-link.is-active');
+    if (!activeLink) return;
+    const adjustment = getScrollAdjustment(
+      this.elements.courseNav.getBoundingClientRect(),
+      activeLink.getBoundingClientRect(),
+    );
+    this.elements.courseNav.scrollTop += adjustment;
   }
 
   createLessonItem(lesson, lessons) {
@@ -333,6 +347,7 @@ function getElements(documentRef) {
     main: documentRef.querySelector('#course-main'),
     progressSummary: documentRef.querySelector('#progress-summary'),
     courseCount: documentRef.querySelector('#course-count'),
+    courseNav: documentRef.querySelector('#course-nav'),
     lessonList: documentRef.querySelector('#lesson-list'),
     lessonCopy: documentRef.querySelector('#lesson-copy'),
     editor: documentRef.querySelector('#code-editor'),
